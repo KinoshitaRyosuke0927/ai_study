@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocAI - 表示案B：左サイドバー＋詳細パネル型</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans JP', 'Segoe UI', sans-serif; background: #F8FAFC; color: #1E293B; }
+
+/* NAVBAR */
+.navbar { background: #fff; border-bottom: 1px solid #E2E8F0; padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: fixed; top: 0; left: 0; right: 0; z-index: 100; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.navbar-brand { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; color: #3B82F6; }
+.brand-icon { width: 32px; height: 32px; background: linear-gradient(135deg, #3B82F6, #8B5CF6); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 800; }
+.navbar-title { font-size: 15px; color: #64748B; font-weight: 500; }
+.nav-right { display: flex; align-items: center; gap: 16px; }
+.user-badge { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 24px; background: #F1F5F9; }
+.user-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #3B82F6, #8B5CF6); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.user-name { font-size: 14px; color: #374151; font-weight: 500; }
+
+/* PAGE */
+.page { padding-top: 60px; min-height: 100vh; }
+.page-content { max-width: 1300px; margin: 0 auto; padding: 28px 24px; }
+
+/* HEADER */
+.page-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+.back-arrow { font-size: 20px; color: #94A3B8; cursor: pointer; }
+.page-header-title { font-size: 22px; font-weight: 700; color: #1E293B; }
+.status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #D1FAE5; color: #059669; }
+.status-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #059669; }
+
+/* ===== 3カラムレイアウト ===== */
+.three-col { display: grid; grid-template-columns: 220px 1fr 280px; gap: 20px; align-items: start; height: calc(100vh - 160px); }
+
+/* ===== 左：関数リスト ===== */
+.func-list-panel { background: #fff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px #E2E8F0; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
+.func-list-header { padding: 16px 18px; border-bottom: 1px solid #E2E8F0; font-size: 13px; font-weight: 700; color: #64748B; display: flex; flex-direction: column; gap: 8px; }
+.tab-row { display: flex; gap: 4px; }
+.tab-btn { flex: 1; padding: 6px 4px; border: none; background: #F1F5F9; border-radius: 6px; font-size: 11px; font-weight: 600; color: #64748B; cursor: pointer; transition: all 0.2s; }
+.tab-btn.active { background: linear-gradient(135deg, #3B82F6, #6366F1); color: #fff; }
+.func-list-body { overflow-y: auto; padding: 10px 10px; flex: 1; }
+
+/* 関数リストアイテム */
+.func-list-item { padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: all 0.15s; margin-bottom: 4px; border: 1.5px solid transparent; }
+.func-list-item:hover { background: #F0F7FF; }
+.func-list-item.active { background: #EFF6FF; border-color: #BFDBFE; }
+.func-item-name { font-size: 13px; font-weight: 600; color: #1E293B; font-family: 'Courier New', monospace; margin-bottom: 2px; }
+.func-item-name .fn { color: #2563EB; }
+.func-list-item.active .func-item-name .fn { color: #1D4ED8; }
+.func-item-purpose { font-size: 11px; color: #94A3B8; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.func-list-item.active .func-item-purpose { color: #64748B; }
+
+/* インポートパネル */
+.import-panel-body { padding: 10px; }
+.import-mini-item { padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; background: #F8FAFC; border: 1px solid #E2E8F0; }
+.import-mini-name { font-family: 'Courier New', monospace; font-size: 11px; font-weight: 700; color: #1D4ED8; margin-bottom: 3px; }
+.import-mini-desc { font-size: 11px; color: #64748B; line-height: 1.45; }
+
+/* ===== 中央：詳細表示 ===== */
+.detail-panel { background: #fff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px #E2E8F0; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
+.detail-panel-header { padding: 18px 24px; border-bottom: 1px solid #E2E8F0; background: #FAFBFC; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-shrink: 0; }
+.detail-func-sig { font-family: 'Courier New', monospace; font-size: 13px; background: #1E293B; color: #E2E8F0; padding: 10px 16px; border-radius: 8px; line-height: 1.5; }
+.detail-func-sig .fn { color: #7DD3FC; font-weight: 700; }
+.detail-func-sig .arg { color: #FDE68A; }
+.detail-func-sig .ret { color: #86EFAC; }
+.nav-arrows { display: flex; gap: 6px; flex-shrink: 0; }
+.nav-arrow-btn { width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #E2E8F0; background: #fff; color: #64748B; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.nav-arrow-btn:hover { border-color: #3B82F6; color: #3B82F6; background: #EFF6FF; }
+
+.detail-panel-body { padding: 24px; overflow-y: auto; flex: 1; }
+
+/* 詳細パネル内コンテンツ */
+.detail-section { margin-bottom: 24px; }
+.detail-section-title { font-size: 12px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #F1F5F9; display: flex; align-items: center; gap: 6px; }
+.section-icon { width: 16px; height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; }
+.icon-purpose { background: #DBEAFE; color: #2563EB; }
+.icon-input { background: #EDE9FE; color: #7C3AED; }
+.icon-output { background: #D1FAE5; color: #059669; }
+.icon-algo { background: #FEF3C7; color: #D97706; }
+.purpose-text { font-size: 14px; color: #374151; line-height: 1.75; background: #F8FAFC; border-left: 3px solid #3B82F6; padding: 12px 16px; border-radius: 0 8px 8px 0; }
+
+/* パラメータテーブル */
+.param-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.param-table th { padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E2E8F0; background: #F8FAFC; }
+.param-table td { padding: 10px 12px; border-bottom: 1px solid #F1F5F9; vertical-align: top; line-height: 1.5; }
+.param-table tr:last-child td { border-bottom: none; }
+.param-name { font-family: 'Courier New', monospace; font-size: 12px; color: #7C3AED; font-weight: 700; white-space: nowrap; }
+.param-type { font-family: 'Courier New', monospace; font-size: 11px; color: #64748B; }
+.param-desc { font-size: 12px; color: #475569; }
+
+/* アルゴリズムステップ */
+.step-list { list-style: none; }
+.step-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #F8FAFC; }
+.step-item:last-child { border-bottom: none; }
+.step-badge { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, #3B82F6, #6366F1); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.step-text { font-size: 13px; color: #374151; line-height: 1.65; flex: 1; }
+.step-text code { font-family: 'Courier New', monospace; background: #EFF6FF; color: #1D4ED8; padding: 1px 6px; border-radius: 4px; font-size: 12px; border: 1px solid #BFDBFE; }
+
+/* ページネーション */
+.detail-pagination { padding: 12px 24px; border-top: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: space-between; background: #FAFBFC; flex-shrink: 0; }
+.pagination-info { font-size: 12px; color: #94A3B8; }
+.pagination-btns { display: flex; gap: 8px; }
+.pag-btn { padding: 6px 14px; border: 1.5px solid #E2E8F0; background: #fff; border-radius: 8px; font-size: 13px; font-weight: 600; color: #374151; cursor: pointer; transition: all 0.2s; }
+.pag-btn:hover { border-color: #3B82F6; color: #3B82F6; }
+.pag-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ===== 右パネル ===== */
+.right-panel { display: flex; flex-direction: column; gap: 16px; }
+.side-card { background: #fff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px #E2E8F0; overflow: hidden; }
+.side-card-header { padding: 14px 18px; border-bottom: 1px solid #E2E8F0; font-size: 14px; font-weight: 700; color: #1E293B; display: flex; align-items: center; gap: 8px; }
+.side-card-body { padding: 12px 14px; }
+.file-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; background: #F8FAFC; border: 1px solid #E2E8F0; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+.file-item:hover { background: #EFF6FF; border-color: #BFDBFE; }
+.file-ext { font-family: 'Courier New', monospace; font-size: 10px; font-weight: 700; background: #3B82F6; color: #fff; padding: 2px 5px; border-radius: 3px; }
+.file-name { font-size: 13px; color: #1E293B; font-weight: 500; }
+.back-btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px; background: #fff; border: 1.5px solid #E2E8F0; border-radius: 10px; font-size: 14px; font-weight: 600; color: #374151; cursor: pointer; transition: all 0.2s; width: 100%; }
+.back-btn:hover { background: #F8FAFC; }
+
+/* 関数カウント */
+.func-counter { font-size: 11px; color: #94A3B8; font-weight: 600; }
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div class="navbar-brand"><div class="brand-icon">D</div>DocAI</div>
+    <span class="navbar-title">タスク詳細</span>
+  </div>
+  <div class="nav-right">
+    <div class="user-badge"><div class="user-avatar">木</div><span class="user-name">木下 凌介</span></div>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-content">
+    <div class="page-header">
+      <span class="back-arrow">←</span>
+      <div>
+        <div class="page-header-title">すーぱーねね〜ち</div>
+        <div style="margin-top:4px;"><span class="status-badge">翻訳済</span></div>
+      </div>
+    </div>
+
+    <div class="three-col">
+      <!-- 左：関数ナビ -->
+      <div class="func-list-panel">
+        <div class="func-list-header">
+          <div class="tab-row">
+            <button class="tab-btn active" onclick="switchTab('funcs', this)">関数</button>
+            <button class="tab-btn" onclick="switchTab('imports', this)">インポート</button>
+          </div>
+        </div>
+
+        <div id="tab-funcs" class="func-list-body">
+          <div id="fli1" class="func-list-item active" onclick="selectFunc(1)">
+            <div class="func-item-name"><span class="fn">create_new_task</span></div>
+            <div class="func-item-purpose">新たなタスクを作成しDBへ登録</div>
+          </div>
+          <div id="fli2" class="func-list-item" onclick="selectFunc(2)">
+            <div class="func-item-name"><span class="fn">get_task_info</span></div>
+            <div class="func-item-purpose">タスクの状態と表示情報を取得</div>
+          </div>
+          <div id="fli3" class="func-list-item" onclick="selectFunc(3)">
+            <div class="func-item-name"><span class="fn">get_task_detail</span></div>
+            <div class="func-item-purpose">翻訳済み結果ファイルを取得</div>
+          </div>
+          <div id="fli4" class="func-list-item" onclick="selectFunc(4)">
+            <div class="func-item-name"><span class="fn">update_task_name</span></div>
+            <div class="func-item-purpose">既存タスクの名称を更新</div>
+          </div>
+          <div id="fli5" class="func-list-item" onclick="selectFunc(5)">
+            <div class="func-item-name"><span class="fn">delete_task</span></div>
+            <div class="func-item-purpose">タスクと関連データを削除</div>
+          </div>
+          <div id="fli6" class="func-list-item" onclick="selectFunc(6)">
+            <div class="func-item-name"><span class="fn">translate_files</span></div>
+            <div class="func-item-purpose">AI変換をバックグラウンドで実行</div>
+          </div>
+          <div id="fli7" class="func-list-item" onclick="selectFunc(7)">
+            <div class="func-item-name"><span class="fn">async_translate_file</span></div>
+            <div class="func-item-purpose">Azure AIでコード変換・DB登録</div>
+          </div>
+          <div id="fli8" class="func-list-item" onclick="selectFunc(8)">
+            <div class="func-item-name"><span class="fn">generate_display_info</span></div>
+            <div class="func-item-purpose">表示用オブジェクト情報を生成</div>
+          </div>
+        </div>
+
+        <div id="tab-imports" class="import-panel-body" style="display:none; overflow-y:auto; flex:1;">
+          <div class="import-mini-item"><div class="import-mini-name">pandas</div><div class="import-mini-desc">データフレーム操作。DBデータ変換に利用。</div></div>
+          <div class="import-mini-item"><div class="import-mini-name">ResourceNotFoundError</div><div class="import-mini-desc">Azureファイル未存在時の例外処理。</div></div>
+          <div class="import-mini-item"><div class="import-mini-name">azure_ai / files_service</div><div class="import-mini-desc">Azure AI処理・ファイル操作の自作モジュール。</div></div>
+          <div class="import-mini-item"><div class="import-mini-name">common_validate</div><div class="import-mini-desc">データバリデーション処理モジュール。</div></div>
+          <div class="import-mini-item"><div class="import-mini-name">FileShareName / TaskState</div><div class="import-mini-desc">定数定義。ファイル共有名・タスク状態のEnum。</div></div>
+          <div class="import-mini-item"><div class="import-mini-name">db_access_service</div><div class="import-mini-desc">DB統一アクセスモジュール。CRUD提供。</div></div>
+          <div class="import-mini-item"><div class="import-mini-name">BackgroundTasks / File</div><div class="import-mini-desc">FastAPI標準クラス。非同期処理・ファイル制御。</div></div>
+          <div class="import-mini-item"><div class="import-mini-name">TaskDetailResponse</div><div class="import-mini-desc">レスポンスモデル。status/messages/task_detailを保持。</div></div>
+        </div>
+      </div>
+
+      <!-- 中央：詳細 -->
+      <div class="detail-panel">
+        <div class="detail-panel-header">
+          <div style="flex:1;">
+            <div id="funcSig" class="detail-func-sig">def <span class="fn">create_new_task</span>(<span class="arg">task_name: str</span>, <span class="arg">user_id: int</span>) → <span class="ret">TaskDetailResponse</span></div>
+          </div>
+          <div class="nav-arrows">
+            <button class="nav-arrow-btn" onclick="prevFunc()" id="prevBtn" disabled>◀</button>
+            <button class="nav-arrow-btn" onclick="nextFunc()" id="nextBtn">▶</button>
+          </div>
+        </div>
+
+        <div class="detail-panel-body" id="detailBody">
+          <!-- 関数1 -->
+          <div id="func-detail-1">
+            <div class="detail-section">
+              <div class="detail-section-title"><span class="section-icon icon-purpose">目</span>処理目的</div>
+              <div class="purpose-text">新たなタスクを作成し、その内容をデータベースへ登録してレスポンスとして返す。</div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-section-title"><span class="section-icon icon-input">入</span>入力パラメータ</div>
+              <table class="param-table">
+                <thead><tr><th>引数名</th><th>型</th><th>説明</th></tr></thead>
+                <tbody>
+                  <tr><td><span class="param-name">task_name</span></td><td><span class="param-type">str</span></td><td class="param-desc">タスク名称</td></tr>
+                  <tr><td><span class="param-name">user_id</span></td><td><span class="param-type">int</span></td><td class="param-desc">タスクを作成したユーザのID</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="detail-section">
+              <div class="detail-section-title"><span class="section-icon icon-output">出</span>出力</div>
+              <table class="param-table">
+                <thead><tr><th>型</th><th>説明</th></tr></thead>
+                <tbody><tr><td><span class="param-name">TaskDetailResponse</span></td><td class="param-desc">作成したタスクの詳細情報と検証結果メッセージ。</td></tr></tbody>
+              </table>
+            </div>
+            <div class="detail-section">
+              <div class="detail-section-title"><span class="section-icon icon-algo">手</span>アルゴリズム</div>
+              <ol class="step-list">
+                <li class="step-item"><span class="step-badge">1</span><span class="step-text"><code>common_validate.length_validation</code> で名称の長さ（1〜255文字）を検証。</span></li>
+                <li class="step-item"><span class="step-badge">2</span><span class="step-text">エラーがあれば <code>TaskDetailResponse</code> にエラーを格納して返却。</span></li>
+                <li class="step-item"><span class="step-badge">3</span><span class="step-text">DBへ <code>insert_task(task_name, user_id)</code> を実行し、新規レコードを作成。</span></li>
+                <li class="step-item"><span class="step-badge">4</span><span class="step-text">作成結果をDataFrameから辞書に変換。</span></li>
+                <li class="step-item"><span class="step-badge">5</span><span class="step-text">正常完了時はメッセージ空でレスポンス返却。</span></li>
+              </ol>
+            </div>
+          </div>
+          <!-- 関数2 -->
+          <div id="func-detail-2" style="display:none;">
+            <div class="detail-section">
+              <div class="detail-section-title"><span class="section-icon icon-purpose">目</span>処理目的</div>
+              <div class="purpose-text">指定タスクの状態を取得し、タスク詳細および表示用オブジェクト情報を返す。</div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-section-title"><span class="section-icon icon-input">入</span>入力パラメータ</div>
+              <table class="param-table">
+                <thead><tr><th>引数名</th><th>型</th><th>説明</th></tr></thead>
+                <tbody><tr><td><span class="param-name">task_id</span></td><td><span class="param-type">int</span></td><td class="param-desc">照会対象タスクのID</td></tr></tbody>
+              </table>
+            </div>
+            <div class="detail-section">
+              <div class="detail-section-title"><span class="section-icon icon-algo">手</span>アルゴリズム</div>
+              <ol class="step-list">
+                <li class="step-item"><span class="step-badge">1</span><span class="step-text">DBからタスク情報取得 (<code>select_task_by_task_id</code>)。</span></li>
+                <li class="step-item"><span class="step-badge">2</span><span class="step-text">該当なし→「msg-E-0005」メッセージを返す。</span></li>
+                <li class="step-item"><span class="step-badge">3</span><span class="step-text">タスク状態に応じて <code>match</code> 文で処理分岐：<code>DOING</code> / <code>RERUN</code> / <code>DONE</code></span></li>
+                <li class="step-item"><span class="step-badge">4</span><span class="step-text">タスク詳細・メッセージ・表示情報をまとめて返却。</span></li>
+              </ol>
+            </div>
+          </div>
+          <!-- 関数3〜8はスペース削減のため省略 -->
+          <div id="func-detail-3" style="display:none;"><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-purpose">目</span>処理目的</div><div class="purpose-text">翻訳済みタスクの変換結果ファイルを取得して返す。</div></div><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-algo">手</span>アルゴリズム</div><ol class="step-list"><li class="step-item"><span class="step-badge">1</span><span class="step-text"><code>select_task_by_task_id</code> でタスク情報取得。</span></li><li class="step-item"><span class="step-badge">2</span><span class="step-text">該当なし / <code>DONE</code> 以外の場合は「msg-E-0005」返却。</span></li><li class="step-item"><span class="step-badge">3</span><span class="step-text"><code>generate_display_info</code> で結果ファイルを取得。</span></li><li class="step-item"><span class="step-badge">4</span><span class="step-text">タスク詳細・ファイル表示情報をレスポンスにまとめ返却。</span></li></ol></div></div>
+          <div id="func-detail-4" style="display:none;"><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-purpose">目</span>処理目的</div><div class="purpose-text">既存タスクの名称を更新する。</div></div><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-algo">手</span>アルゴリズム</div><ol class="step-list"><li class="step-item"><span class="step-badge">1</span><span class="step-text">名称長さを <code>common_validate.length_validation</code> で確認。</span></li><li class="step-item"><span class="step-badge">2</span><span class="step-text">エラー存在時は即返却。</span></li><li class="step-item"><span class="step-badge">3</span><span class="step-text"><code>update_task_name</code> を実行し結果取得。</span></li><li class="step-item"><span class="step-badge">4</span><span class="step-text">該当レコードなしなら「msg-E-0003」返却。</span></li></ol></div></div>
+          <div id="func-detail-5" style="display:none;"><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-purpose">目</span>処理目的</div><div class="purpose-text">指定タスクおよび関連データ（アップロード・結果ファイル）を削除する。</div></div><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-algo">手</span>アルゴリズム</div><ol class="step-list"><li class="step-item"><span class="step-badge">1</span><span class="step-text"><code>select_task_by_task_id</code> で存在確認。なし→「msg-E-0005」返却。</span></li><li class="step-item"><span class="step-badge">2</span><span class="step-text">実行中(<code>DOING</code>)→「msg-E-0006」返却。</span></li><li class="step-item"><span class="step-badge">3</span><span class="step-text"><code>delete_task</code> により削除実行。失敗→「msg-E-0004」返却。</span></li><li class="step-item"><span class="step-badge">4</span><span class="step-text">関連オブジェクト・結果ファイルも削除。Azureフォルダ削除。</span></li></ol></div></div>
+          <div id="func-detail-6" style="display:none;"><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-purpose">目</span>処理目的</div><div class="purpose-text">アップロードファイルをAI変換処理にかけ、変換をバックグラウンドで実行する。</div></div><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-algo">手</span>アルゴリズム</div><ol class="step-list"><li class="step-item"><span class="step-badge">1</span><span class="step-text">ファイル型オブジェクトのみ抽出 (<code>filter_data</code>)。有効ファイルなし→「msg-E-0009」返却。</span></li><li class="step-item"><span class="step-badge">2</span><span class="step-text">DBからタスク情報取得・存在確認。</span></li><li class="step-item"><span class="step-badge">3</span><span class="step-text"><code>background_tasks.add_task(async_translate_file)</code> で非同期変換処理登録。</span></li><li class="step-item"><span class="step-badge">4</span><span class="step-text">タスク状態を <code>DOING</code> に更新。「msg-I-0002」を追加してレスポンス返却。</span></li></ol></div></div>
+          <div id="func-detail-7" style="display:none;"><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-purpose">目</span>処理目的</div><div class="purpose-text">バックグラウンドでAzure AIを使用してコード変換し、結果をDBとファイル共有に登録する。</div></div><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-algo">手</span>アルゴリズム</div><ol class="step-list"><li class="step-item"><span class="step-badge">1</span><span class="step-text">各ファイルごとに <code>azure_ai_operation_service.translate_code</code> でコード変換。</span></li><li class="step-item"><span class="step-badge">2</span><span class="step-text">変換結果をAzureファイル共有にアップロード。</span></li><li class="step-item"><span class="step-badge">3</span><span class="step-text">変換結果をDB登録。タスク状態を <code>DONE</code> に更新。</span></li><li class="step-item"><span class="step-badge">4</span><span class="step-text">エラー発生時：関連データ削除。タスク状態を <code>RERUN</code> に更新。</span></li></ol></div></div>
+          <div id="func-detail-8" style="display:none;"><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-purpose">目</span>処理目的</div><div class="purpose-text">指定タスクに紐づく表示オブジェクト情報を生成。タスク状態に応じて変換結果を取得または空結果を返す。</div></div><div class="detail-section"><div class="detail-section-title"><span class="section-icon icon-algo">手</span>アルゴリズム</div><ol class="step-list"><li class="step-item"><span class="step-badge">1</span><span class="step-text"><code>DOING</code>：アップロードオブジェクト取得。<code>result_text</code> を空で追加し辞書配列に変換。</span></li><li class="step-item"><span class="step-badge">2</span><span class="step-text"><code>DONE</code>：各ファイルの変換結果をAzureファイル共有から取得して <code>result_text</code> に格納。</span></li><li class="step-item"><span class="step-badge">3</span><span class="step-text">DataFrameを辞書配列に変換して返却。</span></li></ol></div></div>
+        </div>
+
+        <div class="detail-pagination">
+          <span class="pagination-info" id="pageInfo">1 / 8 関数</span>
+          <div class="pagination-btns">
+            <button class="pag-btn" onclick="prevFunc()" id="prevBtn2" disabled>← 前の関数</button>
+            <button class="pag-btn" onclick="nextFunc()" id="nextBtn2">次の関数 →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右パネル -->
+      <div class="right-panel">
+        <div class="side-card">
+          <div class="side-card-header">📁 アップロード一覧</div>
+          <div class="side-card-body">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:10px;">services/</div>
+            <div class="file-item"><span class="file-ext">.py</span><span class="file-name">task_detail_service.py</span></div>
+          </div>
+        </div>
+        <button class="back-btn">← 一覧に戻る</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const sigs = [
+  'def <span class="fn">create_new_task</span>(<span class="arg">task_name: str</span>, <span class="arg">user_id: int</span>) → <span class="ret">TaskDetailResponse</span>',
+  'def <span class="fn">get_task_info</span>(<span class="arg">task_id: int</span>) → <span class="ret">TaskDetailResponse</span>',
+  'def <span class="fn">get_task_detail</span>(<span class="arg">task_id: int</span>) → <span class="ret">TaskDetailResponse</span>',
+  'def <span class="fn">update_task_name</span>(<span class="arg">task_id: int</span>, <span class="arg">task_name: str</span>) → <span class="ret">TaskDetailResponse</span>',
+  'def <span class="fn">delete_task</span>(<span class="arg">task_id: int</span>) → <span class="ret">TaskDetailResponse</span>',
+  'def <span class="fn">translate_files</span>(<span class="arg">target_file_list</span>, <span class="arg">metadata_list</span>, <span class="arg">task_id</span>, <span class="arg">user_id</span>, <span class="arg">background_tasks</span>) → <span class="ret">TaskDetailResponse</span>',
+  'def <span class="fn">async_translate_file</span>(<span class="arg">target_file_df</span>, <span class="arg">upload_file_dict</span>, <span class="arg">task_id</span>, <span class="arg">user_id</span>)',
+  'def <span class="fn">generate_display_info</span>(<span class="arg">task_id: int</span>, <span class="arg">task_state: int</span>) → <span class="ret">list[dict]</span>'
+];
+let cur = 1;
+function selectFunc(n) {
+  document.querySelectorAll('.func-list-item').forEach((el,i) => el.classList.toggle('active', i+1===n));
+  for(let i=1;i<=8;i++) document.getElementById('func-detail-'+i).style.display = i===n ? '' : 'none';
+  document.getElementById('funcSig').innerHTML = sigs[n-1];
+  document.getElementById('pageInfo').textContent = n + ' / 8 関数';
+  document.getElementById('prevBtn').disabled = document.getElementById('prevBtn2').disabled = n===1;
+  document.getElementById('nextBtn').disabled = document.getElementById('nextBtn2').disabled = n===8;
+  cur = n;
+}
+function prevFunc() { if(cur>1) selectFunc(cur-1); }
+function nextFunc() { if(cur<8) selectFunc(cur+1); }
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-funcs').style.display = tab==='funcs' ? '' : 'none';
+  document.getElementById('tab-imports').style.display = tab==='imports' ? '' : 'none';
+}
+</script>
+</body>
+</html>

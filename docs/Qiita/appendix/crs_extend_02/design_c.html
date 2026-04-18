@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocAI - 案C: ナチュラル・アクセシブル</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #FAFAF7;
+    --surface: #FFFFFF;
+    --surface2: #F5F4EF;
+    --border: #E8E6DF;
+    --text-primary: #2D2926;
+    --text-secondary: #6B6560;
+    --text-muted: #9B978F;
+    --accent: #2E7D52;
+    --accent-light: #E8F5EE;
+    --accent2: #1565C0;
+    --accent2-light: #E3F0FF;
+    --warn: #C17B29;
+    --warn-light: #FEF3E2;
+    --error: #C0392B;
+    --error-light: #FDECEA;
+    --purple: #7B3FA0;
+    --purple-light: #F3E8FF;
+  }
+  body { font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif; background: var(--bg); color: var(--text-primary); min-height: 100vh; font-size: 15px; line-height: 1.6; }
+
+  /* SKIP LINK (accessibility) */
+  .skip-link { position: absolute; top: -100px; left: 8px; padding: 8px 16px; background: var(--accent); color: #fff; border-radius: 4px; text-decoration: none; font-size: 13px; z-index: 999; transition: top 0.2s; }
+  .skip-link:focus { top: 8px; }
+
+  /* NAVBAR */
+  .navbar {
+    background: var(--surface); border-bottom: 2px solid var(--border);
+    padding: 0 40px; height: 64px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 36px; height: 36px; background: var(--accent); border-radius: 10px;
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 900; letter-spacing: -1px;
+  }
+  .brand-name { font-size: 20px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; }
+  .brand-divider { width: 1px; height: 20px; background: var(--border); }
+  .page-title { font-size: 14px; color: var(--text-muted); font-weight: 500; }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .user-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 14px 7px 8px; background: var(--surface2);
+    border: 1.5px solid var(--border); border-radius: 30px; cursor: pointer; transition: border-color 0.2s;
+  }
+  .user-pill:hover { border-color: var(--accent); }
+  .user-av {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .user-nm { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+  .logout-ico { background: transparent; border: 1.5px solid var(--border); color: var(--text-muted); width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+  .logout-ico:hover { background: var(--error-light); border-color: var(--error); color: var(--error); }
+
+  /* PAGES */
+  .page { display: none; padding-top: 64px; min-height: 100vh; }
+  .page.active { display: block; }
+
+  /* ===== LOGIN ===== */
+  .login-outer {
+    min-height: calc(100vh - 64px); display: flex; align-items: center; justify-content: center;
+    padding: 40px 20px;
+    background: linear-gradient(160deg, #F0F7F3 0%, #FAFAF7 40%, #EFF4FB 100%);
+  }
+  .login-box {
+    width: 100%; max-width: 440px;
+    background: var(--surface); border-radius: 20px;
+    border: 1.5px solid var(--border);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
+    overflow: hidden;
+  }
+  .login-top { background: var(--accent); padding: 32px; text-align: center; }
+  .login-top-icon { font-size: 36px; margin-bottom: 8px; }
+  .login-top-title { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+  .login-top-sub { font-size: 13px; color: rgba(255,255,255,0.75); }
+  .login-form { padding: 32px; }
+  .field { margin-bottom: 20px; }
+  .field-label { display: block; font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; }
+  .field-input {
+    width: 100%; padding: 12px 14px; background: var(--surface2);
+    border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 14px; color: var(--text-primary); outline: none; transition: all 0.2s;
+  }
+  .field-input:focus { background: var(--surface); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(46,125,82,0.12); }
+  .field-input::placeholder { color: var(--text-muted); }
+  .login-submit {
+    width: 100%; padding: 14px; background: var(--accent); color: #fff;
+    border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(46,125,82,0.25);
+  }
+  .login-submit:hover { background: #245F3F; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(46,125,82,0.35); }
+  .login-submit:focus-visible { outline: 3px solid #245F3F; outline-offset: 2px; }
+
+  /* ===== LIST ===== */
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 36px 28px; }
+  .new-task-block {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px;
+    padding: 28px 32px; margin-bottom: 36px;
+    border-left: 4px solid var(--accent);
+  }
+  .nt-title { font-size: 17px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
+  .nt-hint { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+  .nt-row { display: flex; gap: 10px; }
+  .nt-input {
+    flex: 1; padding: 12px 16px; border: 1.5px solid var(--border);
+    border-radius: 10px; font-size: 14px; background: var(--surface2); outline: none; transition: all 0.2s;
+  }
+  .nt-input:focus { background: var(--surface); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(46,125,82,0.12); }
+  .nt-input::placeholder { color: var(--text-muted); }
+  .nt-btn {
+    padding: 12px 22px; background: var(--accent); color: #fff;
+    border: none; border-radius: 10px; font-size: 14px; font-weight: 700;
+    cursor: pointer; white-space: nowrap; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+  }
+  .nt-btn:hover { background: #245F3F; }
+
+  .hist-header { font-size: 16px; font-weight: 800; color: var(--text-primary); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .hist-header svg { color: var(--text-muted); }
+  .count-badge { background: var(--surface2); border: 1px solid var(--border); padding: 2px 10px; border-radius: 12px; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+  .task-grid { display: flex; flex-direction: column; gap: 10px; }
+  .task-row {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px;
+    padding: 16px 20px; display: flex; align-items: center; gap: 16px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .task-row:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(0,0,0,0.06); transform: translateX(2px); }
+  .task-row-name { font-size: 15px; font-weight: 700; color: var(--text-primary); flex: 1; }
+  .task-row-date { font-size: 12px; color: var(--text-muted); }
+  .task-row-arrow { color: var(--text-muted); font-size: 14px; }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    white-space: nowrap;
+  }
+  .sp-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .sp-translating { background: var(--warn-light); color: var(--warn); }
+  .sp-translating .sp-dot { background: var(--warn); animation: pulse2 1.5s infinite; }
+  .sp-done { background: var(--accent-light); color: var(--accent); }
+  .sp-done .sp-dot { background: var(--accent); }
+  .sp-preparing { background: var(--purple-light); color: var(--purple); }
+  .sp-preparing .sp-dot { background: var(--purple); animation: pulse2 1.5s infinite; }
+  .sp-reviewing { background: var(--accent2-light); color: var(--accent2); }
+  .sp-reviewing .sp-dot { background: var(--accent2); }
+  @keyframes pulse2 { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+  /* ===== DETAIL ===== */
+  .breadcrumb-nav { display: flex; align-items: center; gap: 6px; margin-bottom: 20px; font-size: 13px; color: var(--text-muted); }
+  .bc-link { cursor: pointer; color: var(--accent); font-weight: 600; text-decoration: underline; }
+  .bc-sep { color: var(--border); }
+  .detail-h { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  .detail-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+  .d-panel { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .d-panel-head { background: var(--surface2); padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .d-ph-icon { font-size: 16px; }
+  .d-ph-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+  .d-panel-body { padding: 20px; max-height: 580px; overflow-y: auto; }
+  .section-sep { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .token-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; padding: 14px 16px; background: var(--surface2); border-radius: 10px; border: 1px solid var(--border); }
+  .token-name { font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; color: var(--accent2); }
+  .token-explain { font-size: 13px; color: var(--text-secondary); line-height: 1.65; }
+  .token-explain code { background: var(--border); padding: 1px 5px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 12px; color: var(--text-primary); }
+  .func-card-c { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+  .func-sig-c { font-family: 'Courier New', monospace; font-size: 12px; background: var(--text-primary); color: #A8FF78; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; line-height: 1.5; }
+  .func-purpose-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .func-purpose-text { font-size: 13px; color: var(--text-secondary); line-height: 1.65; }
+  .func-purpose-text strong { color: var(--text-primary); }
+  .file-card {
+    display: flex; align-items: center; gap: 10px;
+    padding: 13px 14px; background: var(--surface2); border-radius: 10px;
+    border: 1.5px solid var(--border); cursor: pointer; transition: all 0.2s;
+  }
+  .file-card:hover { background: var(--accent-light); border-color: var(--accent); }
+  .file-ext { font-family: 'Courier New', monospace; font-size: 11px; font-weight: 700; background: var(--accent); color: #fff; padding: 2px 6px; border-radius: 4px; }
+  .file-nm { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+  .back-c { display: flex; align-items: center; gap: 6px; margin-top: 14px; padding: 12px 18px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; width: 100%; justify-content: center; }
+  .back-c:hover { background: var(--surface); border-color: var(--text-secondary); }
+  
+  /* FOCUS VISIBLE */
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">コンテンツへスキップ</a>
+
+<!-- NAVBAR -->
+<nav class="navbar" role="navigation" aria-label="メインナビゲーション">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">D</div>
+    <span class="brand-name">DocAI</span>
+    <div class="brand-divider" aria-hidden="true"></div>
+    <span class="page-title" id="pageTitle">ログイン</span>
+  </div>
+  <div class="nav-right" id="navRight" style="display:none;">
+    <div class="user-pill" role="button" tabindex="0">
+      <div class="user-av" aria-hidden="true">木</div>
+      <span class="user-nm">木下 凌介</span>
+    </div>
+    <button class="logout-ico" onclick="showPage('login')" aria-label="ログアウト">⏻</button>
+  </div>
+</nav>
+
+<!-- LOGIN -->
+<main id="main-content">
+<div class="page active" id="page-login">
+  <div class="login-outer">
+    <div class="login-box" role="main">
+      <div class="login-top">
+        <div class="login-top-icon" aria-hidden="true">📄</div>
+        <div class="login-top-title">DocAI</div>
+        <div class="login-top-sub">Pythonコードを自然言語に翻訳するAIツール</div>
+      </div>
+      <div class="login-form">
+        <div class="field">
+          <label class="field-label" for="email">メールアドレス</label>
+          <input id="email" type="email" class="field-input" placeholder="your@email.com" autocomplete="email">
+        </div>
+        <div class="field">
+          <label class="field-label" for="pw">パスワード</label>
+          <input id="pw" type="password" class="field-input" placeholder="パスワードを入力" autocomplete="current-password">
+        </div>
+        <button class="login-submit" onclick="showPage('list')">ログイン</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LIST -->
+<div class="page" id="page-list">
+  <div class="wrap">
+    <section class="new-task-block" aria-label="新しいレビューを開始">
+      <div class="nt-title">📝 新しいレビューを開始する</div>
+      <div class="nt-hint">タスクに名前を付けて、レビューを始めましょう</div>
+      <div class="nt-row">
+        <label class="sr-only" for="taskname">タスク名</label>
+        <input id="taskname" class="nt-input" placeholder="例: レビュー対象ファイル名、レビューの種別など">
+        <button class="nt-btn" onclick="showPage('detail')">▶ レビューを開始する</button>
+      </div>
+    </section>
+    <section aria-label="過去のレビュー一覧">
+      <div class="hist-header">
+        過去のレビュー
+        <span class="count-badge">5件</span>
+      </div>
+      <div class="task-grid" role="list">
+        <div class="task-row" role="listitem" onclick="showPage('detail')" tabindex="0">
+          <span class="task-row-name">大伴ミナ</span>
+          <span class="status-pill sp-translating"><span class="sp-dot"></span>翻訳中</span>
+          <span class="task-row-date">2026/01/14 09:17</span>
+          <span class="task-row-arrow">›</span>
+        </div>
+        <div class="task-row" role="listitem" onclick="showPage('detail')" tabindex="0">
+          <span class="task-row-name">ぽうぽうぽうぽう</span>
+          <span class="status-pill sp-done"><span class="sp-dot"></span>翻訳済</span>
+          <span class="task-row-date">2026/02/19 02:22</span>
+          <span class="task-row-arrow">›</span>
+        </div>
+        <div class="task-row" role="listitem" onclick="showPage('detail')" tabindex="0">
+          <span class="task-row-name">さくらみこ</span>
+          <span class="status-pill sp-preparing"><span class="sp-dot"></span>準備中</span>
+          <span class="task-row-date">2026/03/03 01:44</span>
+          <span class="task-row-arrow">›</span>
+        </div>
+        <div class="task-row" role="listitem" onclick="showPage('detail')" tabindex="0">
+          <span class="task-row-name">星街すいせい</span>
+          <span class="status-pill sp-translating"><span class="sp-dot"></span>翻訳中</span>
+          <span class="task-row-date">2026/03/05 01:32</span>
+          <span class="task-row-arrow">›</span>
+        </div>
+        <div class="task-row" role="listitem" onclick="showPage('detail')" tabindex="0">
+          <span class="task-row-name">ふぶにゃ</span>
+          <span class="status-pill sp-reviewing"><span class="sp-dot"></span>審査中</span>
+          <span class="task-row-date">2026/03/05 01:32</span>
+          <span class="task-row-arrow">›</span>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- DETAIL -->
+<div class="page" id="page-detail">
+  <div class="wrap">
+    <nav class="breadcrumb-nav" aria-label="パンくずリスト">
+      <span class="bc-link" onclick="showPage('list')">タスク一覧</span>
+      <span class="bc-sep" aria-hidden="true">›</span>
+      <span>星街すいせい</span>
+    </nav>
+    <div class="detail-h">星街すいせい</div>
+    <div class="detail-meta">
+      <span class="status-pill sp-translating"><span class="sp-dot"></span>翻訳中</span>
+      <span style="font-size:13px;color:var(--text-muted);">最終更新: 2026/03/05 01:32:44</span>
+    </div>
+    <div class="detail-grid">
+      <div class="d-panel">
+        <div class="d-panel-head">
+          <span class="d-ph-icon">🔍</span>
+          <span class="d-ph-title">コード解析結果</span>
+        </div>
+        <div class="d-panel-body">
+          <div class="section-sep">定数・インポート</div>
+          <div class="token-row">
+            <span class="token-name">bcrypt</span>
+            <p class="token-explain">パスワードのハッシュ化および照合を行うライブラリ。<code>checkpw()</code> 関数でハッシュと平文パスワードを比較できる。</p>
+          </div>
+          <div class="token-row">
+            <span class="token-name">db_access_service</span>
+            <p class="token-explain">データベースへのアクセスを担うモジュール。ユーザー情報取得やメッセージ処理などの関数を提供する。</p>
+          </div>
+          <div class="token-row">
+            <span class="token-name">LoginResponse</span>
+            <p class="token-explain">ログイン処理の結果を表すレスポンスモデル。ステータス、メッセージ、ユーザーID、ユーザー名などを属性として持つ。</p>
+          </div>
+          <div class="section-sep" style="margin-top:24px;">関数</div>
+          <div class="func-card-c">
+            <div class="func-sig-c">login(mail_address: str, password: str) → LoginResponse</div>
+            <div class="func-purpose-label">処理目的</div>
+            <p class="func-purpose-text">指定されたメールアドレスとパスワードを用いて認証を行い、その結果を <strong>LoginResponse</strong> オブジェクトとして返す。</p>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="d-panel">
+          <div class="d-panel-head">
+            <span class="d-ph-icon">📁</span>
+            <span class="d-ph-title">アップロードファイル</span>
+          </div>
+          <div class="d-panel-body" style="padding:14px;">
+            <div class="file-card">
+              <span class="file-ext">.py</span>
+              <span class="file-nm">login_service.py</span>
+            </div>
+          </div>
+        </div>
+        <button class="back-c" onclick="showPage('list')">← 一覧に戻る</button>
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+
+<script>
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  const t = { login:'ログイン', list:'タスク一覧', detail:'タスク詳細' };
+  document.getElementById('pageTitle').textContent = t[page];
+  document.getElementById('navRight').style.display = page === 'login' ? 'none' : 'flex';
+}
+</script>
+</body>
+</html>

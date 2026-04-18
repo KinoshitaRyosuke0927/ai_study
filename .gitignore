@@ -29,3 +29,6 @@ node_modules/
 # 004_play_role データ・設定
 004_play_role/data/
 004_play_role/reviewers.csv
+
+# シークレットが含まれるファイル
+docs/Qiita/appendix/crs_extend_01/project_codes.json

@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocAI - 表示案A：アコーディオン型</title>
+<style>
+/* ===== BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans JP', 'Segoe UI', sans-serif; background: #F8FAFC; color: #1E293B; }
+
+/* ===== NAVBAR ===== */
+.navbar {
+  background: #fff; border-bottom: 1px solid #E2E8F0;
+  padding: 0 32px; height: 60px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.navbar-brand { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; color: #3B82F6; }
+.brand-icon { width: 32px; height: 32px; background: linear-gradient(135deg, #3B82F6, #8B5CF6); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 800; }
+.navbar-title { font-size: 15px; color: #64748B; font-weight: 500; }
+.nav-right { display: flex; align-items: center; gap: 16px; }
+.user-badge { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 24px; background: #F1F5F9; }
+.user-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #3B82F6, #8B5CF6); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.user-name { font-size: 14px; color: #374151; font-weight: 500; }
+
+/* ===== LAYOUT ===== */
+.page { padding-top: 60px; min-height: 100vh; }
+.page-content { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+/* ===== PAGE HEADER ===== */
+.page-header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+.back-arrow { font-size: 20px; color: #94A3B8; cursor: pointer; transition: color 0.2s; text-decoration: none; }
+.back-arrow:hover { color: #374151; }
+.page-header-title { font-size: 22px; font-weight: 700; color: #1E293B; }
+.status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #D1FAE5; color: #059669; }
+.status-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #059669; }
+
+/* ===== MAIN LAYOUT ===== */
+.detail-layout { display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
+
+/* ===== RESULT CARD ===== */
+.result-card { background: #fff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px #E2E8F0; overflow: hidden; }
+.result-card-header { padding: 18px 24px; border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: space-between; }
+.result-card-title { font-size: 15px; font-weight: 700; color: #1E293B; display: flex; align-items: center; gap: 8px; }
+.func-count { font-size: 12px; color: #94A3B8; background: #F1F5F9; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.expand-all-btn { font-size: 12px; color: #3B82F6; cursor: pointer; background: none; border: none; font-weight: 600; padding: 4px 8px; border-radius: 6px; transition: background 0.2s; }
+.expand-all-btn:hover { background: #EFF6FF; }
+
+/* ===== IMPORTS SECTION ===== */
+.imports-section { padding: 20px 24px; border-bottom: 2px solid #F1F5F9; }
+.section-label { font-size: 11px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; }
+.module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.module-item { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; }
+.module-name { font-family: 'Courier New', monospace; font-size: 12px; font-weight: 700; color: #1D4ED8; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 5px; padding: 2px 7px; display: inline-block; margin-bottom: 6px; }
+.module-desc { font-size: 12px; color: #475569; line-height: 1.55; }
+
+/* ===== FUNCTIONS SECTION ===== */
+.functions-section { padding: 20px 24px; }
+
+/* アコーディオン */
+.accordion-item { border: 1px solid #E2E8F0; border-radius: 12px; margin-bottom: 10px; overflow: hidden; transition: box-shadow 0.2s; }
+.accordion-item.open { box-shadow: 0 4px 12px rgba(59,130,246,0.10); border-color: #BFDBFE; }
+.accordion-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px; cursor: pointer; background: #FAFBFC;
+  transition: background 0.15s; user-select: none;
+}
+.accordion-header:hover { background: #F0F7FF; }
+.accordion-item.open .accordion-header { background: #EFF6FF; }
+.func-index { width: 22px; height: 22px; border-radius: 50%; background: #E2E8F0; color: #64748B; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+.accordion-item.open .func-index { background: #3B82F6; color: #fff; }
+.func-sig-preview { font-family: 'Courier New', monospace; font-size: 12px; color: #1E293B; flex: 1; }
+.func-sig-preview .fn-name { color: #2563EB; font-weight: 700; }
+.func-sig-preview .fn-args { color: #7C3AED; }
+.func-sig-preview .fn-ret { color: #059669; }
+.accordion-chevron { font-size: 14px; color: #94A3B8; transition: transform 0.25s; flex-shrink: 0; }
+.accordion-item.open .accordion-chevron { transform: rotate(180deg); color: #3B82F6; }
+
+.accordion-body { display: none; padding: 0 18px 18px; }
+.accordion-item.open .accordion-body { display: block; }
+
+/* アコーディオン内コンテンツ */
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.detail-box { background: #F8FAFC; border-radius: 8px; padding: 12px 14px; border: 1px solid #E2E8F0; }
+.detail-box-label { font-size: 11px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+.detail-box-label .dot { width: 6px; height: 6px; border-radius: 50%; }
+.dot-input { background: #7C3AED; }
+.dot-output { background: #059669; }
+.dot-purpose { background: #3B82F6; }
+.dot-algo { background: #D97706; }
+.param-list { list-style: none; }
+.param-list li { font-size: 12px; color: #475569; line-height: 1.6; padding: 2px 0; }
+.param-list li code { font-family: 'Courier New', monospace; background: #EFF6FF; color: #1D4ED8; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+.purpose-text { font-size: 12px; color: #475569; line-height: 1.65; }
+
+/* アルゴリズムステップ */
+.algo-full { grid-column: 1 / -1; }
+.algo-steps { list-style: none; }
+.algo-step { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; font-size: 12px; color: #475569; line-height: 1.6; }
+.step-num { width: 20px; height: 20px; border-radius: 50%; background: linear-gradient(135deg, #3B82F6, #6366F1); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.algo-step code { font-family: 'Courier New', monospace; background: #EFF6FF; color: #1D4ED8; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+
+/* ===== RIGHT PANEL ===== */
+.right-panel { display: flex; flex-direction: column; gap: 16px; }
+.side-card { background: #fff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px #E2E8F0; overflow: hidden; }
+.side-card-header { padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #1E293B; }
+.side-card-body { padding: 14px 16px; }
+.file-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; background: #F8FAFC; border: 1px solid #E2E8F0; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+.file-item:hover { background: #EFF6FF; border-color: #BFDBFE; }
+.file-item:last-child { margin-bottom: 0; }
+.file-ext { font-family: 'Courier New', monospace; font-size: 10px; font-weight: 700; background: #3B82F6; color: #fff; padding: 2px 5px; border-radius: 3px; }
+.file-name { font-size: 13px; color: #1E293B; font-weight: 500; }
+.back-btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px; background: #fff; border: 1.5px solid #E2E8F0; border-radius: 10px; font-size: 14px; font-weight: 600; color: #374151; cursor: pointer; transition: all 0.2s; width: 100%; }
+.back-btn:hover { background: #F8FAFC; border-color: #CBD5E1; }
+
+/* ===== LABEL TAG ===== */
+.label-info { display: inline-block; background: #FEF3C7; color: #D97706; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div class="navbar-brand"><div class="brand-icon">D</div>DocAI</div>
+    <span class="navbar-title">タスク詳細</span>
+  </div>
+  <div class="nav-right">
+    <div class="user-badge"><div class="user-avatar">木</div><span class="user-name">木下 凌介</span></div>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-content">
+    <div class="page-header">
+      <a class="back-arrow">←</a>
+      <div>
+        <div class="page-header-title">すーぱーねね〜ち</div>
+        <div style="margin-top:4px;"><span class="status-badge">翻訳済</span></div>
+      </div>
+    </div>
+
+    <div class="detail-layout">
+      <!-- 左：解析結果 -->
+      <div class="result-card">
+        <div class="result-card-header">
+          <div class="result-card-title">
+            📋 コード解析結果
+            <span class="func-count">関数 8件</span>
+          </div>
+          <button class="expand-all-btn" onclick="toggleAll()">すべて展開 ▾</button>
+        </div>
+
+        <!-- インポート -->
+        <div class="imports-section">
+          <div class="section-label">定数・インポート</div>
+          <div class="module-grid">
+            <div class="module-item"><span class="module-name">pandas</span><p class="module-desc">データフレーム操作。DBから取得したデータの変換に利用。</p></div>
+            <div class="module-item"><span class="module-name">ResourceNotFoundError</span><p class="module-desc">Azureファイル操作時のファイル未存在例外処理。</p></div>
+            <div class="module-item"><span class="module-name">azure_ai_operation_service</span><p class="module-desc">Azure上のAI処理・ファイル操作を提供する自作モジュール。</p></div>
+            <div class="module-item"><span class="module-name">common_validate</span><p class="module-desc">データバリデーション処理。文字長・ファイル内容の検証。</p></div>
+            <div class="module-item"><span class="module-name">FileShareName / TaskState</span><p class="module-desc">定数定義。ファイル共有名やタスク状態を示すEnum的変数。</p></div>
+            <div class="module-item"><span class="module-name">db_access_service</span><p class="module-desc">DBアクセス統一モジュール。CRUD操作を提供。</p></div>
+            <div class="module-item"><span class="module-name">BackgroundTasks / File</span><p class="module-desc">FastAPI標準クラス。非同期実行・ファイルアップロード制御。</p></div>
+            <div class="module-item"><span class="module-name">TaskDetailResponse</span><p class="module-desc">レスポンスモデル。status, messages, task_detail, display_object_info を保持。</p></div>
+          </div>
+        </div>
+
+        <!-- 関数一覧（アコーディオン） -->
+        <div class="functions-section">
+          <div class="section-label" style="margin-bottom:14px;">関数一覧</div>
+
+          <!-- 関数1 -->
+          <div class="accordion-item open" id="acc1">
+            <div class="accordion-header" onclick="toggle('acc1')">
+              <span class="func-index">1</span>
+              <span class="func-sig-preview"><span class="fn-name">create_new_task</span><span class="fn-args">(task_name: str, user_id: int)</span> → <span class="fn-ret">TaskDetailResponse</span></span>
+              <span class="accordion-chevron">▼</span>
+            </div>
+            <div class="accordion-body">
+              <div class="detail-grid">
+                <div class="detail-box">
+                  <div class="detail-box-label"><span class="dot dot-purpose"></span>処理目的</div>
+                  <p class="purpose-text">新たなタスクを作成し、その内容をデータベースへ登録してレスポンスとして返す。</p>
+                </div>
+                <div class="detail-box">
+                  <div class="detail-box-label"><span class="dot dot-output"></span>出力</div>
+                  <ul class="param-list"><li><code>TaskDetailResponse</code>：作成タスクの詳細情報と検証結果メッセージ。</li></ul>
+                </div>
+                <div class="detail-box">
+                  <div class="detail-box-label"><span class="dot dot-input"></span>入力</div>
+                  <ul class="param-list">
+                    <li><code>task_name</code>：タスク名称</li>
+                    <li><code>user_id</code>：タスクを作成したユーザのID</li>
+                  </ul>
+                </div>
+                <div class="detail-box algo-full">
+                  <div class="detail-box-label"><span class="dot dot-algo"></span>アルゴリズム</div>
+                  <ol class="algo-steps">
+                    <li class="algo-step"><span class="step-num">1</span><span><code>common_validate.length_validation</code> で名称の長さ（1〜255文字）を検証。</span></li>
+                    <li class="algo-step"><span class="step-num">2</span><span>エラーがあれば <code>TaskDetailResponse</code> にエラーを格納して返却。</span></li>
+                    <li class="algo-step"><span class="step-num">3</span><span>DBへ <code>insert_task(task_name, user_id)</code> を実行し、新規レコードを作成。</span></li>
+                    <li class="algo-step"><span class="step-num">4</span><span>作成結果をDataFrameから辞書に変換。</span></li>
+                    <li class="algo-step"><span class="step-num">5</span><span>正常完了時はメッセージ空でレスポンス返却。</span></li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 関数2 -->
+          <div class="accordion-item" id="acc2">
+            <div class="accordion-header" onclick="toggle('acc2')">
+              <span class="func-index">2</span>
+              <span class="func-sig-preview"><span class="fn-name">get_task_info</span><span class="fn-args">(task_id: int)</span> → <span class="fn-ret">TaskDetailResponse</span></span>
+              <span class="accordion-chevron">▼</span>
+            </div>
+            <div class="accordion-body">
+              <div class="detail-grid">
+                <div class="detail-box">
+                  <div class="detail-box-label"><span class="dot dot-purpose"></span>処理目的</div>
+                  <p class="purpose-text">指定タスクの状態を取得し、タスク詳細および表示用オブジェクト情報を返す。</p>
+                </div>
+                <div class="detail-box">
+                  <div class="detail-box-label"><span class="dot dot-input"></span>入力</div>
+                  <ul class="param-list"><li><code>task_id</code>：照会対象タスクのID</li></ul>
+                </div>
+                <div class="detail-box algo-full">
+                  <div class="detail-box-label"><span class="dot dot-algo"></span>アルゴリズム</div>
+                  <ol class="algo-steps">
+                    <li class="algo-step"><span class="step-num">1</span><span>DBからタスク情報取得 (<code>select_task_by_task_id</code>)。</span></li>
+                    <li class="algo-step"><span class="step-num">2</span><span>該当なし→「msg-E-0005」メッセージを返す。</span></li>
+                    <li class="algo-step"><span class="step-num">3</span><span>タスク状態に応じて <code>match</code> 文で処理分岐：<code>DOING</code> / <code>RERUN</code> / <code>DONE</code></span></li>
+                    <li class="algo-step"><span class="step-num">4</span><span>タスク詳細・メッセージ・表示情報をまとめて返却。</span></li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 関数3 -->
+          <div class="accordion-item" id="acc3">
+            <div class="accordion-header" onclick="toggle('acc3')">
+              <span class="func-index">3</span>
+              <span class="func-sig-preview"><span class="fn-name">get_task_detail</span><span class="fn-args">(task_id: int)</span> → <span class="fn-ret">TaskDetailResponse</span></span>
+              <span class="accordion-chevron">▼</span>
+            </div>
+            <div class="accordion-body">
+              <div class="detail-grid">
+                <div class="detail-box">
+                  <div class="detail-box-label"><span class="dot dot-purpose"></span>処理目的</div>
+                  <p class="purpose-text">翻訳済みタスクの変換結果ファイルを取得して返す。</p>
+                </div>
+                <div class="detail-box algo-full">
+                  <div class="detail-box-label"><span class="dot dot-algo"></span>アルゴリズム</div>
+                  <ol class="algo-steps">
+                    <li class="algo-step"><span class="step-num">1</span><span><code>select_task_by_task_id</code> でタスク情報取得。</span></li>
+                    <li class="algo-step"><span class="step-num">2</span><span>該当なし / <code>DONE</code> 以外の場合は「msg-E-0005」返却。</span></li>
+                    <li class="algo-step"><span class="step-num">3</span><span><code>generate_display_info</code> で結果ファイルを取得。</span></li>
+                    <li class="algo-step"><span class="step-num">4</span><span>タスク詳細・ファイル表示情報をレスポンスにまとめ返却。</span></li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 関数4〜8（省略表示） -->
+          <div class="accordion-item" id="acc4">
+            <div class="accordion-header" onclick="toggle('acc4')">
+              <span class="func-index">4</span>
+              <span class="func-sig-preview"><span class="fn-name">update_task_name</span><span class="fn-args">(task_id: int, task_name: str)</span> → <span class="fn-ret">TaskDetailResponse</span></span>
+              <span class="accordion-chevron">▼</span>
+            </div>
+            <div class="accordion-body">
+              <div class="detail-grid">
+                <div class="detail-box">
+                  <div class="detail-box-label"><span class="dot dot-purpose"></span>処理目的</div>
+                  <p class="purpose-text">既存タスクの名称を更新する。</p>
+                </div>
+                <div class="detail-box algo-full">
+                  <div class="detail-box-label"><span class="dot dot-algo"></span>アルゴリズム</div>
+                  <ol class="algo-steps">
+                    <li class="algo-step"><span class="step-num">1</span><span>名称長さを <code>common_validate.length_validation</code> で確認。</span></li>
+                    <li class="algo-step"><span class="step-num">2</span><span>エラー存在時は即返却。</span></li>
+                    <li class="algo-step"><span class="step-num">3</span><span><code>update_task_name</code> を実行し結果取得。</span></li>
+                    <li class="algo-step"><span class="step-num">4</span><span>該当レコードなしなら「msg-E-0003」返却。</span></li>
+                    <li class="algo-step"><span class="step-num">5</span><span>正常更新結果を辞書変換しレスポンス返却。</span></li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item" id="acc5">
+            <div class="accordion-header" onclick="toggle('acc5')">
+              <span class="func-index">5</span>
+              <span class="func-sig-preview"><span class="fn-name">delete_task</span><span class="fn-args">(task_id: int)</span> → <span class="fn-ret">TaskDetailResponse</span></span>
+              <span class="accordion-chevron">▼</span>
+            </div>
+            <div class="accordion-body">
+              <div class="detail-grid">
+                <div class="detail-box">
+                  <div class="detail-box-label"><span class="dot dot-purpose"></span>処理目的</div>
+                  <p class="purpose-text">指定タスクおよび関連データ（アップロード・結果ファイル）を削除する。</p>
+                </div>
+                <div class="detail-box algo-full">
+                  <div class="detail-box-label"><span class="dot dot-algo"></span>アルゴリズム</div>
+                  <ol class="algo-steps">
+                    <li class="algo-step"><span class="step-num">1</span><span><code>select_task_by_task_id</code> で存在確認。なし→「msg-E-0005」返却。</span></li>
+                    <li class="algo-step"><span class="step-num">2</span><span>タスク状態確認。実行中(<code>DOING</code>)→「msg-E-0006」返却。</span></li>
+                    <li class="algo-step"><span class="step-num">3</span><span><code>delete_task</code> により削除実行。失敗→「msg-E-0004」返却。</span></li>
+                    <li class="algo-step"><span class="step-num">4</span><span>関連オブジェクト・結果ファイルも削除。Azureフォルダ削除。</span></li>
+                    <li class="algo-step"><span class="step-num">5</span><span>削除済タスク名を挿入した「msg-I-0001」メッセージ生成。</span></li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item" id="acc6">
+            <div class="accordion-header" onclick="toggle('acc6')">
+              <span class="func-index">6</span>
+              <span class="func-sig-preview"><span class="fn-name">translate_files</span><span class="fn-args">(target_file_list, metadata_list, task_id, user_id, background_tasks)</span> → <span class="fn-ret">TaskDetailResponse</span></span>
+              <span class="accordion-chevron">▼</span>
+            </div>
+            <div class="accordion-body">
+              <div class="detail-grid">
+                <div class="detail-box">
+                  <div class="detail-box-label"><span class="dot dot-purpose"></span>処理目的</div>
+                  <p class="purpose-text">アップロードファイルをAI変換処理にかけ、変換をバックグラウンドで実行する。</p>
+                </div>
+                <div class="detail-box algo-full">
+                  <div class="detail-box-label"><span class="dot dot-algo"></span>アルゴリズム</div>
+                  <ol class="algo-steps">
+                    <li class="algo-step"><span class="step-num">1</span><span>ファイル型オブジェクトのみ抽出し検証 (<code>filter_data</code>)。有効ファイルなし→「msg-E-0009」返却。</span></li>
+                    <li class="algo-step"><span class="step-num">2</span><span>DBからタスク情報取得・存在確認。翻訳中/完了タスクなら「msg-E-0007」返却。</span></li>
+                    <li class="algo-step"><span class="step-num">3</span><span>アップロードオブジェクトをDB登録 (<code>insert_upload_objects</code>)。パスとIDの辞書を作成。</span></li>
+                    <li class="algo-step"><span class="step-num">4</span><span><code>background_tasks.add_task(async_translate_file, …)</code> で非同期変換処理登録。</span></li>
+                    <li class="algo-step"><span class="step-num">5</span><span>タスク状態を <code>DOING</code> に更新。「msg-I-0002」を追加してレスポンス返却。</span></li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item" id="acc7">
+            <div class="accordion-header" onclick="toggle('acc7')">
+              <span class="func-index">7</span>
+              <span class="func-sig-preview"><span class="fn-name">async_translate_file</span><span class="fn-args">(target_file_df, upload_file_dict, task_id, user_id)</span></span>
+              <span class="accordion-chevron">▼</span>
+            </div>
+            <div class="accordion-body">
+              <div class="detail-grid">
+                <div class="detail-box">
+                  <div class="detail-box-label"><span class="dot dot-purpose"></span>処理目的</div>
+                  <p class="purpose-text">バックグラウンドでAzure AIを使用してコード変換し、結果をDBとファイル共有に登録する。</p>
+                </div>
+                <div class="detail-box algo-full">
+                  <div class="detail-box-label"><span class="dot dot-algo"></span>アルゴリズム</div>
+                  <ol class="algo-steps">
+                    <li class="algo-step"><span class="step-num">1</span><span>各ファイルごとに <code>azure_ai_operation_service.translate_code</code> でコード変換。</span></li>
+                    <li class="algo-step"><span class="step-num">2</span><span>変換結果をAzureファイル共有にアップロード。</span></li>
+                    <li class="algo-step"><span class="step-num">3</span><span>変換結果をDB登録 (<code>insert_result_files</code>)。タスク状態を <code>DONE</code> に更新。</span></li>
+                    <li class="algo-step"><span class="step-num">4</span><span>エラー発生時：関連DBデータ・共有ファイル削除。タスク状態を <code>RERUN</code> に更新。</span></li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item" id="acc8">
+            <div class="accordion-header" onclick="toggle('acc8')">
+              <span class="func-index">8</span>
+              <span class="func-sig-preview"><span class="fn-name">generate_display_info</span><span class="fn-args">(task_id: int, task_state: int)</span> → <span class="fn-ret">list[dict]</span></span>
+              <span class="accordion-chevron">▼</span>
+            </div>
+            <div class="accordion-body">
+              <div class="detail-grid">
+                <div class="detail-box">
+                  <div class="detail-box-label"><span class="dot dot-purpose"></span>処理目的</div>
+                  <p class="purpose-text">指定タスクに紐づく表示オブジェクト情報を生成。タスク状態に応じて変換結果を取得または空結果を返す。</p>
+                </div>
+                <div class="detail-box algo-full">
+                  <div class="detail-box-label"><span class="dot dot-algo"></span>アルゴリズム</div>
+                  <ol class="algo-steps">
+                    <li class="algo-step"><span class="step-num">1</span><span><code>DOING</code>：アップロードオブジェクト取得。<code>result_text</code> を空で追加し辞書配列に変換して返却。</span></li>
+                    <li class="algo-step"><span class="step-num">2</span><span><code>DONE</code>：各ファイルの変換結果をAzureファイル共有から取得して <code>result_text</code> に格納。</span></li>
+                    <li class="algo-step"><span class="step-num">3</span><span>DataFrameを辞書配列に変換して返却。</span></li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 右パネル -->
+      <div class="right-panel">
+        <div class="side-card">
+          <div class="side-card-header">📁 アップロード一覧</div>
+          <div class="side-card-body">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:10px;">services/</div>
+            <div class="file-item"><span class="file-ext">.py</span><span class="file-name">task_detail_service.py</span></div>
+          </div>
+        </div>
+        <button class="back-btn">← 一覧に戻る</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggle(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+function toggleAll() {
+  const items = document.querySelectorAll('.accordion-item');
+  const btn = document.querySelector('.expand-all-btn');
+  const anyOpen = [...items].some(i => i.classList.contains('open'));
+  items.forEach(i => anyOpen ? i.classList.remove('open') : i.classList.add('open'));
+  btn.textContent = anyOpen ? 'すべて展開 ▾' : 'すべて折りたたむ ▴';
+}
+</script>
+</body>
+</html>

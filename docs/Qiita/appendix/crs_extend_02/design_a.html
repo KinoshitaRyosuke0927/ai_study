@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocAI - 案A: モダン・クリーンデザイン</title>
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', 'Noto Sans JP', sans-serif; background: #F8FAFC; color: #1E293B; min-height: 100vh; }
+
+  /* ===== NAVBAR ===== */
+  .navbar {
+    background: #fff;
+    border-bottom: 1px solid #E2E8F0;
+    padding: 0 32px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .navbar-brand {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 20px; font-weight: 700; color: #3B82F6;
+    letter-spacing: -0.5px;
+  }
+  .navbar-brand .brand-icon {
+    width: 32px; height: 32px; background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 14px; font-weight: 800;
+  }
+  .navbar-title { font-size: 15px; color: #64748B; font-weight: 500; }
+  .navbar-right { display: flex; align-items: center; gap: 16px; }
+  .user-badge {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 24px;
+    background: #F1F5F9; cursor: pointer; transition: background 0.2s;
+  }
+  .user-badge:hover { background: #E2E8F0; }
+  .user-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+    color: #fff; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .user-name { font-size: 14px; color: #374151; font-weight: 500; }
+  .logout-btn {
+    width: 32px; height: 32px; border-radius: 8px; border: none;
+    background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: #94A3B8; transition: all 0.2s; font-size: 16px;
+  }
+  .logout-btn:hover { background: #FEF2F2; color: #EF4444; }
+
+  /* ===== PAGE WRAPPER ===== */
+  .page { display: none; padding-top: 60px; min-height: 100vh; }
+  .page.active { display: block; }
+
+  /* ===== LOGIN PAGE ===== */
+  .login-bg {
+    min-height: calc(100vh - 60px);
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #EFF6FF 0%, #F5F3FF 100%);
+    padding: 40px 16px;
+  }
+  .login-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 48px 40px;
+    width: 100%; max-width: 420px;
+    box-shadow: 0 20px 60px rgba(59,130,246,0.12), 0 4px 16px rgba(0,0,0,0.06);
+  }
+  .login-header { text-align: center; margin-bottom: 36px; }
+  .login-icon {
+    width: 56px; height: 56px; background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+    border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 22px; font-weight: 900; margin: 0 auto 16px;
+  }
+  .login-title { font-size: 24px; font-weight: 700; color: #1E293B; margin-bottom: 4px; }
+  .login-subtitle { font-size: 14px; color: #94A3B8; }
+  .form-group { margin-bottom: 20px; }
+  .form-label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+  .form-input {
+    width: 100%; padding: 12px 16px; border: 1.5px solid #E2E8F0;
+    border-radius: 10px; font-size: 14px; color: #1E293B; background: #F8FAFC;
+    transition: all 0.2s; outline: none;
+  }
+  .form-input:focus { border-color: #3B82F6; background: #fff; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+  .form-input::placeholder { color: #CBD5E1; }
+  .login-btn {
+    width: 100%; padding: 14px; background: linear-gradient(135deg, #3B82F6, #6366F1);
+    color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; margin-top: 8px;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+  }
+  .login-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(59,130,246,0.4); }
+
+  /* ===== TASK LIST PAGE ===== */
+  .page-content { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  .new-task-card {
+    background: #fff; border-radius: 16px; padding: 28px 32px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px #E2E8F0;
+    margin-bottom: 32px;
+  }
+  .new-task-label { font-size: 16px; font-weight: 700; color: #1E293B; margin-bottom: 4px; }
+  .new-task-hint { font-size: 13px; color: #94A3B8; margin-bottom: 16px; }
+  .new-task-row { display: flex; gap: 12px; }
+  .task-name-input {
+    flex: 1; padding: 12px 16px; border: 1.5px solid #E2E8F0;
+    border-radius: 10px; font-size: 14px; background: #F8FAFC; outline: none;
+    transition: all 0.2s;
+  }
+  .task-name-input:focus { border-color: #3B82F6; background: #fff; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+  .start-btn {
+    padding: 12px 24px; background: linear-gradient(135deg, #3B82F6, #6366F1);
+    color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.25); transition: all 0.2s;
+  }
+  .start-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(59,130,246,0.35); }
+
+  .section-title { font-size: 18px; font-weight: 700; color: #1E293B; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .section-title::before { content: ''; width: 4px; height: 20px; background: linear-gradient(180deg, #3B82F6, #8B5CF6); border-radius: 2px; }
+
+  .task-table-card { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px #E2E8F0; }
+  .task-table { width: 100%; border-collapse: collapse; }
+  .task-table thead { background: #F8FAFC; }
+  .task-table th { padding: 14px 20px; text-align: left; font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E2E8F0; }
+  .task-table td { padding: 16px 20px; font-size: 14px; border-bottom: 1px solid #F1F5F9; }
+  .task-table tr:last-child td { border-bottom: none; }
+  .task-table tbody tr { cursor: pointer; transition: background 0.15s; }
+  .task-table tbody tr:hover { background: #F8FAFC; }
+  .task-name-cell { font-weight: 500; color: #1E293B; }
+  .date-cell { color: #94A3B8; font-size: 13px; }
+
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  }
+  .status-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+  .status-translating { background: #FEF3C7; color: #D97706; }
+  .status-translating::before { background: #D97706; animation: pulse 1.5s infinite; }
+  .status-done { background: #D1FAE5; color: #059669; }
+  .status-done::before { background: #059669; }
+  .status-preparing { background: #EDE9FE; color: #7C3AED; }
+  .status-preparing::before { background: #7C3AED; animation: pulse 1.5s infinite; }
+  .status-reviewing { background: #DBEAFE; color: #2563EB; }
+  .status-reviewing::before { background: #2563EB; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  /* ===== TASK DETAIL PAGE ===== */
+  .detail-layout { display: grid; grid-template-columns: 1fr 340px; gap: 24px; }
+  .detail-card { background: #fff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px #E2E8F0; overflow: hidden; }
+  .detail-card-header { padding: 20px 24px; border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; gap: 10px; }
+  .detail-card-title { font-size: 15px; font-weight: 700; color: #1E293B; }
+  .detail-card-body { padding: 24px; max-height: 600px; overflow-y: auto; }
+  .analysis-section { margin-bottom: 28px; }
+  .analysis-section-title {
+    font-size: 13px; font-weight: 700; color: #64748B; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 8px;
+    border-bottom: 1px solid #F1F5F9;
+  }
+  .token-chip {
+    display: inline-block; background: #EFF6FF; color: #1D4ED8;
+    border: 1px solid #BFDBFE; padding: 3px 10px; border-radius: 6px;
+    font-size: 12px; font-family: 'Courier New', monospace; font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .token-desc { font-size: 13px; color: #475569; line-height: 1.7; margin-bottom: 16px; }
+  .token-desc strong { color: #1E293B; }
+  .func-card {
+    background: #F8FAFC; border-radius: 12px; padding: 16px;
+    border: 1px solid #E2E8F0; margin-bottom: 16px;
+  }
+  .func-signature {
+    font-family: 'Courier New', monospace; font-size: 12px;
+    background: #1E293B; color: #7DD3FC; padding: 8px 12px;
+    border-radius: 8px; margin-bottom: 12px;
+  }
+  .func-label { font-size: 12px; font-weight: 700; color: #64748B; margin-bottom: 4px; }
+  .func-text { font-size: 13px; color: #475569; line-height: 1.6; }
+  .file-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px; border-radius: 10px; background: #F8FAFC;
+    border: 1px solid #E2E8F0; margin-bottom: 8px; cursor: pointer; transition: all 0.2s;
+  }
+  .file-item:hover { background: #EFF6FF; border-color: #BFDBFE; }
+  .file-icon { font-size: 18px; }
+  .file-name { font-size: 13px; font-weight: 500; color: #1E293B; }
+  .back-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 12px 20px; background: #fff; border: 1.5px solid #E2E8F0;
+    border-radius: 10px; font-size: 14px; font-weight: 600; color: #374151;
+    cursor: pointer; transition: all 0.2s; margin-top: 16px;
+  }
+  .back-btn:hover { background: #F8FAFC; border-color: #CBD5E1; }
+  .page-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+  .page-header-title { font-size: 22px; font-weight: 700; color: #1E293B; }
+  .page-header-sub { font-size: 14px; color: #94A3B8; }
+  .chevron-icon { cursor: pointer; color: #94A3B8; transition: color 0.2s; }
+  .chevron-icon:hover { color: #374151; }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar" id="navbar">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div class="navbar-brand">
+      <div class="brand-icon">D</div>
+      DocAI
+    </div>
+    <span class="navbar-title" id="navTitle">ログイン</span>
+  </div>
+  <div class="navbar-right" id="navRight" style="display:none;">
+    <div class="user-badge">
+      <div class="user-avatar">木</div>
+      <span class="user-name">木下 凌介</span>
+    </div>
+    <button class="logout-btn" onclick="showPage('login')" title="ログアウト">⏻</button>
+  </div>
+</nav>
+
+<!-- PAGE: LOGIN -->
+<div class="page active" id="page-login">
+  <div class="login-bg">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-icon">D</div>
+        <div class="login-title">DocAI へようこそ</div>
+        <div class="login-subtitle">Pythonコードを自然言語に翻訳するAIツール</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">メールアドレス</label>
+        <input type="email" class="form-input" placeholder="your@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">パスワード</label>
+        <input type="password" class="form-input" placeholder="••••••••">
+      </div>
+      <button class="login-btn" onclick="showPage('list')">ログイン</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: TASK LIST -->
+<div class="page" id="page-list">
+  <div class="page-content">
+    <div class="new-task-card">
+      <div class="new-task-label">新しいレビューを開始</div>
+      <div class="new-task-hint">タスク名を入力して、レビューを開始してください</div>
+      <div class="new-task-row">
+        <input type="text" class="task-name-input" placeholder="例: レビュー対象ファイル名、レビューの種別など">
+        <button class="start-btn" onclick="showPage('detail')">▶ レビューを開始する</button>
+      </div>
+    </div>
+    <div class="section-title">過去のレビュー</div>
+    <div class="task-table-card">
+      <table class="task-table">
+        <thead>
+          <tr>
+            <th>タスク名 ↕</th>
+            <th>ステータス ↕</th>
+            <th>最終更新日時 ↕</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr onclick="showPage('detail')">
+            <td class="task-name-cell">大伴ミナ</td>
+            <td><span class="status-badge status-translating">翻訳中</span></td>
+            <td class="date-cell">2026/01/14 09:17:37</td>
+          </tr>
+          <tr onclick="showPage('detail')">
+            <td class="task-name-cell">ぽうぽうぽうぽう</td>
+            <td><span class="status-badge status-done">翻訳済</span></td>
+            <td class="date-cell">2026/02/19 02:22:37</td>
+          </tr>
+          <tr onclick="showPage('detail')">
+            <td class="task-name-cell">さくらみこ</td>
+            <td><span class="status-badge status-preparing">準備中</span></td>
+            <td class="date-cell">2026/03/03 01:44:07</td>
+          </tr>
+          <tr onclick="showPage('detail')">
+            <td class="task-name-cell">星街すいせい</td>
+            <td><span class="status-badge status-translating">翻訳中</span></td>
+            <td class="date-cell">2026/03/05 01:32:44</td>
+          </tr>
+          <tr onclick="showPage('detail')">
+            <td class="task-name-cell">ふぶにゃ</td>
+            <td><span class="status-badge status-reviewing">審査中</span></td>
+            <td class="date-cell">2026/03/05 01:32:02</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: TASK DETAIL -->
+<div class="page" id="page-detail">
+  <div class="page-content">
+    <div class="page-header">
+      <span class="chevron-icon" onclick="showPage('list')" style="font-size:20px;">←</span>
+      <div>
+        <div class="page-header-title">星街すいせい</div>
+        <div class="page-header-sub"><span class="status-badge status-translating" style="font-size:11px;">翻訳中</span></div>
+      </div>
+    </div>
+    <div class="detail-layout">
+      <!-- LEFT: ANALYSIS -->
+      <div class="detail-card">
+        <div class="detail-card-header">
+          <span>📋</span>
+          <span class="detail-card-title">コード解析結果</span>
+        </div>
+        <div class="detail-card-body">
+          <div class="analysis-section">
+            <div class="analysis-section-title">定数・インポート</div>
+            <span class="token-chip">bcrypt</span>
+            <p class="token-desc">パスワードのハッシュ化および照合を行うためのライブラリ。<strong>checkpw()</strong> 関数でハッシュと生パスワードを比較できる。</p>
+            <span class="token-chip">db_access_service</span>
+            <p class="token-desc">データベースへのアクセスを担うモジュール。ユーザー情報取得やメッセージ処理などの関数を提供する。</p>
+            <span class="token-chip">LoginResponse</span>
+            <p class="token-desc">ログイン処理の結果を表すレスポンスモデル。ステータス、メッセージ、ユーザーID、ユーザー名などを属性として持つ。</p>
+          </div>
+          <div class="analysis-section">
+            <div class="analysis-section-title">関数</div>
+            <div class="func-card">
+              <div class="func-signature">login(mail_address: str, password: str) → LoginResponse</div>
+              <div class="func-label">処理目的</div>
+              <p class="func-text">指定されたメールアドレスとパスワードを用いて認証を行い、その結果を <strong>LoginResponse</strong> オブジェクトとして返す。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- RIGHT: FILES -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="detail-card">
+          <div class="detail-card-header">
+            <span>📁</span>
+            <span class="detail-card-title">アップロードファイル</span>
+          </div>
+          <div class="detail-card-body" style="padding:16px;">
+            <div class="file-item">
+              <span class="file-icon">🐍</span>
+              <span class="file-name">login_service.py</span>
+            </div>
+          </div>
+        </div>
+        <button class="back-btn" onclick="showPage('list')">← 一覧に戻る</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  const titles = { login: 'ログイン', list: 'タスク一覧', detail: 'タスク詳細' };
+  document.getElementById('navTitle').textContent = titles[page];
+  document.getElementById('navRight').style.display = page === 'login' ? 'none' : 'flex';
+}
+</script>
+</body>
+</html>

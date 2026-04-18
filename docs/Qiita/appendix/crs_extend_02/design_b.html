@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocAI - 案B: ダークモード・プロフェッショナル</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Courier New', 'Noto Sans JP', monospace; background: #0F1117; color: #E2E8F0; min-height: 100vh; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #1A1D27; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+  /* NAVBAR */
+  .navbar {
+    background: #1A1D27; border-bottom: 1px solid #1E2D3D;
+    padding: 0 32px; height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-logo {
+    font-family: 'Courier New', monospace; font-size: 18px; font-weight: 900;
+    color: #38BDF8; letter-spacing: 1px;
+  }
+  .brand-sep { color: #334155; font-size: 18px; }
+  .nav-page { font-size: 13px; color: #64748B; }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .user-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 12px; background: #1E2D3D; border-radius: 6px;
+    border: 1px solid #334155; cursor: pointer; transition: border-color 0.2s;
+  }
+  .user-chip:hover { border-color: #38BDF8; }
+  .user-dot { width: 8px; height: 8px; background: #34D399; border-radius: 50%; }
+  .user-text { font-size: 13px; color: #94A3B8; }
+  .logout-btn { background: transparent; border: 1px solid #334155; color: #64748B; width: 30px; height: 30px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+  .logout-btn:hover { border-color: #EF4444; color: #EF4444; }
+
+  /* PAGES */
+  .page { display: none; padding-top: 56px; min-height: 100vh; }
+  .page.active { display: block; }
+
+  /* LOGIN */
+  .login-wrap {
+    min-height: calc(100vh - 56px); display: flex; align-items: center; justify-content: center;
+    padding: 40px 16px;
+    background: radial-gradient(circle at 50% 30%, rgba(56,189,248,0.05) 0%, transparent 60%);
+  }
+  .terminal-card {
+    width: 100%; max-width: 420px;
+    background: #1A1D27; border: 1px solid #1E2D3D;
+    border-radius: 12px; overflow: hidden;
+    box-shadow: 0 0 0 1px #1E2D3D, 0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(56,189,248,0.04);
+  }
+  .terminal-header {
+    background: #151820; padding: 12px 16px;
+    display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #1E2D3D;
+  }
+  .t-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .t-red { background: #FF5F57; } .t-yellow { background: #FFBD2E; } .t-green { background: #28C840; }
+  .terminal-title { font-size: 12px; color: #475569; margin-left: 8px; }
+  .terminal-body { padding: 32px; }
+  .t-prompt { color: #38BDF8; font-size: 13px; margin-bottom: 24px; }
+  .t-prompt span { color: #64748B; }
+  .t-label { font-size: 12px; color: #64748B; margin-bottom: 6px; display: block; }
+  .t-label::before { content: '# '; color: #334155; }
+  .t-input {
+    width: 100%; background: #0F1117; border: 1px solid #1E2D3D;
+    border-radius: 6px; padding: 11px 14px; color: #E2E8F0; font-family: 'Courier New', monospace;
+    font-size: 13px; outline: none; transition: border-color 0.2s; margin-bottom: 16px;
+  }
+  .t-input:focus { border-color: #38BDF8; box-shadow: 0 0 0 2px rgba(56,189,248,0.1); }
+  .t-input::placeholder { color: #334155; }
+  .t-btn {
+    width: 100%; padding: 13px; background: #0F3460;
+    border: 1px solid #38BDF8; color: #38BDF8; border-radius: 6px;
+    font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; letter-spacing: 1px;
+  }
+  .t-btn:hover { background: #38BDF8; color: #0F1117; box-shadow: 0 0 20px rgba(56,189,248,0.3); }
+
+  /* LIST */
+  .content { max-width: 1100px; margin: 0 auto; padding: 28px 24px; }
+  .new-task-panel {
+    background: #1A1D27; border: 1px solid #1E2D3D; border-radius: 10px;
+    padding: 24px 28px; margin-bottom: 28px;
+  }
+  .panel-title { font-size: 13px; color: #64748B; margin-bottom: 12px; }
+  .panel-title::before { content: '> '; color: #38BDF8; }
+  .input-row { display: flex; gap: 10px; }
+  .task-input {
+    flex: 1; background: #0F1117; border: 1px solid #1E2D3D; border-radius: 6px;
+    padding: 11px 14px; color: #E2E8F0; font-family: 'Courier New', monospace; font-size: 13px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .task-input:focus { border-color: #38BDF8; }
+  .task-input::placeholder { color: #334155; }
+  .run-btn {
+    padding: 11px 20px; background: transparent; border: 1px solid #38BDF8; color: #38BDF8;
+    border-radius: 6px; font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700;
+    cursor: pointer; white-space: nowrap; transition: all 0.2s;
+  }
+  .run-btn:hover { background: #38BDF8; color: #0F1117; }
+  .sec-header { font-size: 12px; color: #64748B; margin-bottom: 12px; letter-spacing: 1px; text-transform: uppercase; }
+  .sec-header::before { content: '// '; color: #334155; }
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table thead tr { background: #151820; }
+  .data-table th { padding: 11px 20px; text-align: left; font-size: 11px; color: #475569; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #1E2D3D; }
+  .data-table td { padding: 14px 20px; font-size: 13px; border-bottom: 1px solid #151820; }
+  .data-table tbody tr { cursor: pointer; transition: background 0.15s; }
+  .data-table tbody tr:hover { background: #1E2D3D; }
+  .table-wrap { background: #1A1D27; border: 1px solid #1E2D3D; border-radius: 10px; overflow: hidden; }
+  .date-col { color: #475569; font-size: 12px; font-family: 'Courier New', monospace; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 4px; font-size: 11px; font-weight: 700;
+    font-family: 'Courier New', monospace; letter-spacing: 0.5px;
+  }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; }
+  .b-translating { background: rgba(251,191,36,0.15); color: #FCD34D; border: 1px solid rgba(251,191,36,0.3); }
+  .b-translating .badge-dot { background: #FCD34D; animation: blink 1s infinite; }
+  .b-done { background: rgba(52,211,153,0.15); color: #6EE7B7; border: 1px solid rgba(52,211,153,0.3); }
+  .b-done .badge-dot { background: #6EE7B7; }
+  .b-preparing { background: rgba(167,139,250,0.15); color: #C4B5FD; border: 1px solid rgba(167,139,250,0.3); }
+  .b-preparing .badge-dot { background: #C4B5FD; animation: blink 1s infinite; }
+  .b-reviewing { background: rgba(56,189,248,0.15); color: #7DD3FC; border: 1px solid rgba(56,189,248,0.3); }
+  .b-reviewing .badge-dot { background: #7DD3FC; }
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.2; } }
+
+  /* DETAIL */
+  .detail-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+  .d-card { background: #1A1D27; border: 1px solid #1E2D3D; border-radius: 10px; overflow: hidden; }
+  .d-header { background: #151820; padding: 14px 20px; border-bottom: 1px solid #1E2D3D; display: flex; align-items: center; gap: 8px; }
+  .d-header-dot { width: 8px; height: 8px; border-radius: 50%; background: #38BDF8; }
+  .d-header-title { font-size: 13px; color: #94A3B8; }
+  .d-body { padding: 20px; max-height: 560px; overflow-y: auto; }
+  .import-section { margin-bottom: 24px; }
+  .import-title { font-size: 11px; color: #475569; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .import-title::before { content: '/* '; } .import-title::after { content: ' */'; }
+  .import-item { margin-bottom: 16px; padding: 12px 14px; background: #0F1117; border-radius: 6px; border-left: 3px solid #38BDF8; }
+  .import-name { font-size: 12px; color: #7DD3FC; font-weight: 700; margin-bottom: 6px; }
+  .import-desc { font-size: 12px; color: #64748B; line-height: 1.6; }
+  .import-desc mark { background: transparent; color: #FCD34D; }
+  .func-section { margin-bottom: 24px; }
+  .func-sig { background: #0F1117; padding: 10px 14px; border-radius: 6px; font-size: 12px; color: #A78BFA; margin-bottom: 12px; }
+  .func-sig .fn { color: #38BDF8; } .func-sig .arg { color: #FCD34D; } .func-sig .ret { color: #6EE7B7; }
+  .func-purpose { font-size: 12px; color: #64748B; line-height: 1.7; padding: 0 2px; }
+  .func-purpose mark { background: transparent; color: #E2E8F0; }
+  .file-entry {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; background: #0F1117; border-radius: 6px;
+    border: 1px solid #1E2D3D; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s;
+  }
+  .file-entry:hover { border-color: #38BDF8; }
+  .file-entry-icon { font-size: 14px; color: #38BDF8; font-family: 'Courier New', monospace; }
+  .file-entry-name { font-size: 12px; color: #94A3B8; }
+  .back-btn {
+    display: flex; align-items: center; gap: 6px; margin-top: 14px;
+    padding: 11px 18px; background: transparent; border: 1px solid #334155; color: #64748B;
+    border-radius: 6px; font-family: 'Courier New', monospace; font-size: 12px; cursor: pointer; transition: all 0.2s;
+  }
+  .back-btn:hover { border-color: #38BDF8; color: #38BDF8; }
+  .detail-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+  .detail-title { font-size: 18px; color: #E2E8F0; }
+  .detail-title span { color: #38BDF8; }
+  .breadcrumb { font-size: 12px; color: #334155; cursor: pointer; }
+  .breadcrumb:hover { color: #38BDF8; }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="brand">
+    <span class="brand-logo">DocAI</span>
+    <span class="brand-sep">/</span>
+    <span class="nav-page" id="navPage">login</span>
+  </div>
+  <div class="nav-right" id="navRight" style="display:none;">
+    <div class="user-chip">
+      <span class="user-dot"></span>
+      <span class="user-text">kinoshita_ryosuke</span>
+    </div>
+    <button class="logout-btn" onclick="showPage('login')" title="logout">⏻</button>
+  </div>
+</nav>
+
+<!-- LOGIN -->
+<div class="page active" id="page-login">
+  <div class="login-wrap">
+    <div class="terminal-card">
+      <div class="terminal-header">
+        <div class="t-dot t-red"></div>
+        <div class="t-dot t-yellow"></div>
+        <div class="t-dot t-green"></div>
+        <span class="terminal-title">docai -- authenticate</span>
+      </div>
+      <div class="terminal-body">
+        <div class="t-prompt">$ docai login <span>--session new</span></div>
+        <label class="t-label"><span style="color:#64748B;">mail_address</span></label>
+        <input type="email" class="t-input" placeholder="your@email.com">
+        <label class="t-label"><span style="color:#64748B;">password</span></label>
+        <input type="password" class="t-input" placeholder="••••••••">
+        <button class="t-btn" onclick="showPage('list')">[ AUTHENTICATE ]</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LIST -->
+<div class="page" id="page-list">
+  <div class="content">
+    <div class="new-task-panel">
+      <div class="panel-title">task_name = input("タスクに名前を付けてください")</div>
+      <div class="input-row">
+        <input class="task-input" placeholder="ex. レビュー対象ファイル名、レビューの種別など">
+        <button class="run-btn" onclick="showPage('detail')">▶ RUN</button>
+      </div>
+    </div>
+    <div class="sec-header">review_history</div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>task_name</th><th>status</th><th>updated_at</th></tr></thead>
+        <tbody>
+          <tr onclick="showPage('detail')">
+            <td>大伴ミナ</td>
+            <td><span class="badge b-translating"><span class="badge-dot"></span>TRANSLATING</span></td>
+            <td class="date-col">2026-01-14 09:17:37</td>
+          </tr>
+          <tr onclick="showPage('detail')">
+            <td>ぽうぽうぽうぽう</td>
+            <td><span class="badge b-done"><span class="badge-dot"></span>DONE</span></td>
+            <td class="date-col">2026-02-19 02:22:37</td>
+          </tr>
+          <tr onclick="showPage('detail')">
+            <td>さくらみこ</td>
+            <td><span class="badge b-preparing"><span class="badge-dot"></span>PREPARING</span></td>
+            <td class="date-col">2026-03-03 01:44:07</td>
+          </tr>
+          <tr onclick="showPage('detail')">
+            <td>星街すいせい</td>
+            <td><span class="badge b-translating"><span class="badge-dot"></span>TRANSLATING</span></td>
+            <td class="date-col">2026-03-05 01:32:44</td>
+          </tr>
+          <tr onclick="showPage('detail')">
+            <td>ふぶにゃ</td>
+            <td><span class="badge b-reviewing"><span class="badge-dot"></span>REVIEWING</span></td>
+            <td class="date-col">2026-03-05 01:32:02</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL -->
+<div class="page" id="page-detail">
+  <div class="content">
+    <div class="detail-header">
+      <span class="breadcrumb" onclick="showPage('list')">tasks /</span>
+      <div class="detail-title"><span>#</span> 星街すいせい</div>
+      <span class="badge b-translating"><span class="badge-dot"></span>TRANSLATING</span>
+    </div>
+    <div class="detail-grid">
+      <div class="d-card">
+        <div class="d-header"><div class="d-header-dot"></div><span class="d-header-title">analysis_result.json</span></div>
+        <div class="d-body">
+          <div class="import-section">
+            <div class="import-title">imports &amp; constants</div>
+            <div class="import-item">
+              <div class="import-name">bcrypt</div>
+              <div class="import-desc">パスワードのハッシュ化および照合ライブラリ。<mark>checkpw()</mark> でハッシュと平文を比較する。</div>
+            </div>
+            <div class="import-item">
+              <div class="import-name">db_access_service</div>
+              <div class="import-desc">DBアクセス担当モジュール。ユーザー取得・メッセージ処理の関数群を提供。</div>
+            </div>
+            <div class="import-item">
+              <div class="import-name">LoginResponse</div>
+              <div class="import-desc">レスポンスモデル。status / message / user_id / username を属性として持つ。</div>
+            </div>
+          </div>
+          <div class="func-section">
+            <div class="import-title">functions</div>
+            <div class="func-sig">
+              def <span class="fn">login</span>(<span class="arg">mail_address</span>: str, <span class="arg">password</span>: str) -&gt; <span class="ret">LoginResponse</span>:
+            </div>
+            <div class="func-purpose">
+              指定された <mark>mail_address</mark> と <mark>password</mark> を用いて認証を行い、その結果を <mark>LoginResponse</mark> オブジェクトとして返す。
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="d-card">
+          <div class="d-header"><div class="d-header-dot" style="background:#A78BFA;"></div><span class="d-header-title">uploaded_files</span></div>
+          <div class="d-body" style="padding:14px;">
+            <div class="file-entry">
+              <span class="file-entry-icon">.py</span>
+              <span class="file-entry-name">login_service.py</span>
+            </div>
+          </div>
+        </div>
+        <button class="back-btn" onclick="showPage('list')">← tasks[]</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.getElementById('navPage').textContent = { login:'login', list:'tasks', detail:'tasks/星街すいせい' }[page];
+  document.getElementById('navRight').style.display = page === 'login' ? 'none' : 'flex';
+}
+</script>
+</body>
+</html>
