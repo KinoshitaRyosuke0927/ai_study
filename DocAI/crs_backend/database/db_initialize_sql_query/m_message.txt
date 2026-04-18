@@ -1,0 +1,34 @@
+--- テーブル作成
+-- テーブルがあれば削除
+DROP TABLE IF EXISTS m_message;
+-- 型指定
+CREATE TABLE m_message (
+    message_id   VARCHAR(10)    NOT NULL,
+    message_type VARCHAR(8)     NOT NULL,
+    message      NVARCHAR(255)  NOT NULL,
+    CONSTRAINT PK_m_message PRIMARY KEY (message_id)
+);
+-- 存在確認
+SELECT * FROM m_message
+
+
+--- マスタデータ登録
+-- 既存のデータをすべて削除
+DELETE FROM [dbo].[m_message];
+
+-- 固定値追加
+INSERT INTO [dbo].[m_message] VALUES ('msg-E-0001', 'error', N'メールアドレスまたはパスワードが正しくありません。')
+INSERT INTO [dbo].[m_message] VALUES ('msg-E-0002', 'error', N'{}が正しくありません。{}は{}文字以上{}文字以下にしてください。')
+INSERT INTO [dbo].[m_message] VALUES ('msg-E-0003', 'error', N'タスク名称の更新に失敗しました。')
+INSERT INTO [dbo].[m_message] VALUES ('msg-E-0004', 'error', N'タスクの削除に失敗しました。')
+INSERT INTO [dbo].[m_message] VALUES ('msg-E-0005', 'error', N'タスク情報の取得に失敗しました。')
+INSERT INTO [dbo].[m_message] VALUES ('msg-E-0006', 'error', N'翻訳実行中のタスクを削除することはできません。')
+INSERT INTO [dbo].[m_message] VALUES ('msg-E-0007', 'error', N'翻訳対象のファイルの登録に失敗しました。お手数ですが、再度翻訳処理を実行してください。')
+INSERT INTO [dbo].[m_message] VALUES ('msg-E-0008', 'error', N'予期せぬエラーが発生しました。このタスクを削除し、新しくタスクを作成して再度アップロードからお試しください。')
+INSERT INTO [dbo].[m_message] VALUES ('msg-E-0009', 'error', N'翻訳対象のファイルが存在しません。')
+INSERT INTO [dbo].[m_message] VALUES ('msg-E-0010', 'error', N'翻訳に失敗しました。お手数ですが再度アップロードからお試しください。解決しない場合は管理者にお問い合わせください。')
+INSERT INTO [dbo].[m_message] VALUES ('msg-I-0001', 'info', N'タスク「{}」を削除しました。')
+INSERT INTO [dbo].[m_message] VALUES ('msg-I-0002', 'info', N'翻訳を開始しました。しばらくお待ちください。')
+
+-- 結果確認
+SELECT * FROM [dbo].[m_message]

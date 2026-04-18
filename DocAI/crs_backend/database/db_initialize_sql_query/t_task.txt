@@ -1,0 +1,21 @@
+--- テーブル作成
+-- テーブルがあれば削除
+DROP TABLE IF EXISTS t_task;
+-- 型指定
+CREATE TABLE t_task (
+    task_id BIGINT IDENTITY(1,1)    NOT NULL,
+    task_name NVARCHAR(255)         NOT NULL,
+    task_state_id INT               NOT NULL,
+    update_at DATETIME              NOT NULL,
+    user_id BIGINT                  NOT NULL,
+    CONSTRAINT PK_t_task PRIMARY KEY (task_id),
+);
+-- 存在確認
+SELECT * FROM t_task
+
+
+--- テーブル初期化
+-- 既存のデータをすべて削除
+DELETE FROM [dbo].[t_task];
+-- 自動採番の値をリセットする
+DBCC CHECKIDENT (t_task, RESEED, 0);

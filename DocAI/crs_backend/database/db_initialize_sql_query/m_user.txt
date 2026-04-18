@@ -1,0 +1,29 @@
+--- テーブル作成
+-- テーブルがあれば削除
+DROP TABLE IF EXISTS m_user;
+-- 型指定
+CREATE TABLE m_user (
+    user_id BIGINT IDENTITY(1,1)    NOT NULL,
+    user_name NVARCHAR(30)          NOT NULL,
+    mail_address VARCHAR(255)       NOT NULL,
+    password VARCHAR(255)           NOT NULL,
+    CONSTRAINT PK_m_user PRIMARY KEY (user_id),
+    CONSTRAINT UQ_m_mail_address UNIQUE (mail_address),
+);
+-- 存在確認
+SELECT * FROM m_user
+
+
+--- マスタデータ登録
+-- 既存のデータをすべて削除
+DELETE FROM [dbo].[m_user];
+
+-- 固定値追加
+-- パスワード列はそれぞれ社員番号をハッシュ化したもの
+INSERT INTO [dbo].[m_user] VALUES (N'海野 亮', 'm-unno@jbd.co.jp', '$2b$12$ORCIMHRSpJaHeB1lrNqGdurqRXk9uoHMvoLf4Tba3OtTLxZ2eFAfa')
+INSERT INTO [dbo].[m_user] VALUES (N'淺野間 龍児', 'r-asanoma@jbd.co.jp', '$2b$12$FG1obeD9oxUPC.uSC7l2bOpL7LSx68E0cerzWVtb3Sj1zoaIrJrIe')
+INSERT INTO [dbo].[m_user] VALUES (N'木下 凌介', 'r-kinoshita@jbd.co.jp', '$2b$12$AErSWgVNEpK8XBZGuyd5xO1uUKPwoWERywmQznlOcPVuyj6UWxgpC')
+INSERT INTO [dbo].[m_user] VALUES (N'百合野 琉', 'r-yurino@jbd.co.jp', '$2b$12$XmK2dBjN8Ux9LSVFKtCILOE1LX7LnE4FR8YhGsXSAjZs6WgUuzgfq')
+
+-- 結果確認
+SELECT * FROM [dbo].[m_user]

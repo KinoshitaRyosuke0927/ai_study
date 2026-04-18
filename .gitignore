@@ -21,3 +21,11 @@ node_modules/
 # アップロード・出力ディレクトリ
 */uploads/
 */outputs/
+
+# graph_gui 生成データ
+graph_gui/data/flowcharts/
+graph_gui/data/graph.json
+
+# play_role データ・設定
+play_role/data/
+play_role/reviewers.csv

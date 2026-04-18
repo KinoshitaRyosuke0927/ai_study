@@ -1,0 +1,21 @@
+--- テーブル作成
+-- テーブルがあれば削除
+DROP TABLE IF EXISTS t_result_file;
+-- 型指定
+CREATE TABLE t_result_file (
+    result_file_id BIGINT IDENTITY(1,1) NOT NULL,
+    result_file_name NVARCHAR(255)      NOT NULL,
+    original_file_id BIGINT             NOT NULL,
+    task_id BIGINT                      NOT NULL,
+    user_id BIGINT                      NOT NULL,
+    CONSTRAINT PK_t_result_file PRIMARY KEY (result_file_id),
+);
+-- 存在確認
+SELECT * FROM t_result_file
+
+
+--- テーブル初期化
+-- 既存のデータをすべて削除
+DELETE FROM [dbo].[t_result_file];
+-- 自動採番の値をリセットする
+DBCC CHECKIDENT (t_result_file, RESEED, 0);

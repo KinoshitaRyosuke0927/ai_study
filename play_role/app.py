@@ -8,10 +8,14 @@ import tempfile  # 一時ファイルの作成に使用
 import uuid      # 動画解析ジョブ ID 生成に使用
 from pathlib import Path  # パス操作をOSに依存せず行うために使用
 
+from dotenv import load_dotenv  # .env ファイルから環境変数を読み込むために使用
 import threading  # Whisper モデルの遅延ロードでスレッドセーフにするために使用
 import whisper  # OpenAI Whisper による音声認識ライブラリ
 from pydantic import BaseModel  # リクエストボディのバリデーションモデルに使用
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile  # FastAPI 本体と各種ユーティリティ
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")  # .env ファイルから環境変数を読み込む
+
 from azure_ai_service import brushup_text, play_role  # 文字起こし推敲／役割別コメント生成関数
 from prompt import ROLE_DICT  # 役割プロンプト辞書（キーが有効な役割名と一致）
 from history_store import (    # レビュアー別フィードバック履歴・プロファイルのCSV管理

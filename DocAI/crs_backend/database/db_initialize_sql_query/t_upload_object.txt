@@ -1,0 +1,22 @@
+--- テーブル作成
+-- テーブルがあれば削除
+DROP TABLE IF EXISTS t_upload_object;
+-- 型指定
+CREATE TABLE t_upload_object (
+    upload_object_id BIGINT IDENTITY(1,1)   NOT NULL,
+    upload_object_name NVARCHAR(255)        NOT NULL,
+    upload_object_type VARCHAR(8)           NOT NULL,
+    full_path NVARCHAR(300)                NOT NULL,
+    task_id BIGINT                          NOT NULL,
+    user_id BIGINT                          NOT NULL,
+    CONSTRAINT PK_t_upload_object PRIMARY KEY (upload_object_id),
+);
+-- 存在確認
+SELECT * FROM t_upload_object
+
+
+--- テーブル初期化
+-- 既存のデータをすべて削除
+DELETE FROM [dbo].[t_upload_object];
+-- 自動採番の値をリセットする
+DBCC CHECKIDENT (t_upload_object, RESEED, 0);

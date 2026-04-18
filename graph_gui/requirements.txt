@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+openai
+rustworkx
+python-multipart
+python-dotenv

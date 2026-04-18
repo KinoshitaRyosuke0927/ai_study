@@ -1,0 +1,25 @@
+--- テーブル作成
+-- テーブルがあれば削除
+DROP TABLE IF EXISTS m_task_state;
+-- 型指定
+CREATE TABLE m_task_state (
+    task_state_id INT               NOT NULL,
+    task_state_name NVARCHAR(4)     NOT NULL,
+    CONSTRAINT PK_m_task_state PRIMARY KEY (task_state_id),
+);
+-- 存在確認
+SELECT * FROM m_task_state
+
+
+--- マスタデータ登録
+-- 既存のデータをすべて削除
+DELETE FROM [dbo].[m_task_state];
+
+-- 固定値追加
+INSERT INTO [dbo].[m_task_state] VALUES (1, N'準備中')
+INSERT INTO [dbo].[m_task_state] VALUES (2, N'翻訳中')
+INSERT INTO [dbo].[m_task_state] VALUES (3, N'翻訳失敗')
+INSERT INTO [dbo].[m_task_state] VALUES (4, N'翻訳済')
+
+-- 結果確認
+SELECT * FROM [dbo].[m_task_state]

@@ -1,0 +1,227 @@
+@import '../../utils/css/util.css';
+
+/* ===== ページ全体 ===== */
+.task-list-page-container {
+    height: 100vh;
+    overflow: hidden;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--color-bg);
+}
+
+.task-list-page-container main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ===== セクションタイトル ===== */
+.tasklist-review-section {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.tasklist-review-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.tasklist-create-btn {
+    padding: 10px 20px;
+    font-size: 14px;
+}
+
+.tasklist-section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tasklist-section-title::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #3B82F6, #8B5CF6);
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+/* ===== テーブルカード ===== */
+.tasklist-review-table-card {
+    background: var(--color-surface);
+    border-radius: var(--border-radius-l);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--color-border);
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.tasklist-review-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tasklist-review-table thead {
+    background: var(--color-bg);
+}
+
+.tasklist-review-table th {
+    padding: 14px 20px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    background: var(--color-bg);
+    z-index: 1;
+}
+
+/* ソート可能なヘッダー列 */
+.tasklist-th-sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s, color 0.15s;
+}
+.tasklist-th-sortable:hover {
+    background: var(--color-border-sub);
+    color: var(--color-accent);
+}
+
+/* ソートアイコン */
+.sort-icon {
+    display: inline-block;
+    margin-left: 4px;
+    font-style: normal;
+    font-weight: 400;
+}
+.sort-icon-neutral {
+    opacity: 0.35;
+}
+.sort-icon-active {
+    color: var(--color-accent);
+    opacity: 1;
+}
+
+.tasklist-review-table td {
+    padding: 16px 20px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--color-border-sub);
+}
+
+.tasklist-review-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.tasklist-review-row {
+    transition: background 0.15s;
+}
+
+.tasklist-review-row:hover {
+    background: var(--color-bg);
+}
+
+/* テーブル列定義 */
+.tasklist-review-col-name {
+    flex: 3;
+    font-weight: 500;
+    color: var(--color-text-primary);
+}
+
+.tasklist-review-col-status {
+    width: 130px;
+    text-align: center;
+}
+
+.tasklist-review-col-date {
+    width: 200px;
+    color: #94A3B8;
+    font-size: 13px;
+}
+
+/* ===== ステータスバッジ ===== */
+.tasklist-review-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.tasklist-review-status::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+/* 準備中（state: 1） - Purple */
+.tasklist-review-status-1 {
+    background-color: var(--color-status-preparing-bg);
+    color: var(--color-status-preparing-text);
+}
+.tasklist-review-status-1::before {
+    background-color: var(--color-status-preparing-text);
+    animation: pulse 1.5s infinite;
+}
+
+/* 翻訳中（state: 2） - Amber */
+.tasklist-review-status-2 {
+    background-color: var(--color-status-translating-bg);
+    color: var(--color-status-translating-text);
+}
+.tasklist-review-status-2::before {
+    background-color: var(--color-status-translating-text);
+    animation: pulse 1.5s infinite;
+}
+
+/* 翻訳失敗（state: 3） - Red */
+.tasklist-review-status-3 {
+    background-color: var(--color-error-bg);
+    color: var(--color-error-text);
+}
+.tasklist-review-status-3::before {
+    background-color: var(--color-error-text);
+}
+
+/* 翻訳済（state: 4） - Emerald */
+.tasklist-review-status-4 {
+    background-color: var(--color-status-done-bg);
+    color: var(--color-status-done-text);
+}
+.tasklist-review-status-4::before {
+    background-color: var(--color-status-done-text);
+}
+
+/* 空状態 */
+.tasklist-review-empty {
+    padding: 48px;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 14px;
+}
