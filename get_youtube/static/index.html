@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Live Archive Viewer</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --card: #ffffff;
+      --line: #d9deea;
+      --text: #1f2430;
+      --muted: #5c667a;
+      --accent: #cc0000;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Meiryo, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container {
+      margin: 0 5vw;
+      padding: 24px 0;
+    }
+    /* Two-column layout */
+    .main-layout {
+      display: flex;
+      gap: 28px;
+      align-items: flex-start;
+    }
+    .left-panel {
+      flex: 0 0 480px;
+      min-width: 0;
+    }
+    .right-panel {
+      flex: 1;
+      min-width: 0;
+    }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    .lead { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 6px 18px rgba(24, 39, 75, 0.06);
+    }
+    .search-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: white;
+      padding: 10px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:disabled {
+      background: #9ca3af !important;
+      opacity: 1;
+      cursor: not-allowed;
+    }
+    .message {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+    .channel {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 12px;
+      align-items: start;
+      margin-top: 16px;
+    }
+    .channel img {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid var(--line);
+    }
+    .channel-meta p { margin: 4px 0; color: var(--muted); font-size: 13px; }
+    .channel-meta h3 { margin: 0 0 4px; font-size: 15px; }
+    .stats {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .section-title {
+      margin: 20px 0 10px;
+      font-size: 18px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 12px;
+    }
+    .video-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(24, 39, 75, 0.06);
+      display: flex;
+      flex-direction: column;
+    }
+    .thumb {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      background: #eef1f7;
+    }
+    .video-body {
+      padding: 10px;
+      display: grid;
+      gap: 5px;
+    }
+    .video-title {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+    .kv {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .link {
+      color: #0b57d0;
+      text-decoration: none;
+      word-break: break-all;
+    }
+    .small-note {
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    .placeholder-msg {
+      color: var(--muted);
+      font-size: 14px;
+      padding: 28px 16px;
+      text-align: center;
+      border: 1.5px dashed var(--line);
+      border-radius: 12px;
+      background: var(--card);
+      grid-column: 1 / -1;
+    }
+    .placeholder-stat .stat-value { color: var(--line) !important; }
+    /* Right panel: analysis */
+    .stats-cards {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 20px;
+      min-width: 140px;
+      box-shadow: 0 4px 12px rgba(24,39,75,0.06);
+      text-align: center;
+    }
+    .stat-card .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .stat-card .stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .breakdown-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 16px;
+    }
+    .breakdown-title { margin: 0 0 8px; font-size: 15px; }
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+    .bar-label { min-width: 90px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-wrap { flex: 1; background: var(--line); border-radius: 6px; height: 12px; }
+    .bar-fill { height: 12px; border-radius: 6px; background: var(--accent); }
+    .bar-count { min-width: 32px; color: var(--muted); text-align: right; }
+    /* Scrollable table */
+    .table-scroll-wrap {
+      max-height: 440px;
+      overflow-y: auto;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(24,39,75,0.06);
+      border: 1px solid var(--line);
+    }
+    table#allVideosTable {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      background: var(--card);
+    }
+    #allVideosTable thead th {
+      background: #eef1f7;
+      padding: 10px 12px;
+      text-align: left;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    #allVideosTable thead th:hover { background: #e0e4ef; }
+    #allVideosTable td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    #allVideosTable tr:last-child td { border-bottom: none; }
+    #allVideosTable tr:hover td { background: #f7f8fb; }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .badge-live { background: #ffeaea; color: var(--accent); }
+    .badge-normal { background: #eef1f7; color: var(--muted); }
+    .sort-icon::after { content: '↕'; font-size: 10px; opacity: 0.4; }
+    th.sort-asc .sort-icon::after { content: '↑'; opacity: 1; }
+    th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; }
+    @media (max-width: 900px) {
+      .main-layout { flex-direction: column; }
+      .left-panel { flex: none; width: 100%; }
+      .right-panel { width: 100%; }
+      .search-row { grid-template-columns: 1fr; }
+      .channel { grid-template-columns: 1fr; }
+      .breakdown-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="main-layout">
+
+      <!-- LEFT PANEL -->
+      <div class="left-panel">
+        <h1>YouTube ライブアーカイブ一覧</h1>
+        <p class="lead">チャンネルURL、@handle、channel_id を入力すると、チャンネル基本情報とライブ配信アーカイブの最新10件を表示します。</p>
+
+        <div class="card">
+          <div class="search-row">
+            <input id="channelInput" type="text" placeholder="例: https://www.youtube.com/@GoogleDevelopers  または  UC_x5XG1OV2P6uZZ5FSM9Ttw" />
+            <button id="fetchBtn">取得</button>
+          </div>
+          <div style="margin-bottom: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button id="csvBtn" disabled>CSVダウンロード</button>
+            <button id="analyzeBtn" disabled>全動画を解析・表示</button>
+            <button id="updateBtn" disabled>更新</button>
+          </div>
+          <div id="message" class="message"></div>
+          <div id="channelArea"></div>
+        </div>
+
+        <h2 class="section-title">ライブ配信アーカイブ</h2>
+        <div id="summary" class="small-note">チャンネル情報を取得してください。</div>
+        <div id="videoGrid" class="grid">
+          <div class="placeholder-msg">チャンネルURLを入力して「取得」ボタンを押してください。</div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL -->
+      <div class="right-panel" id="analyzeSection">
+        <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
+          <h2 class="section-title" style="margin-top:0; margin-bottom:0;">全動画 解析結果</h2>
+          <button id="graphBtn" disabled style="background:#2563eb; font-size:13px; padding:8px 14px;">グラフを表示</button>
+        </div>
+        <div id="statsCards" class="stats-cards">
+          <div class="stat-card placeholder-stat"><div class="stat-value">---</div><div class="stat-label">総動画数</div></div>
+          <div class="stat-card placeholder-stat"><div class="stat-value">---</div><div class="stat-label">ライブアーカイブ数</div></div>
+          <div class="stat-card placeholder-stat"><div class="stat-value">---</div><div class="stat-label">総再生数</div></div>
+        </div>
+        <div class="breakdown-row">
+          <div>
+            <h3 class="breakdown-title">カテゴリ別</h3>
+            <div id="categoryBreakdown"><span style="color:var(--muted);font-size:13px;">「全動画を解析・表示」を押してください。</span></div>
+          </div>
+          <div>
+            <h3 class="breakdown-title">年別投稿数</h3>
+            <div id="yearBreakdown"><span style="color:var(--muted);font-size:13px;">「全動画を解析・表示」を押してください。</span></div>
+          </div>
+        </div>
+
+        <h3 class="breakdown-title" style="margin-top:24px; margin-bottom:8px;">全動画一覧</h3>
+        <div style="margin-bottom:10px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+          <input id="tableSearch" type="text" placeholder="タイトル・カテゴリで絞り込み" style="max-width:280px;" />
+          <label style="color:var(--muted);font-size:13px;">
+            絞り込み:
+            <select id="liveFilter">
+              <option value="all">すべて</option>
+              <option value="live">ライブアーカイブのみ</option>
+              <option value="normal">通常動画のみ</option>
+            </select>
+          </label>
+          <span id="tableCount" style="color:var(--muted);font-size:13px;"></span>
+        </div>
+        <div class="table-scroll-wrap">
+          <table id="allVideosTable">
+            <thead>
+              <tr>
+                <th data-col="published_at">公開日 <span class="sort-icon"></span></th>
+                <th data-col="title">タイトル <span class="sort-icon"></span></th>
+                <th data-col="duration">長さ <span class="sort-icon"></span></th>
+                <th data-col="view_count">再生数 <span class="sort-icon"></span></th>
+                <th data-col="category">カテゴリ <span class="sort-icon"></span></th>
+                <th>種別</th>
+              </tr>
+            </thead>
+            <tbody id="allVideosBody">
+              <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:28px;">「全動画を解析・表示」ボタンを押してください。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ── DOM refs ───────────────────────────────────────────────────
+    const fetchBtn    = document.getElementById('fetchBtn');
+    const csvBtn      = document.getElementById('csvBtn');
+    const analyzeBtn  = document.getElementById('analyzeBtn');
+    const updateBtn   = document.getElementById('updateBtn');
+    const graphBtn    = document.getElementById('graphBtn');
+    const channelInput = document.getElementById('channelInput');
+    const message     = document.getElementById('message');
+    const channelArea = document.getElementById('channelArea');
+    const videoGrid   = document.getElementById('videoGrid');
+    const summary     = document.getElementById('summary');
+
+    let currentChannelInput = '';
+    let currentChannel = null;
+    let allVideosData  = [];
+    let sortCol = 'published_at';
+    let sortDir = 'desc';
+
+    // ── Cache helpers (localStorage) ──────────────────────────────
+    const CACHE_PREFIX = 'yt_v1_';
+
+    function cacheKey(input) { return CACHE_PREFIX + input.trim(); }
+
+    function loadCache(input) {
+      try {
+        const s = localStorage.getItem(cacheKey(input));
+        return s ? JSON.parse(s) : null;
+      } catch { return null; }
+    }
+
+    function saveCache(input, patch) {
+      try {
+        const existing = loadCache(input) || {};
+        localStorage.setItem(cacheKey(input), JSON.stringify({ ...existing, ...patch }));
+      } catch (e) { console.warn('Cache save failed:', e); }
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '';
+      return new Date(iso).toLocaleString('ja-JP', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      });
+    }
+
+    // ── Utilities ─────────────────────────────────────────────────
+    function escapeHtml(text) {
+      return (text ?? '').replace(/[&<>'"]/g, c =>
+        ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[c]));
+    }
+
+    function formatNumber(value) {
+      if (value === undefined || value === null || value === '') return '-';
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toLocaleString('ja-JP') : value;
+    }
+
+    function setAllBtns(disabled) {
+      [fetchBtn, csvBtn, analyzeBtn, updateBtn].forEach(b => b.disabled = disabled);
+    }
+
+    // ── Render helpers ────────────────────────────────────────────
+    function renderChannel(channel) {
+      channelArea.innerHTML = `
+        <div class="channel">
+          <img src="${escapeHtml(channel.thumbnail_url || '')}" alt="channel thumbnail">
+          <div class="channel-meta">
+            <h3>${escapeHtml(channel.title || '')}</h3>
+            <p><strong>チャンネルID:</strong> ${escapeHtml(channel.channel_id || '')}</p>
+            <div class="stats">
+              <span>登録者数: ${formatNumber(channel.subscriber_count)}</span>
+              <span>総再生数: ${formatNumber(channel.view_count)}</span>
+              <span>動画数: ${formatNumber(channel.video_count)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderVideos(videos) {
+      const display = videos.slice(0, 4);
+      if (!display.length) {
+        videoGrid.innerHTML = '<div class="card">ライブアーカイブが見つかりませんでした。</div>';
+        return;
+      }
+      videoGrid.innerHTML = display.map(video => `
+        <div class="video-card">
+          <a href="${escapeHtml(video.watch_url)}" target="_blank" rel="noopener noreferrer">
+            <img class="thumb" src="${escapeHtml(video.thumbnail_url || '')}" alt="thumbnail">
+          </a>
+          <div class="video-body">
+            <div class="video-title">${escapeHtml(video.title || '')}</div>
+            <div class="kv"><strong>公開日:</strong> ${escapeHtml(video.published_at || '-')}</div>
+            <div class="kv"><strong>長さ:</strong> ${escapeHtml(video.duration || '-')}</div>
+            <div class="kv"><strong>視聴回数:</strong> ${formatNumber(video.view_count)}</div>
+            <div class="kv"><a class="link" href="${escapeHtml(video.watch_url)}" target="_blank" rel="noopener noreferrer">YouTubeで開く</a></div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderBarChart(containerId, items, maxCount) {
+      const el = document.getElementById(containerId);
+      el.innerHTML = items.map(item => {
+        const label = item.name || item.year || '';
+        const pct = maxCount > 0 ? Math.round((item.count / maxCount) * 100) : 0;
+        return `<div class="bar-row">
+          <div class="bar-label" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <div class="bar-count">${item.count}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function applyAllVideosData(data) {
+      allVideosData  = data.videos || [];
+      currentChannel = data.channel || null;
+      const s = data.stats || {};
+      document.getElementById('statsCards').innerHTML = `
+        <div class="stat-card"><div class="stat-value">${(s.total_videos||0).toLocaleString('ja-JP')}</div><div class="stat-label">総動画数</div></div>
+        <div class="stat-card"><div class="stat-value">${(s.live_archive_count||0).toLocaleString('ja-JP')}</div><div class="stat-label">ライブアーカイブ数</div></div>
+        <div class="stat-card"><div class="stat-value">${(s.total_views||0).toLocaleString('ja-JP')}</div><div class="stat-label">総再生数</div></div>
+      `;
+      const categories = data.category_breakdown || [];
+      const years      = data.year_breakdown || [];
+      renderBarChart('categoryBreakdown', categories, categories.length ? categories[0].count : 1);
+      renderBarChart('yearBreakdown', years, years.length ? Math.max(...years.map(y => y.count)) : 1);
+      sortCol = 'published_at'; sortDir = 'desc';
+      document.querySelectorAll('#allVideosTable th').forEach(el => el.classList.remove('sort-asc','sort-desc'));
+      const firstTh = document.querySelector('#allVideosTable th[data-col="published_at"]');
+      if (firstTh) firstTh.classList.add('sort-desc');
+      renderTable();
+      graphBtn.disabled = false;
+    }
+
+    function renderTable() {
+      const keyword    = document.getElementById('tableSearch').value.trim().toLowerCase();
+      const liveFilter = document.getElementById('liveFilter').value;
+      let filtered = allVideosData.filter(v => {
+        if (liveFilter === 'live'   && !v.is_live) return false;
+        if (liveFilter === 'normal' &&  v.is_live) return false;
+        if (keyword && !(v.title + ' ' + v.category).toLowerCase().includes(keyword)) return false;
+        return true;
+      });
+      filtered.sort((a, b) => {
+        let va = a[sortCol], vb = b[sortCol];
+        if (sortCol === 'view_count') { va = Number(va); vb = Number(vb); }
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ?  1 : -1;
+        return 0;
+      });
+      document.getElementById('tableCount').textContent = `${filtered.length.toLocaleString('ja-JP')} 件`;
+      document.getElementById('allVideosBody').innerHTML = filtered.map(v => `
+        <tr>
+          <td style="white-space:nowrap;">${escapeHtml(v.published_at)}</td>
+          <td><a class="link" href="${escapeHtml(v.watch_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(v.title)}</a></td>
+          <td style="white-space:nowrap;">${escapeHtml(v.duration)}</td>
+          <td style="text-align:right;white-space:nowrap;">${Number(v.view_count).toLocaleString('ja-JP')}</td>
+          <td>${escapeHtml(v.category)}</td>
+          <td><span class="badge ${v.is_live ? 'badge-live' : 'badge-normal'}">${v.is_live ? 'LIVE' : '通常'}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    // ── API wrappers ──────────────────────────────────────────────
+    async function apiFetchLiveArchives(input) {
+      const res = await fetch('/api/channel/live-archives', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel_input: input }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail, null, 2));
+      return data;
+    }
+
+    async function apiFetchAllVideos(input) {
+      const res = await fetch('/api/channel/all-videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel_input: input }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail, null, 2));
+      return data;
+    }
+
+    // ── fetchArchives ─────────────────────────────────────────────
+    async function fetchArchives(forceRefresh = false) {
+      const value = channelInput.value.trim();
+      if (!value) { message.textContent = 'チャンネルURL または channel_id を入力してください。'; return; }
+
+      if (!forceRefresh) {
+        const cache = loadCache(value);
+        if (cache?.live_archives) {
+          const d = cache.live_archives;
+          renderChannel(d.channel);
+          renderVideos(d.videos || []);
+          const total = (d.videos || []).length;
+          summary.textContent = `走査した uploads 動画数: ${formatNumber(d.scanned_video_count)} / ライブアーカイブ: ${formatNumber(total)}件（最新${Math.min(total, 4)}件を表示）`;
+          message.textContent = `キャッシュから読み込みました（取得日時: ${fmtDate(cache.live_archives_at)}）`;
+          currentChannelInput = value;
+          csvBtn.disabled = false; analyzeBtn.disabled = false; updateBtn.disabled = false;
+          return;
+        }
+      }
+
+      setAllBtns(true);
+      currentChannelInput = '';
+      message.textContent = forceRefresh ? '取得データを更新中です...' : '取得中です...';
+      channelArea.innerHTML = ''; videoGrid.innerHTML = ''; summary.textContent = '';
+
+      try {
+        const data = await apiFetchLiveArchives(value);
+        renderChannel(data.channel);
+        renderVideos(data.videos || []);
+        const total = (data.videos || []).length;
+        summary.textContent = `走査した uploads 動画数: ${formatNumber(data.scanned_video_count)} / ライブアーカイブ: ${formatNumber(total)}件（最新${Math.min(total, 4)}件を表示）`;
+        message.textContent = forceRefresh ? '更新が完了しました。' : '取得が完了しました。';
+        saveCache(value, { live_archives: data, live_archives_at: new Date().toISOString() });
+        currentChannelInput = value;
+        csvBtn.disabled = false; analyzeBtn.disabled = false; updateBtn.disabled = false;
+      } catch (err) {
+        message.textContent = '取得に失敗しました。\n' + (err?.message || err);
+      } finally {
+        fetchBtn.disabled = false;
+      }
+    }
+
+    // ── analyzeAllVideos ──────────────────────────────────────────
+    async function analyzeAllVideos(forceRefresh = false) {
+      if (!forceRefresh) {
+        const cache = loadCache(currentChannelInput);
+        if (cache?.all_videos) {
+          message.textContent = `キャッシュから読み込みました（取得日時: ${fmtDate(cache.all_videos_at)}）`;
+          applyAllVideosData(cache.all_videos);
+          document.getElementById('analyzeSection').style.display = '';
+          return;
+        }
+      }
+
+      analyzeBtn.disabled = true; csvBtn.disabled = true; updateBtn.disabled = true;
+      message.textContent = forceRefresh
+        ? '全動画データを更新中です...（数分かかる場合があります）'
+        : '全動画を取得・解析中です...（動画数によっては数分かかる場合があります）';
+
+      try {
+        const data = await apiFetchAllVideos(currentChannelInput);
+        saveCache(currentChannelInput, { all_videos: data, all_videos_at: new Date().toISOString() });
+        message.textContent = forceRefresh ? '更新が完了しました。' : '解析が完了しました。';
+        applyAllVideosData(data);
+      } catch (err) {
+        message.textContent = '解析に失敗しました。\n' + (err?.message || err);
+      } finally {
+        analyzeBtn.disabled = false; csvBtn.disabled = false; updateBtn.disabled = false;
+      }
+    }
+
+    // ── updateAll: 更新ボタン ─────────────────────────────────────
+    async function updateAll() {
+      if (!currentChannelInput) return;
+      setAllBtns(true);
+      message.textContent = '更新中です...';
+      channelArea.innerHTML = ''; videoGrid.innerHTML = ''; summary.textContent = '';
+
+      try {
+        // ライブアーカイブを再取得
+        const d1 = await apiFetchLiveArchives(currentChannelInput);
+        renderChannel(d1.channel);
+        renderVideos(d1.videos || []);
+        const total = (d1.videos || []).length;
+        summary.textContent = `走査した uploads 動画数: ${formatNumber(d1.scanned_video_count)} / ライブアーカイブ: ${formatNumber(total)}件（最新${Math.min(total, 4)}件を表示）`;
+        saveCache(currentChannelInput, { live_archives: d1, live_archives_at: new Date().toISOString() });
+
+        // 全動画を以前に取得済みなら再取得
+        const cache = loadCache(currentChannelInput);
+        if (cache?.all_videos || allVideosData.length > 0) {
+          const d2 = await apiFetchAllVideos(currentChannelInput);
+          saveCache(currentChannelInput, { all_videos: d2, all_videos_at: new Date().toISOString() });
+          applyAllVideosData(d2);
+        }
+
+        message.textContent = '更新が完了しました。';
+      } catch (err) {
+        message.textContent = '更新に失敗しました。\n' + (err?.message || err);
+      } finally {
+        setAllBtns(false);
+        // 更新ボタンは currentChannelInput がある場合のみ有効
+        if (!currentChannelInput) { csvBtn.disabled = true; analyzeBtn.disabled = true; updateBtn.disabled = true; }
+      }
+    }
+
+    // ── downloadAllVideosCsv ──────────────────────────────────────
+    async function downloadAllVideosCsv() {
+      csvBtn.disabled = true;
+      message.textContent = 'CSV取得中です...（動画数によっては数分かかる場合があります）';
+      try {
+        const res = await fetch('/api/channel/all-videos-csv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel_input: currentChannelInput }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail, null, 2));
+        }
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        const disposition = res.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename\*=UTF-8''(.+)/i);
+        a.download = match ? decodeURIComponent(match[1]) : 'all_videos.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        message.textContent = 'CSVのダウンロードが完了しました。';
+      } catch (err) {
+        message.textContent = 'CSV取得に失敗しました。\n' + (err?.message || err);
+      } finally {
+        csvBtn.disabled = false;
+      }
+    }
+
+    // ── Event listeners ───────────────────────────────────────────
+    fetchBtn.addEventListener('click',   () => fetchArchives());
+    channelInput.addEventListener('keydown', e => { if (e.key === 'Enter') fetchArchives(); });
+    csvBtn.addEventListener('click',     downloadAllVideosCsv);
+    analyzeBtn.addEventListener('click', () => analyzeAllVideos());
+    updateBtn.addEventListener('click',  updateAll);
+
+    document.getElementById('tableSearch').addEventListener('input', renderTable);
+    document.getElementById('liveFilter').addEventListener('change', renderTable);
+
+    document.getElementById('allVideosTable').querySelector('thead').addEventListener('click', e => {
+      const th = e.target.closest('th[data-col]');
+      if (!th) return;
+      const col = th.dataset.col;
+      if (sortCol === col) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+      else { sortCol = col; sortDir = col === 'view_count' ? 'desc' : 'asc'; }
+      document.querySelectorAll('#allVideosTable th').forEach(el => el.classList.remove('sort-asc', 'sort-desc'));
+      th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+      renderTable();
+    });
+
+    document.getElementById('graphBtn').addEventListener('click', () => {
+      sessionStorage.setItem('graphData', JSON.stringify({ channel: currentChannel, videos: allVideosData }));
+      window.open('/static/graphs.html', '_blank');
+    });
+  </script>
+</body>
+</html>

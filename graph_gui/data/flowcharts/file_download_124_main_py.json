@@ -1,0 +1,78 @@
+{
+  "nodes": [
+    {
+      "data": {
+        "id": "n1",
+        "label": "開始: file_download()",
+        "kind": "start"
+      }
+    },
+    {
+      "data": {
+        "id": "n2",
+        "label": "ファイル共有からダウンロード処理を実行",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n3",
+        "label": "エラーリストを初期化",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n4",
+        "label": "ファイル情報取得を試行（失敗時は空文字とエラーメッセージを追加）",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n5",
+        "label": "レスポンスを返却",
+        "kind": "return"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "data": {
+        "id": "e1",
+        "source": "n1",
+        "target": "n2",
+        "label": "処理開始"
+      }
+    },
+    {
+      "data": {
+        "id": "e2",
+        "source": "n2",
+        "target": "n3",
+        "label": "次へ"
+      }
+    },
+    {
+      "data": {
+        "id": "e3",
+        "source": "n3",
+        "target": "n4",
+        "label": "ファイル取得試行"
+      }
+    },
+    {
+      "data": {
+        "id": "e4",
+        "source": "n4",
+        "target": "n5",
+        "label": "結果を返却"
+      }
+    }
+  ],
+  "meta": {
+    "layout_hints": {
+      "switch_nodes": []
+    }
+  }
+}

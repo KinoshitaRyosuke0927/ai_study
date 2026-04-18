@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AST: login_service</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        #tree-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            overflow: auto;
+        }
+        .node circle {
+            fill: #fff;
+            stroke: steelblue;
+            stroke-width: 3px;
+            cursor: pointer;
+        }
+        .node circle.has-children {
+            fill: lightsteelblue;
+        }
+        .node text {
+            font: 12px sans-serif;
+            cursor: pointer;
+        }
+        .link {
+            fill: none;
+            stroke: #ccc;
+            stroke-width: 2px;
+        }
+        .instructions {
+            text-align: center;
+            color: #666;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AST: login_service</h1>
+    <div class="instructions">
+        ノードをクリックして展開/折りたたみできます
+    </div>
+    <div id="tree-container"></div>
+    
+    <script>
+        const treeDataJson = {
+  "name": "Module",
+  "children": [
+    {
+      "name": "body[4]",
+      "children": [
+        {
+          "name": "Import",
+          "children": [
+            {
+              "name": "names[1]",
+              "children": [
+                {
+                  "name": "alias"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "ImportFrom",
+          "children": [
+            {
+              "name": "names[1]",
+              "children": [
+                {
+                  "name": "alias"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "ImportFrom",
+          "children": [
+            {
+              "name": "names[1]",
+              "children": [
+                {
+                  "name": "alias"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "FunctionDef(name=login)",
+          "children": [
+            {
+              "name": "args: arguments",
+              "children": [
+                {
+                  "name": "args[2]",
+                  "children": [
+                    {
+                      "name": "arg(mail_address)",
+                      "children": [
+                        {
+                          "name": "annotation: Name(id=str)",
+                          "children": [
+                            {
+                              "name": "ctx: Load"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "arg(password)",
+                      "children": [
+                        {
+                          "name": "annotation: Name(id=str)",
+                          "children": [
+                            {
+                              "name": "ctx: Load"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "body[3]",
+              "children": [
+                {
+                  "name": "Expr",
+                  "children": [
+                    {
+                      "name": "value: Constant('\\n    メールアドレスとパスワードでログインを行う\\n    参考 : パスワードハッシュ化について\\n    https://zenn.dev/417/scraps/43f1ffbe90132c\\n\\n    Args\\n    -----------------\\n    - mail_address: str,        メールアドレス\\n    - password: str,            パスワード\\n\\n    Returns\\n    -----------------\\n    - response: LoginResponse,    レスポンス\\n\\n    ')"
+                    }
+                  ]
+                },
+                {
+                  "name": "Assign",
+                  "children": [
+                    {
+                      "name": "targets[1]",
+                      "children": [
+                        {
+                          "name": "Name(id=df)",
+                          "children": [
+                            {
+                              "name": "ctx: Store"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "value: Call()",
+                      "children": [
+                        {
+                          "name": "func: Attribute(attr=select_user)",
+                          "children": [
+                            {
+                              "name": "value: Name(id=db_access_service)",
+                              "children": [
+                                {
+                                  "name": "ctx: Load"
+                                }
+                              ]
+                            },
+                            {
+                              "name": "ctx: Load"
+                            }
+                          ]
+                        },
+                        {
+                          "name": "args[1]",
+                          "children": [
+                            {
+                              "name": "Name(id=mail_address)",
+                              "children": [
+                                {
+                                  "name": "ctx: Load"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "If",
+                  "children": [
+                    {
+                      "name": "test: Attribute(attr=empty)",
+                      "children": [
+                        {
+                          "name": "value: Name(id=df)",
+                          "children": [
+                            {
+                              "name": "ctx: Load"
+                            }
+                          ]
+                        },
+                        {
+                          "name": "ctx: Load"
+                        }
+                      ]
+                    },
+                    {
+                      "name": "body[2]",
+                      "children": [
+                        {
+                          "name": "Assign",
+                          "children": [
+                            {
+                              "name": "targets[1]",
+                              "children": [
+                                {
+                                  "name": "Name(id=message_dict)",
+                                  "children": [
+                                    {
+                                      "name": "ctx: Store"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "name": "value: Call()",
+                              "children": [
+                                {
+                                  "name": "func: Attribute(attr=select_message)",
+                                  "children": [
+                                    {
+                                      "name": "value: Name(id=db_access_service)",
+                                      "children": [
+                                        {
+                                          "name": "ctx: Load"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "name": "ctx: Load"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "name": "args[1]",
+                                  "children": [
+                                    {
+                                      "name": "Constant('msg-E-0001')"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "name": "Return",
+                          "children": [
+                            {
+                              "name": "value: Call()",
+                              "children": [
+                                {
+                                  "name": "func: Name(id=LoginResponse)",
+                                  "children": [
+                                    {
+                                      "name": "ctx: Load"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "name": "keywords[2]",
+                                  "children": [
+                                    {
+                                      "name": "keyword",
+                                      "children": [
+                                        {
+                                          "name": "value: Constant(200)"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "name": "keyword",
+                                      "children": [
+                                        {
+                                          "name": "value: List",
+                                          "children": [
+                                            {
+                                              "name": "elts[1]",
+                                              "children": [
+                                                {
+                                                  "name": "Name(id=message_dict)",
+                                                  "children": [
+                                                    {
+                                                      "name": "ctx: Load"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "name": "ctx: Load"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "orelse[1]",
+                      "children": [
+                        {
+                          "name": "If",
+                          "children": [
+                            {
+                              "name": "test: Call()",
+                              "children": [
+                                {
+                                  "name": "func: Attribute(attr=checkpw)",
+                                  "children": [
+                                    {
+                                      "name": "value: Name(id=bcrypt)",
+                                      "children": [
+                                        {
+                                          "name": "ctx: Load"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "name": "ctx: Load"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "name": "args[2]",
+                                  "children": [
+                                    {
+                                      "name": "Call()",
+                                      "children": [
+                                        {
+                                          "name": "func: Attribute(attr=encode)",
+                                          "children": [
+                                            {
+                                              "name": "value: Name(id=password)",
+                                              "children": [
+                                                {
+                                                  "name": "ctx: Load"
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "name": "ctx: Load"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "name": "args[1]",
+                                          "children": [
+                                            {
+                                              "name": "Constant('utf-8')"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "name": "Subscript",
+                                      "children": [
+                                        {
+                                          "name": "value: Attribute(attr=values)",
+                                          "children": [
+                                            {
+                                              "name": "value: Subscript",
+                                              "children": [
+                                                {
+                                                  "name": "value: Name(id=df)",
+                                                  "children": [
+                                                    {
+                                                      "name": "ctx: Load"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "name": "slice: Constant('password')"
+                                                },
+                                                {
+                                                  "name": "ctx: Load"
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "name": "ctx: Load"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "name": "slice: Constant(0)"
+                                        },
+                                        {
+                                          "name": "ctx: Load"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "name": "body[1]",
+                              "children": [
+                                {
+                                  "name": "Return",
+                                  "children": [
+                                    {
+                                      "name": "value: Call()",
+                                      "children": [
+                                        {
+                                          "name": "func: Name(id=LoginResponse)",
+                                          "children": [
+                                            {
+                                              "name": "ctx: Load"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "name": "keywords[4]",
+                                          "children": [
+                                            {
+                                              "name": "keyword",
+                                              "children": [
+                                                {
+                                                  "name": "value: Constant(200)"
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "name": "keyword",
+                                              "children": [
+                                                {
+                                                  "name": "value: List",
+                                                  "children": [
+                                                    {
+                                                      "name": "ctx: Load"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "name": "keyword",
+                                              "children": [
+                                                {
+                                                  "name": "value: Subscript",
+                                                  "children": [
+                                                    {
+                                                      "name": "value: Attribute(attr=values)",
+                                                      "children": [
+                                                        {
+                                                          "name": "value: Subscript",
+                                                          "children": [
+                                                            {
+                                                              "name": "value: Name(id=df)",
+                                                              "children": [
+                                                                {
+                                                                  "name": "ctx: Load"
+                                                                }
+                                                              ]
+                                                            },
+                                                            {
+                                                              "name": "slice: Constant('user_id')"
+                                                            },
+                                                            {
+                                                              "name": "ctx: Load"
+                                                            }
+                                                          ]
+                                                        },
+                                                        {
+                                                          "name": "ctx: Load"
+                                                        }
+                                                      ]
+                                                    },
+                                                    {
+                                                      "name": "slice: Constant(0)"
+                                                    },
+                                                    {
+                                                      "name": "ctx: Load"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "name": "keyword",
+                                              "children": [
+                                                {
+                                                  "name": "value: Subscript",
+                                                  "children": [
+                                                    {
+                                                      "name": "value: Attribute(attr=values)",
+                                                      "children": [
+                                                        {
+                                                          "name": "value: Subscript",
+                                                          "children": [
+                                                            {
+                                                              "name": "value: Name(id=df)",
+                                                              "children": [
+                                                                {
+                                                                  "name": "ctx: Load"
+                                                                }
+                                                              ]
+                                                            },
+                                                            {
+                                                              "name": "slice: Constant('user_name')"
+                                                            },
+                                                            {
+                                                              "name": "ctx: Load"
+                                                            }
+                                                          ]
+                                                        },
+                                                        {
+                                                          "name": "ctx: Load"
+                                                        }
+                                                      ]
+                                                    },
+                                                    {
+                                                      "name": "slice: Constant(0)"
+                                                    },
+                                                    {
+                                                      "name": "ctx: Load"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "name": "orelse[2]",
+                              "children": [
+                                {
+                                  "name": "Assign",
+                                  "children": [
+                                    {
+                                      "name": "targets[1]",
+                                      "children": [
+                                        {
+                                          "name": "Name(id=message_dict)",
+                                          "children": [
+                                            {
+                                              "name": "ctx: Store"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "name": "value: Call()",
+                                      "children": [
+                                        {
+                                          "name": "func: Attribute(attr=select_message)",
+                                          "children": [
+                                            {
+                                              "name": "value: Name(id=db_access_service)",
+                                              "children": [
+                                                {
+                                                  "name": "ctx: Load"
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "name": "ctx: Load"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "name": "args[1]",
+                                          "children": [
+                                            {
+                                              "name": "Constant('msg-E-0001')"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "name": "Return",
+                                  "children": [
+                                    {
+                                      "name": "value: Call()",
+                                      "children": [
+                                        {
+                                          "name": "func: Name(id=LoginResponse)",
+                                          "children": [
+                                            {
+                                              "name": "ctx: Load"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "name": "keywords[2]",
+                                          "children": [
+                                            {
+                                              "name": "keyword",
+                                              "children": [
+                                                {
+                                                  "name": "value: Constant(200)"
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "name": "keyword",
+                                              "children": [
+                                                {
+                                                  "name": "value: List",
+                                                  "children": [
+                                                    {
+                                                      "name": "elts[1]",
+                                                      "children": [
+                                                        {
+                                                          "name": "Name(id=message_dict)",
+                                                          "children": [
+                                                            {
+                                                              "name": "ctx: Load"
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    {
+                                                      "name": "ctx: Load"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "returns: Name(id=LoginResponse)",
+              "children": [
+                {
+                  "name": "ctx: Load"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+};
+        
+        const width = window.innerWidth - 80;
+        const height = window.innerHeight - 200;
+        
+        const svg = d3.select("#tree-container")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .append("g")
+            .attr("transform", "translate(40,20)");
+        
+        const treemap = d3.tree().size([height - 40, width - 200]);
+        
+        let root = d3.hierarchy(treeDataJson);
+        root.x0 = height / 2;
+        root.y0 = 0;
+        
+        let i = 0;
+        
+        // 初期状態で一部を折りたたむ
+        if (root.children) {
+            root.children.forEach(collapse);
+        }
+        
+        update(root);
+        
+        function collapse(d) {
+            if (d.children) {
+                d._children = d.children;
+                d._children.forEach(collapse);
+                d.children = null;
+            }
+        }
+        
+        function update(source) {
+            const treeData = treemap(root);
+            const nodes = treeData.descendants();
+            const links = treeData.descendants().slice(1);
+            
+            nodes.forEach(d => { d.y = d.depth * 180; });
+            
+            const node = svg.selectAll("g.node")
+                .data(nodes, d => d.id || (d.id = ++i));
+            
+            const nodeEnter = node.enter().append("g")
+                .attr("class", "node")
+                .attr("transform", d => `translate(${source.y0},${source.x0})`)
+                .on("click", click);
+            
+            nodeEnter.append("circle")
+                .attr("r", 1e-6)
+                .attr("class", d => d._children ? "has-children" : "");
+            
+            nodeEnter.append("text")
+                .attr("dy", ".35em")
+                .attr("x", d => d.children || d._children ? -13 : 13)
+                .attr("text-anchor", d => d.children || d._children ? "end" : "start")
+                .text(d => d.data.name);
+            
+            const nodeUpdate = nodeEnter.merge(node);
+            
+            nodeUpdate.transition()
+                .duration(750)
+                .attr("transform", d => `translate(${d.y},${d.x})`);
+            
+            nodeUpdate.select("circle")
+                .attr("r", 6)
+                .attr("class", d => d._children ? "has-children" : "");
+            
+            const nodeExit = node.exit().transition()
+                .duration(750)
+                .attr("transform", d => `translate(${source.y},${source.x})`)
+                .remove();
+            
+            nodeExit.select("circle").attr("r", 1e-6);
+            nodeExit.select("text").style("fill-opacity", 1e-6);
+            
+            const link = svg.selectAll("path.link")
+                .data(links, d => d.id);
+            
+            const linkEnter = link.enter().insert("path", "g")
+                .attr("class", "link")
+                .attr("d", d => {
+                    const o = {x: source.x0, y: source.y0};
+                    return diagonal(o, o);
+                });
+            
+            const linkUpdate = linkEnter.merge(link);
+            
+            linkUpdate.transition()
+                .duration(750)
+                .attr("d", d => diagonal(d, d.parent));
+            
+            link.exit().transition()
+                .duration(750)
+                .attr("d", d => {
+                    const o = {x: source.x, y: source.y};
+                    return diagonal(o, o);
+                })
+                .remove();
+            
+            nodes.forEach(d => {
+                d.x0 = d.x;
+                d.y0 = d.y;
+            });
+        }
+        
+        function diagonal(s, d) {
+            return `M ${s.y} ${s.x}
+                    C ${(s.y + d.y) / 2} ${s.x},
+                      ${(s.y + d.y) / 2} ${d.x},
+                      ${d.y} ${d.x}`;
+        }
+        
+        function click(event, d) {
+            if (d.children) {
+                d._children = d.children;
+                d.children = null;
+            } else {
+                d.children = d._children;
+                d._children = null;
+            }
+            update(d);
+        }
+    </script>
+</body>
+</html>

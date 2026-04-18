@@ -1,0 +1,1084 @@
+{
+  "elements": {
+    "nodes": [
+      {
+        "data": {
+          "id": "0",
+          "label": "translate_code",
+          "qname": "translate_code",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\azure_ai_operation_service.py",
+          "lineno": 43,
+          "col": 0,
+          "code": "def translate_code(code_text: str) -> str:\n    \"\"\"\n    入力されたコードに対して処理内容を解析してMarkdownテキストを生成する関数\n\n    Args\n    -----------------\n    - code_text: str,                       アップロードされたコード\n\n    Returns\n    -----------------\n    - translated_code_text: str,            解析したコード内容(標準MD形式)\n\n    \"\"\"\n    ## ファイルの中身が存在しない場合\n    if len(code_text) == 0:\n        # エラー時のメッセージを返却\n        return FAILURE_TEXT\n\n    ## セキュリティ上問題のある記述がある場合は報告\n    # プロンプト付与\n    cast_message = SECURE_PROMPT + \"```markdown\" + code_text + \"```\"\n    # 入力データを履歴に追加\n    chat_history = copy.deepcopy(CHAT_TEMPLATE)\n    chat_history.append({\"role\": \"user\", \"content\": cast_message})\n    # モデルにデータ送信\n    response = client.chat.completions.create(\n        model=MODEL_NAME,\n        messages=chat_history\n    )\n    # モデルからのレスポンスを取得\n    secured_text = response.choices[0].message.content.strip()\n    # セキュリティ上問題のある記述が検知された場合はエラーメッセージを返却\n    if secured_text == \"1\":\n        return FAILURE_TEXT\n\n    ## コード変換処理\n    # 事前学習メッセージ用意\n    few_shot_message = SAMPLE_CODE + FEW_SHOT_PROMPT_TEXT + SAMPLE_RESPONSE + FEW_SHOT_PROMPT_DETAIL\n    # コードに対してプロンプトを付与\n    cast_message = \"```\" + code_text + \"```\" + PROMPT_TEXT\n    # 入力データを履歴に追加\n    chat_history = copy.deepcopy(CHAT_TEMPLATE)\n    chat_history.append({\"role\": \"user\", \"content\": few_shot_message})\n    chat_history.append({\"role\": \"user\", \"content\": cast_message})\n    # モデルにデータ送信\n    response = client.chat.completions.create(\n        model=MODEL_NAME,\n        messages=chat_history\n    )\n    # モデルからのレスポンスを取得\n    translated_code_text = response.choices[0].message.content.strip()\n    # レスポンスからマークダウンのコードブロックを除去\n    translated_code_text = translated_code_text.replace(\"```markdown\", \"\").replace(\"```\", \"\")\n\n    return translated_code_text"
+        }
+      },
+      {
+        "data": {
+          "id": "1",
+          "label": "update_code",
+          "qname": "update_code",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\azure_ai_operation_service.py",
+          "lineno": 100,
+          "col": 0,
+          "code": "def update_code(code_text: str, markdown_text: str, summary_text: str) -> str:\n    \"\"\"\n    入力されたコードと実装仕様が記載されたmarkdownに対して, 実装仕様に基づいてコードを修正して返却する関数\n\n    Args\n    -----------------\n    - code_text: str,                       入力されたコード\n    - markdown_text: str,                   入力されたコードに記載される処理仕様\n    - summary_text: str,                    プロジェクト情報の要約\n\n    Returns\n    -----------------\n    - updated_code_text: str,               修正されたコード\n\n    \"\"\"\n    ## コードの中身が存在しない場合\n    if len(code_text) == 0:\n        # 入力されたデータをそのまま返却\n        return code_text\n\n    ## セキュリティ上問題のある記述がある場合は報告(コード側)\n    # プロンプト付与\n    cast_message = SECURE_PROMPT + \"```markdown\" + code_text + \"```\"\n    # 入力データを履歴に追加\n    chat_history = copy.deepcopy(CHAT_TEMPLATE)\n    chat_history.append({\"role\": \"user\", \"content\": cast_message})\n    # モデルにデータ送信\n    response = client.chat.completions.create(\n        model=MODEL_NAME,\n        messages=chat_history\n    )\n    # モデルからのレスポンスを取得\n    secured_text = response.choices[0].message.content.strip()\n    # セキュリティ上問題のある記述が検知された場合は入力値をそのまま返却\n    if secured_text == \"1\":\n        return code_text\n\n    ## セキュリティ上問題のある記述がある場合は報告(Markdown側)\n    # プロンプト付与\n    cast_message = SECURE_PROMPT + \"```markdown\" + markdown_text + \"```\"\n    # 入力データを履歴に追加\n    chat_history = copy.deepcopy(CHAT_TEMPLATE)\n    chat_history.append({\"role\": \"user\", \"content\": cast_message})\n    # モデルにデータ送信\n    response = client.chat.completions.create(\n        model=MODEL_NAME,\n        messages=chat_history\n    )\n    # モデルからのレスポンスを取得\n    secured_text = response.choices[0].message.content.strip()\n    # セキュリティ上問題のある記述が検知された場合は入力値をそのまま返却\n    if secured_text == \"1\":\n        return code_text\n\n    ## コード更新処理\n    # チャット履歴用意\n    chat_history = copy.deepcopy(CHAT_TEMPLATE)\n    # 要約が設定されている場合はプロンプトに追加\n    if len(summary_text) > 0:\n        advance_text = \"```markdown\" + summary_text + \"```\" + ADVANCE_PROMPT\n        # 要約データを履歴に追加\n        chat_history.append({\"role\": \"user\", \"content\": advance_text})\n    # コードとMarkdownに対してプロンプトを付与\n    cast_message = \"```\" + markdown_text + \"```\" + UPDATE_PROMPT_TEXT + \"```\" + code_text + \"```\" + UPDATE_PROMPT_TEXT_DETAIL\n    # 入力データを履歴に追加\n    chat_history.append({\"role\": \"user\", \"content\": cast_message})\n    # モデルにデータ送信\n    response = client.chat.completions.create(\n        model=MODEL_NAME,\n        messages=chat_history\n    )\n    # モデルからのレスポンスを取得\n    updated_code_text = response.choices[0].message.content.strip()\n    # レスポンスからpythonのコードブロックを除去\n    updated_code_text = updated_code_text.replace(\"```python\", \"\").replace(\"```\", \"\")\n\n    return updated_code_text"
+        }
+      },
+      {
+        "data": {
+          "id": "2",
+          "label": "summary_project",
+          "qname": "summary_project",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\azure_ai_operation_service.py",
+          "lineno": 179,
+          "col": 0,
+          "code": "def summary_project(project_json: str) -> str:\n    \"\"\"\n    入力されたプロジェクトデータに対して, 全体の仕様を要約して返却する関数\n\n    Args\n    -----------------\n    - project_json: str,                変換対象の全ファイルの情報からなるJSON\n\n    Returns\n    -----------------\n    - summary_project_text: str,        修正されたコード\n\n    \"\"\"\n    ## 要約対象データが存在しない場合\n    if len(project_json) == 0:\n        # 空の文字列を返却\n        return \"\"\n\n    ## プロジェクト要約処理\n    # プロジェクト情報のJSONに対してプロンプトを付与\n    cast_message = \"```\" + project_json + \"```\" + SUMMARY_PROMPT_TEXT + SAMPLE_SUMMARY\n    # 入力データを履歴に追加\n    chat_history = copy.deepcopy(CHAT_TEMPLATE)\n    chat_history.append({\"role\": \"user\", \"content\": cast_message})\n    # モデルにデータ送信\n    response = client.chat.completions.create(\n        model=MODEL_NAME,\n        messages=chat_history\n    )\n    # モデルからのレスポンスを取得\n    summary_project_text = response.choices[0].message.content.strip()\n    # レスポンスからマークダウンのコードブロックを除去\n    summary_project_text = summary_project_text.replace(\"```markdown\", \"\").replace(\"```\", \"\")\n\n    return summary_project_text"
+        }
+      },
+      {
+        "data": {
+          "id": "3",
+          "label": "review_code",
+          "qname": "review_code",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\azure_ai_operation_service.py",
+          "lineno": 217,
+          "col": 0,
+          "code": "def review_code(code_text: str, markdown_text: str, summary_text: str) -> str:\n    \"\"\"\n    入力されたコードと実装仕様が記載されたmarkdownに対して, 実装仕様に基づいてコードをレビューして返却する関数\n\n    Args\n    -----------------\n    - code_text: str,                       入力されたコード\n    - markdown_text: str,                   入力されたコードと比較する処理仕様\n    - summary_text: str,                    プロジェクト情報の要約\n\n    Returns\n    -----------------\n    - reviewed_text: str,                   レビュー結果\n\n    \"\"\"\n    ## コードの中身が存在しない場合\n    if len(code_text) == 0:\n        # 入力されたデータをそのまま返却\n        return code_text\n\n    ## セキュリティ上問題のある記述がある場合は報告(コード側)\n    # プロンプト付与\n    cast_message = SECURE_PROMPT + \"```markdown\" + code_text + \"```\"\n    # 入力データを履歴に追加\n    chat_history = copy.deepcopy(CHAT_TEMPLATE)\n    chat_history.append({\"role\": \"user\", \"content\": cast_message})\n    # モデルにデータ送信\n    response = client.chat.completions.create(\n        model=MODEL_NAME,\n        messages=chat_history\n    )\n    # モデルからのレスポンスを取得\n    secured_text = response.choices[0].message.content.strip()\n    # セキュリティ上問題のある記述が検知された場合は空文字を返却\n    if secured_text == \"1\":\n        return \"\"\n\n    ## セキュリティ上問題のある記述がある場合は報告(Markdown側)\n    # プロンプト付与\n    cast_message = SECURE_PROMPT + \"```markdown\" + markdown_text + \"```\"\n    # 入力データを履歴に追加\n    chat_history = copy.deepcopy(CHAT_TEMPLATE)\n    chat_history.append({\"role\": \"user\", \"content\": cast_message})\n    # モデルにデータ送信\n    response = client.chat.completions.create(\n        model=MODEL_NAME,\n        messages=chat_history\n    )\n    # モデルからのレスポンスを取得\n    secured_text = response.choices[0].message.content.strip()\n    # セキュリティ上問題のある記述が検知された場合は空文字を返却\n    if secured_text == \"1\":\n        return \"\"\n\n    ## コードレビュー処理\n    # チャット履歴用意\n    chat_history = copy.deepcopy(CHAT_TEMPLATE)\n    # 要約が設定されている場合はプロンプトに追加\n    if len(summary_text) > 0:\n        advance_text = \"```markdown\" + summary_text + \"```\" + ADVANCE_PROMPT\n        # 要約データを履歴に追加\n        chat_history.append({\"role\": \"user\", \"content\": advance_text})\n    # コードとMarkdownに対してプロンプトを付与\n    cast_message = \"```\" + markdown_text + \"```\" + REVIEW_PROMPT_TEXT + \"```\" + code_text + \"```\" + REVIEW_PROMPT_TEXT_DETAIL + SAMPLE_REVIEW\n    # 入力データを履歴に追加\n    chat_history.append({\"role\": \"user\", \"content\": cast_message})\n    # モデルにデータ送信\n    response = client.chat.completions.create(\n        model=MODEL_NAME,\n        messages=chat_history\n    )\n    # モデルからのレスポンスを取得\n    reviewed_text = response.choices[0].message.content.strip()\n    # レスポンスからマークダウンのコードブロックを除去\n    reviewed_text = reviewed_text.replace(\"```markdown\", \"\").replace(\"```\", \"\")\n\n    return reviewed_text"
+        }
+      },
+      {
+        "data": {
+          "id": "4",
+          "label": "upload_multiple_files",
+          "qname": "upload_multiple_files",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\azure_files_operation_service.py",
+          "lineno": 9,
+          "col": 0,
+          "code": "def upload_multiple_files(file_data_list: list[dict[int, str]], user_id: int, task_id: int, target_share_name: str = FileShareName.RESULT.value):\n    \"\"\"\n    入力された文字列をファイル形式に変換してAzure Filesにアップロードする処理の並列化関数\n\n    Args\n    -----------------\n    - file_data_list: list[dict],       Azure Filesにアップロードするファイルの中身からなる配列 ex) [{\"object_id\": 1, \"text\": \"# テスト \\n ## 項目 ... \\n\"}, ...]\n    - user_id: int,                     アップロードするユーザのユーザID\n    - task_id: int,                     アップロード対象のファイルが属するタスクID\n    - target_share_name: str,           アップロードする対象のファイル共有名称\n\n    \"\"\"\n    # 複数ファイルを同時にアップロード\n    with ThreadPoolExecutor(max_workers=MAX_FILE_UPLOAD_NUM) as executor:\n        # 入れ物用意\n        futures = []\n        # アップロード対象のファイルごとに処理\n        for file_data in file_data_list:\n            # アップロード処理呼び出し\n            future = executor.submit(\n                upload_file,\n                file_data[\"text\"],\n                user_id,\n                task_id,\n                file_data[\"object_id\"],\n                target_share_name\n            )\n            futures.append(future)\n\n        # すべてのアップロード処理が完了していることを確認\n        for future in as_completed(futures):\n            try:\n                future.result()\n            except Exception as e:\n                print(f\"ファイル共有への並列アップロード処理中にエラーになりました。ユーザID : {user_id}, タスクID : {task_id}, エラー : {str(e)}\")"
+        }
+      },
+      {
+        "data": {
+          "id": "5",
+          "label": "upload_file",
+          "qname": "upload_file",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\azure_files_operation_service.py",
+          "lineno": 46,
+          "col": 0,
+          "code": "def upload_file(upload_file_text: str, user_id: int, task_id: int, object_id: int, target_share_name: str=FileShareName.RESULT.value):\n    \"\"\"\n    入力された文字列をファイル形式に変換してAzure Filesにアップロードする\n\n    Args\n    -----------------\n    - upload_file_text: str,        Azure Filesにアップロードするファイルの中身\n    - user_id: int,                 アップロードするユーザのユーザID\n    - task_id: int,                 アップロード対象のファイルが属するタスクID\n    - object_id: int,               アップロード対象のファイルのアップロードオブジェクトID\n    - target_share_name: str,       アップロードする対象のファイル共有名称\n\n    \"\"\"\n    ## Azure Filesへの接続\n    # Azure Filesの接続情報作成\n    account_url = f\"https://{AZURE_STORAGE_ACCOUNT_NAME}.file.core.windows.net\"\n    # 接続作成\n    service = ShareServiceClient(account_url=account_url, credential=AZURE_STORAGE_ACCOUNT_KEY)\n    # ファイル共有のクライアント作成\n    share = service.get_share_client(TENANT_NAME)\n\n    ## Directory作成\n    # ユーザディレクトリのクライアント作成\n    user_dir_client = share.get_directory_client(str(user_id))\n    # 対象のディレクトリが存在しない場合は作成\n    try:\n        user_dir_client.create_directory()\n    except ResourceExistsError:\n        # 対象のディレクトリがすでに存在する場合は何もしない\n        pass\n    # アップロード対象のディレクトリのクライアント作成\n    upload_dir_client = user_dir_client.get_subdirectory_client(target_share_name)\n    # 対象のディレクトリが存在しない場合は作成\n    try:\n        upload_dir_client.create_directory()\n    except ResourceExistsError:\n        # 対象のディレクトリがすでに存在する場合は何もしない\n        pass\n    # タスクディレクトリのクライアント作成\n    task_dir_client = upload_dir_client.get_subdirectory_client(str(task_id))\n    # 対象のディレクトリが存在しない場合は作成\n    try:\n        task_dir_client.create_directory()\n    except ResourceExistsError:\n        # 対象のディレクトリがすでに存在する場合は何もしない\n        pass\n\n    ## ファイルアップロード\n    # 文字コードを変更\n    data = upload_file_text.encode(\"utf-8\")\n    # アップロードするファイルの名称設定\n    upload_file_name = str(object_id) + \".md\" # if target_share_name == FileShareName.RESULT.value else str(object_id) + \".py\"\n    # アップロード対象のファイルのクライアント作成\n    file_client = task_dir_client.get_file_client(upload_file_name)\n    # ファイル共有上の領域確保\n    try:\n        file_client.create_file(size=len(data))\n    except ResourceExistsError:\n        # 同名ファイルがすでに存在する場合は上書きする\n        file_client.delete_file()\n        file_client.create_file(size=len(data))\n    # ファイルをアップロード\n    file_client.upload_file(data)"
+        }
+      },
+      {
+        "data": {
+          "id": "6",
+          "label": "download_file",
+          "qname": "download_file",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\azure_files_operation_service.py",
+          "lineno": 111,
+          "col": 0,
+          "code": "def download_file(user_id: int, task_id: int, object_id: int, target_share_name: str=FileShareName.RESULT.value) -> str:\n    \"\"\"\n    Azure Files上のファイルを取得して文字列として返却する\n    ※ 取得対象のリソースが存在しない場合はResourceNotFoundErrorになるので呼び出しもとでハンドリングする\n\n    Args\n    -----------------\n    - user_id: int,                 ダウンロードするユーザのユーザID\n    - task_id: int,                 ダウンロード対象のファイルが属するタスクID\n    - object_id: int,               ダウンロード対象のファイルのアップロードオブジェクトID\n    - target_share_name: str,       ダウンロードする対象のファイル共有名称\n\n    \"\"\"\n    ## Azure Filesへの接続\n    # Azure Filesの接続情報作成\n    account_url = f\"https://{AZURE_STORAGE_ACCOUNT_NAME}.file.core.windows.net\"\n    # 接続作成\n    service = ShareServiceClient(account_url=account_url, credential=AZURE_STORAGE_ACCOUNT_KEY)\n    # ファイル共有のクライアント作成\n    share = service.get_share_client(TENANT_NAME)\n\n    ## ディレクトリパスの構築\n    # ユーザディレクトリのクライアント作成\n    user_dir_client = share.get_directory_client(str(user_id))\n    # アップロード対象のディレクトリのクライアント作成\n    download_dir_client = user_dir_client.get_subdirectory_client(target_share_name)\n    # タスクディレクトリのクライアント作成\n    task_dir_client = download_dir_client.get_subdirectory_client(str(task_id))\n\n    ## ファイルダウンロード\n    # ダウンロードするファイルの名称設定\n    download_file_name = str(object_id) + \".md\"\n    # ダウンロード対象のファイルのクライアント作成\n    file_client = task_dir_client.get_file_client(download_file_name)\n    # ファイルをダウンロード\n    download = file_client.download_file()\n    # ファイルの中身を取得\n    file_content = download.readall()\n    # UTF-8でデコードして返却\n    return file_content.decode(\"utf-8\")"
+        }
+      },
+      {
+        "data": {
+          "id": "7",
+          "label": "delete_task_directory",
+          "qname": "delete_task_directory",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\azure_files_operation_service.py",
+          "lineno": 153,
+          "col": 0,
+          "code": "def delete_task_directory(user_id: int, task_id: int, target_share_name: str=FileShareName.RESULT.value):\n    \"\"\"\n    Azure Files上の指定したタスクディレクトリ配下のデータをすべて削除する\n    ※ 削除対象のリソースが存在しない場合はResourceNotFoundErrorになるので呼び出しもとでハンドリングする\n\n    Args\n    -----------------\n    - user_id: int,                 削除対象のユーザID\n    - task_id: int,                 削除対象のタスクID\n    - target_share_name: str,       削除対象のファイル共有名称\n\n    \"\"\"\n    ## Azure Filesへの接続\n    # Azure Filesの接続情報作成\n    account_url = f\"https://{AZURE_STORAGE_ACCOUNT_NAME}.file.core.windows.net\"\n    # 接続作成\n    service = ShareServiceClient(account_url=account_url, credential=AZURE_STORAGE_ACCOUNT_KEY)\n    # ファイル共有のクライアント作成\n    share = service.get_share_client(TENANT_NAME)\n\n    ## ディレクトリパスの構築\n    # ユーザディレクトリのクライアント作成\n    user_dir_client = share.get_directory_client(str(user_id))\n    # 削除対象のディレクトリのクライアント作成\n    delete_dir_client = user_dir_client.get_subdirectory_client(target_share_name)\n    # タスクディレクトリのクライアント作成\n    task_dir_client = delete_dir_client.get_subdirectory_client(str(task_id))\n\n    ## ディレクトリ内のファイルをすべて削除\n    # ディレクトリ内のファイル or サブディレクトリのリストを取得\n    items = task_dir_client.list_directories_and_files()\n    # 各アイテムを削除\n    for item in items:\n        if item.get(\"is_directory\"):\n            # サブディレクトリの場合は再帰的に削除\n            subdir_client = task_dir_client.get_subdirectory_client(item[\"name\"])\n            subdir_client.delete_directory()\n        else:\n            # ファイルの場合は削除\n            file_client = task_dir_client.get_file_client(item[\"name\"])\n            file_client.delete_file()\n\n    ## タスクディレクトリ自体を削除\n    task_dir_client.delete_directory()"
+        }
+      },
+      {
+        "data": {
+          "id": "8",
+          "label": "code_text_to_markdown",
+          "qname": "code_text_to_markdown",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\chat_translate_service.py",
+          "lineno": 8,
+          "col": 0,
+          "code": "def code_text_to_markdown(code_text: str) -> CodeTranslateResponse:\n    \"\"\"\n    入力されたコードをAIに送信して解析結果を返却する関数\n\n    Args\n    -----------------\n    - code_text: str,                       入力されたコード\n\n    Returns\n    -----------------\n    - response: CodeTranslateResponse,      レスポンス\n\n    \"\"\"\n    try:\n        # コード変換処理を実行\n        result_text = azure_ai_operation_service.translate_code(code_text)\n        # レスポンス返却\n        return CodeTranslateResponse(status=200, messages=[], code_text=\"\", markdown_text=result_text)\n    except Exception as e:\n        # 該当のエラーメッセージを作成\n        error_dict = {\n            \"message_id\": \"msg-E-XXXX\",\n            \"message_type\": \"error\",\n            \"message\": \"コードの変換処理に失敗しました。お手数ですが少し時間を空けて再度お試しください。\",\n        }\n        # レスポンス返却\n        return CodeTranslateResponse(status=200, messages=[error_dict], code_text=\"\", markdown_text=\"\")"
+        }
+      },
+      {
+        "data": {
+          "id": "9",
+          "label": "markdown_to_code_text",
+          "qname": "markdown_to_code_text",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\chat_translate_service.py",
+          "lineno": 37,
+          "col": 0,
+          "code": "def markdown_to_code_text(code_text: str, markdown_text: str, summary_flag: bool, user_id: int, task_id: int) -> CodeTranslateResponse:\n    \"\"\"\n    入力されたMarkdownとコードをAIに送信して修正結果を返却する関数\n\n    Args\n    -----------------\n    - code_text: str,                       入力されたコード\n    - markdown_text: str,                   入力されたコードに記載される処理仕様\n    - summary_flag: bool,                   プロジェクト情報を反映するかどうか\n    - user_id: int,                         ユーザID\n    - task_id: int,                         タスクID\n\n    Returns\n    -----------------\n    - response: CodeTranslateResponse,      レスポンス\n\n    \"\"\"\n    # 入れ物用意\n    error_list = []\n    # 要約情報が指定されていない場合は空文字を設定\n    summary_text = \"\"\n\n    ## プロジェクト情報読み込み\n    try:\n        # プロジェクト情報が読み込まれている場合は情報取得\n        if summary_flag:\n            # ファイル共有から要約を取得\n            summary_text = azure_files_operation_service.download_file(user_id, task_id, 0, FileShareName.SUMMARY.value)\n    except Exception:\n        # 要約情報が取得できなかった場合は警告を表示\n        error_dict = {\n            \"message_id\": \"msg-W-XXXX\",\n            \"message_type\": \"warning\",\n            \"message\": \"プロジェクト情報が読み込めないためコードの修正ができません。\",\n        }\n        # メッセージ追加\n        error_list.append(error_dict)\n        # レスポンス返却\n        return CodeTranslateResponse(status=200, messages=error_list, code_text=\"\", markdown_text=\"\")\n\n    ## コード更新処理\n    try:\n        # コード更新処理を実行\n        result_code = azure_ai_operation_service.update_code(code_text, markdown_text, summary_text)\n        # レスポンス返却\n        return CodeTranslateResponse(status=200, messages=error_list, code_text=result_code, markdown_text=\"\")\n    except Exception:\n        # 該当のエラーメッセージを作成\n        error_dict = {\n            \"message_id\": \"msg-E-XXXX\",\n            \"message_type\": \"error\",\n            \"message\": \"コードの修正処理に失敗しました。お手数ですが少し時間を空けて再度お試しください。\",\n        }\n        # メッセージ追加\n        error_list.append(error_dict)\n        # レスポンス返却\n        return CodeTranslateResponse(status=200, messages=error_list, code_text=\"\", markdown_text=\"\")"
+        }
+      },
+      {
+        "data": {
+          "id": "10",
+          "label": "create_new_task",
+          "qname": "create_new_task",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\chat_translate_service.py",
+          "lineno": 154,
+          "col": 0,
+          "code": "def create_new_task(task_name: str, upload_file_name: str, upload_file_text: str, user_id: int) -> CodeTranslateResponse:\n    \"\"\"\n    タスクを新規作成して変換結果を保存する処理\n\n    Args\n    -----------------\n    - task_name: str,                   作成するタスク名称\n    - upload_file_name: str,            登録するファイルの名称\n    - upload_file_text: str,            変換結果のテキスト\n    - user_id: int,                     ユーザID\n\n    Returns\n    -----------------\n    - response: CodeTranslateResponse,      レスポンス\n\n    \"\"\"\n    ## 入力情報の確認\n    # TODO ファイル名が条件を満たしているか確認する処理を追加\n    # タスク名称が条件を満たしているか確認\n    error_list = common_validate.length_validation(\"タスク名称\", task_name, 1, 255)\n    # エラーが検知された場合\n    if len(error_list) > 0:\n        # レスポンス返却\n        return CodeTranslateResponse(status=200, messages=error_list, code_text=\"\", markdown_text=\"\")\n\n    ## データ登録\n    # TODO エラー時の後処理は後で実装する\n    try:\n        # DBにタスク作成\n        df = db_access_service.insert_task(task_name, user_id)\n        # タスクIDを取得\n        task_id = int(df[\"task_id\"].values[0])\n        # タスク状態をDONEに更新\n        db_access_service.update_task_state(task_id, TaskState.DONE.value)\n        # 入力されたファイルをアップロードされたデータとして登録\n        df_upload = db_access_service.insert_upload_object(upload_file_name, \"file\", upload_file_name, task_id, user_id)\n        # オブジェクトIDを取得\n        object_id = int(df_upload[\"upload_object_id\"].values[0])\n        # 入力されたデータを変換結果のファイルとしてDBに登録\n        df_result = db_access_service.insert_result_file(str(object_id) + \".md\", object_id, task_id, user_id)\n        # 入力されたデータを変換結果のファイルとしてファイル共有に登録\n        azure_files_operation_service.upload_file(upload_file_text, user_id, task_id, object_id, FileShareName.RESULT.value)\n        # 正常終了時のメッセージ作成\n        message_dict = {\n            \"message_id\": \"msg-I-XXXX\",\n            \"message_type\": \"info\",\n            \"message\": \"コード情報のタスクへの登録が完了しました。\",\n        }\n        # レスポンス返却\n        return CodeTranslateResponse(status=200, messages=[message_dict], code_text=\"\", markdown_text=\"\")\n    except Exception:\n        # 異常終了時のメッセージ作成\n        message_dict = {\n            \"message_id\": \"msg-E-XXXX\",\n            \"message_type\": \"error\",\n            \"message\": \"コード情報のタスクへのに失敗しました。お手数ですが時間を空けて再度お試しください。\",\n        }\n        # レスポンス返却\n        return CodeTranslateResponse(status=200, messages=[message_dict], code_text=\"\", markdown_text=\"\")"
+        }
+      },
+      {
+        "data": {
+          "id": "11",
+          "label": "length_validation",
+          "qname": "length_validation",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\common_validate.py",
+          "lineno": 7,
+          "col": 0,
+          "code": "def length_validation(display_string: str, target_string: str, l_min: int, l_max: int) -> list[dict[str, str]]:\n    \"\"\"\n    入力された文字列から半角/全角スペースを除いた長さが, 指定された範囲以内に収まっているかをチェックする関数\n\n    Args\n    -----------------\n    - display_string; str,              表示文字列\n    - target_string: str,               確認対象文字列\n    - l_min: int,                       最小値\n    - l_max: int,                       最大値\n\n    Returns\n    -----------------\n    - error_list: list[dict],           エラーリスト\n\n    \"\"\"\n    # 入れ物用意\n    error_list = []\n    # 半角/全角スペースを削除\n    remove_string = target_string.replace(\" \", \"\").replace(\"　\", \"\")\n    # 長さが条件に満たない場合\n    if (len(remove_string) == 0) or (len(target_string) < l_min) or (l_max < len(target_string)):\n        # 該当のエラーメッセージを取得\n        error_dict = db_access_service.select_message(\"msg-E-0002\")\n        # 表示用の文言をセット\n        error_dict[\"message\"] = error_dict[\"message\"].format(display_string, display_string, l_min, l_max)\n        # エラーのリストに追加\n        error_list.append(error_dict)\n\n    return error_list"
+        }
+      },
+      {
+        "data": {
+          "id": "12",
+          "label": "filter_data",
+          "qname": "filter_data",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\common_validate.py",
+          "lineno": 39,
+          "col": 0,
+          "code": "def filter_data(metadata_list: list[dict]) -> list[bool]:\n    \"\"\"\n    変換対象として登録されたオブジェクト配列に合わせて, 変換対象として適切(True)か不適切(False)かを判別して返却する\n\n    Args\n    -----------------\n    - metadata_list: list[dict],            変換対象のオブジェクト情報からなる配列\n\n    Returns\n    -----------------\n    - filter_result: list[bool],            変換対象のデータの判定結果からなる配列\n\n    \"\"\"\n    # フィルタ結果の配列用意\n    filter_result = []\n    # 変換対象のオブジェクトごとに確認\n    for meta in metadata_list:\n        # オブジェクト種別がfolderの場合\n        if meta[\"upload_object_type\"] == \"folder\":\n            # フィルタ結果の配列にTrueを追加\n            filter_result.append(True)\n        # オブジェクト種別がfileの場合\n        else:\n            # ファイル名称から拡張子を取得\n            _, ext = os.path.splitext(meta[\"upload_object_name\"])\n            # 変換対象のファイル形式か確認\n            result = ext in TRANSLATABLE_FILE_EXT\n            # フィルタ結果の配列に追加\n            filter_result.append(result)\n\n    # フィルタ結果を返却\n    return filter_result"
+        }
+      },
+      {
+        "data": {
+          "id": "13",
+          "label": "select_message",
+          "qname": "select_message",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 14,
+          "col": 0,
+          "code": "############################################################\n## m_messageテーブル\n############################################################\ndef select_message(message_id: int) -> dict[str, str]:\n    \"\"\"\n    m_messageテーブルから該当するメッセージIDを持つメッセージを取得する\n\n    Args\n    -----------------\n    - message_id: int,              メッセージID\n\n    Returns\n    -----------------\n    - message_dict: dict,           取得したメッセージ情報\n\n    \"\"\"\n    # SQLQueryの実行\n    df = pd.read_sql(text(\"SELECT * FROM [dbo].[m_message] WHERE message_id = :message_id\"), con=engine, params={\"message_id\": message_id})\n    # 辞書に変換して返却\n    return df.iloc[0].to_dict()"
+        }
+      },
+      {
+        "data": {
+          "id": "14",
+          "label": "select_user",
+          "qname": "select_user",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 36,
+          "col": 0,
+          "code": "############################################################\n## m_userテーブル\n############################################################\ndef select_user(mail_address: str) -> pd.DataFrame:\n    \"\"\"\n    m_userテーブルから該当するメールアドレスを持つユーザの情報を取得する\n\n    Args\n    -----------------\n    - mail_address: str,            ユーザのメールアドレス\n\n    Returns\n    -----------------\n    - df: pd.DataFrame,             取得したユーザ情報\n\n    \"\"\"\n    # SQLQueryの実行\n    df = pd.read_sql(text(\"SELECT * FROM [dbo].[m_user] WHERE mail_address = :mail_address\"), con=engine, params={\"mail_address\": mail_address})\n    # パスワードについては照合のためByte文字に変換\n    df[\"password\"] = df[\"password\"].astype(bytes)\n\n    return df"
+        }
+      },
+      {
+        "data": {
+          "id": "15",
+          "label": "select_task_by_user_id",
+          "qname": "select_task_by_user_id",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 60,
+          "col": 0,
+          "code": "############################################################\n## t_taskテーブル\n############################################################\ndef select_task_by_user_id(user_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_taskテーブルから該当するユーザIDを持つタスクすべての情報を取得する\n\n    Args\n    -----------------\n    - user_id: int,                 ユーザID\n\n    Returns\n    -----------------\n    - df: pd.DataFrame,             取得したタスク情報\n\n    \"\"\"\n    # SQLQueryの実行\n    df = pd.read_sql(text(\"SELECT * FROM [dbo].[t_task] WHERE user_id = :user_id\"), con=engine, params={\"user_id\": user_id})\n\n    return df"
+        }
+      },
+      {
+        "data": {
+          "id": "16",
+          "label": "select_task_by_task_id",
+          "qname": "select_task_by_task_id",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 79,
+          "col": 0,
+          "code": "def select_task_by_task_id(task_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_taskテーブルから該当するタスクIDを持つタスクの情報を取得する\n\n    Args\n    -----------------\n    - task_id: int,                 タスクID\n\n    Returns\n    -----------------\n    - df: pd.DataFrame,             取得したタスク情報\n\n    \"\"\"\n    # SQLQueryの実行\n    df = pd.read_sql(text(\"SELECT * FROM [dbo].[t_task] WHERE task_id = :task_id\"), con=engine, params={\"task_id\": task_id})\n\n    return df"
+        }
+      },
+      {
+        "data": {
+          "id": "17",
+          "label": "insert_task",
+          "qname": "insert_task",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 98,
+          "col": 0,
+          "code": "def insert_task(task_name: str, user_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_taskテーブルに新しいタスクを作成する\n\n    Args\n    -----------------\n    - task_name: str,                   作成するタスク名称\n    - user_id: int,                     タスクを作成したユーザのユーザID\n\n    Returns\n    -----------------\n    - df_task: pd.DataFrame,            DBにINSERTしたタスク情報からなるDataFrame\n\n    \"\"\"\n    # INSERTするデータを作成\n    task = TTask(task_name=task_name, task_state_id=TaskState.WAITING.value, update_at=datetime.now(), user_id=user_id)\n\n    ## DB処理\n    try:\n        # INSERT処理実行\n        db.add(task)\n        # 問題なければコミット\n        db.commit()\n        # 自動採番された値を反映\n        db.refresh(task)\n    except Exception as e:\n        # エラーが発生した場合はロールバック\n        db.rollback()\n        raise e\n    finally:\n        # セッションを閉じる\n        db.close()\n\n    # INSERTしたタスク情報をDataFrameに成形\n    df_task = pd.DataFrame(\n        [\n            {\"task_id\": task.task_id, \"task_name\": task.task_name, \"task_state_id\": task.task_state_id, \"update_at\": task.update_at, \"user_id\": task.user_id}\n        ]\n    )\n\n    return df_task"
+        }
+      },
+      {
+        "data": {
+          "id": "18",
+          "label": "update_task_name",
+          "qname": "update_task_name",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 141,
+          "col": 0,
+          "code": "def update_task_name(task_id: int, task_name: str) -> pd.DataFrame:\n    \"\"\"\n    t_taskテーブルに存在するタスクのタスク名称を更新する\n\n    Args\n    -----------------\n    - task_id: int,                     タスク名称を更新するタスクのタスクID\n    - task_name: str,                   更新するタスク名称\n\n    Returns\n    -----------------\n    - df_task: pd.DataFrame,            UPDATEしたタスク情報からなるDataFrame\n\n    \"\"\"\n    ## DB処理\n    try:\n        # 更新するタスク情報を取得\n        task = db.get(TTask, task_id)\n        # 対象のデータが存在しない場合\n        if task is None:\n            # 空のDataFrameを返却\n            return pd.DataFrame()\n\n        # タスク名称を更新\n        task.task_name = task_name\n        # タスクの更新時間を更新\n        task.update_at = datetime.now()\n        # 問題なければコミット\n        db.commit()\n        # 更新された値を反映\n        db.refresh(task)\n    except Exception as e:\n        # エラーが発生した場合はロールバック\n        db.rollback()\n        raise e\n    finally:\n        # セッションを閉じる\n        db.close()\n\n    # UPDATEしたタスク情報をDataFrameに成形\n    df_task = pd.DataFrame(\n        [\n            {\"task_id\": task.task_id, \"task_name\": task.task_name, \"task_state_id\": task.task_state_id, \"update_at\": task.update_at, \"user_id\": task.user_id}\n        ]\n    )\n\n    return df_task"
+        }
+      },
+      {
+        "data": {
+          "id": "19",
+          "label": "update_task_state",
+          "qname": "update_task_state",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 190,
+          "col": 0,
+          "code": "def update_task_state(task_id: int, task_state: int) -> pd.DataFrame:\n    \"\"\"\n    t_taskテーブルに存在するタスクのタスク状態を更新する\n\n    Args\n    -----------------\n    - task_id: int,                     タスク状態を更新するタスクのタスクID\n    - task_state: int,                  更新するタスク状態\n\n    Returns\n    -----------------\n    - df_task: pd.DataFrame,            UPDATEしたタスク情報からなるDataFrame\n\n    \"\"\"\n    ## DB処理\n    try:\n        # 更新するタスク情報を取得\n        task = db.get(TTask, task_id)\n        # 対象のデータが存在しない場合\n        if task is None:\n            # 空のDataFrameを返却\n            return pd.DataFrame()\n\n        # タスク状態を更新\n        task.task_state_id = task_state\n        # タスクの更新時間を更新\n        task.update_at = datetime.now()\n        # 問題なければコミット\n        db.commit()\n        # 更新された値を反映\n        db.refresh(task)\n    except Exception as e:\n        # エラーが発生した場合はロールバック\n        db.rollback()\n        raise e\n    finally:\n        # セッションを閉じる\n        db.close()\n\n    # UPDATEしたタスク情報をDataFrameに成形\n    df_task = pd.DataFrame(\n        [\n            {\"task_id\": task.task_id, \"task_name\": task.task_name, \"task_state_id\": task.task_state_id, \"update_at\": task.update_at, \"user_id\": task.user_id}\n        ]\n    )\n\n    return df_task"
+        }
+      },
+      {
+        "data": {
+          "id": "20",
+          "label": "delete_task",
+          "qname": "delete_task",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 239,
+          "col": 0,
+          "code": "def delete_task(task_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_taskテーブルに存在するタスクを削除する\n\n    Args\n    -----------------\n    - task_id: int,                     削除するタスクのタスクID\n\n    Returns\n    -----------------\n    - df_task: pd.DataFrame,            DELETEしたタスク情報からなるDataFrame\n\n    \"\"\"\n    ## DB処理\n    try:\n        # 削除するタスク情報を取得\n        task = db.get(TTask, task_id)\n        # 対象のデータが存在しない場合\n        if task is None:\n            # 空のDataFrameを返却\n            return pd.DataFrame()\n\n        # タスクを削除\n        db.delete(task)\n        # 問題なければコミット\n        db.commit()\n    except Exception as e:\n        # エラーが発生した場合はロールバック\n        db.rollback()\n        raise e\n    finally:\n        # セッションを閉じる\n        db.close()\n\n    # DELETEしたタスク情報をDataFrameに成形\n    df_task = pd.DataFrame(\n        [\n            {\"task_id\": task.task_id, \"task_name\": task.task_name, \"task_state_id\": task.task_state_id, \"update_at\": task.update_at, \"user_id\": task.user_id}\n        ]\n    )\n\n    return df_task"
+        }
+      },
+      {
+        "data": {
+          "id": "21",
+          "label": "select_upload_object_by_task_id",
+          "qname": "select_upload_object_by_task_id",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 286,
+          "col": 0,
+          "code": "############################################################\n## t_upload_objectテーブル\n############################################################\ndef select_upload_object_by_task_id(task_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_upload_objectテーブルから該当するタスクIDを持つアップロードオブジェクトの情報を取得する\n\n    Args\n    -----------------\n    - task_id: int,                 タスクID\n\n    Returns\n    -----------------\n    - df: pd.DataFrame,             取得したアップロードオブジェクト情報\n\n    \"\"\"\n    # SQLQueryの実行\n    df = pd.read_sql(text(\"SELECT * FROM [dbo].[t_upload_object] WHERE task_id = :task_id ORDER BY upload_object_id ASC\"), con=engine, params={\"task_id\": task_id})\n\n    return df"
+        }
+      },
+      {
+        "data": {
+          "id": "22",
+          "label": "insert_upload_object",
+          "qname": "insert_upload_object",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 305,
+          "col": 0,
+          "code": "def insert_upload_object(upload_object_name: str, upload_object_type: str, full_path: str, task_id: int, user_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_upload_objectテーブルに新しいオブジェクトを追加する\n\n    Args\n    -----------------\n    - upload_object_name: str,          追加するオブジェクト名称\n    - upload_object_type: str,          追加するオブジェクトのタイプ(file/folder)\n    - full_path: str,                   追加するオブジェクトのフルパス\n    - task_id: int,                     オブジェクトを追加したタスクのタスクID\n    - user_id: int,                     オブジェクトを追加したユーザのユーザID\n\n    Returns\n    -----------------\n    - df_object: pd.DataFrame,          DBにINSERTしたオブジェクト情報からなるDataFrame\n\n    \"\"\"\n    # INSERTするデータを作成\n    object = TUploadObject(\n        upload_object_name=upload_object_name,\n        upload_object_type=upload_object_type,\n        full_path=full_path,\n        task_id=task_id,\n        user_id=user_id,\n    )\n\n    ## DB処理\n    try:\n        # INSERT処理実行\n        db.add(object)\n        # 問題なければコミット\n        db.commit()\n        # 自動採番された値を反映\n        db.refresh(object)\n    except Exception as e:\n        # エラーが発生した場合はロールバック\n        db.rollback()\n        raise e\n    finally:\n        # セッションを閉じる\n        db.close()\n\n    # INSERTしたオブジェクト情報をDataFrameに成形\n    df_object = pd.DataFrame(\n        [\n            {\n                \"upload_object_id\": object.upload_object_id,\n                \"upload_object_name\": object.upload_object_name,\n                \"upload_object_type\": object.upload_object_type,\n                \"full_path\": object.full_path,\n                \"task_id\": object.task_id,\n                \"user_id\": object.user_id,\n            }\n        ]\n    )\n\n    return df_object"
+        }
+      },
+      {
+        "data": {
+          "id": "23",
+          "label": "insert_upload_objects",
+          "qname": "insert_upload_objects",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 364,
+          "col": 0,
+          "code": "def insert_upload_objects(object_info_list: list[dict[str, int | str]], task_id: int, user_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_upload_objectテーブルに複数のオブジェクトを一括で追加する\n    ※ object_info_listの要素にはfile_sizeも存在するがここでは使用しない\n\n    Args\n    -----------------\n    - object_info_list: list[dict],         追加するオブジェクト情報のリスト ex) [{\"upload_object_name\": \"sample.py\", \"upload_object_type\": \"file, \"full_path\": \"src/sample.py\"}, ...]\n    - task_id: int,                         オブジェクトを追加したタスクのタスクID\n    - user_id: int,                         オブジェクトを追加したユーザのユーザID\n\n    Returns\n    -----------------\n    - df_objects: pd.DataFrame,             DBにINSERTしたオブジェクト情報からなるDataFrame\n\n    \"\"\"\n    # INSERTするデータのリストを作成\n    objects = [\n        TUploadObject(\n            upload_object_name=object_info[\"upload_object_name\"],\n            upload_object_type=object_info[\"upload_object_type\"],\n            full_path=object_info[\"full_path\"],\n            task_id=task_id,\n            user_id=user_id,\n        )\n        for object_info in object_info_list\n    ]\n\n    ## DB処理\n    try:\n        # 一括INSERT処理実行\n        db.add_all(objects)\n        # 問題なければコミット\n        db.commit()\n        # 自動採番された値を反映\n        for object in objects:\n            db.refresh(object)\n    except Exception as e:\n        # エラーが発生した場合はロールバック\n        db.rollback()\n        raise e\n    finally:\n        # セッションを閉じる\n        db.close()\n\n    # INSERTしたオブジェクト情報をDataFrameに成形\n    df_objects = pd.DataFrame(\n        [\n            {\n                \"upload_object_id\": object.upload_object_id,\n                \"upload_object_name\": object.upload_object_name,\n                \"upload_object_type\": object.upload_object_type,\n                \"full_path\": object.full_path,\n                \"task_id\": object.task_id,\n                \"user_id\": object.user_id,\n            }\n            for object in objects\n        ]\n    )\n\n    return df_objects"
+        }
+      },
+      {
+        "data": {
+          "id": "24",
+          "label": "delete_upload_object",
+          "qname": "delete_upload_object",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 427,
+          "col": 0,
+          "code": "def delete_upload_object(task_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_upload_objectテーブルに存在するタスクIDに紐づくデータを削除する\n\n    Args\n    -----------------\n    - task_id: int,                         削除するアップロードオブジェクトのタスクID\n\n    Returns\n    -----------------\n    - df_upload_object: pd.DataFrame,       DELETEしたアップロードオブジェクト情報からなるDataFrame\n\n    \"\"\"\n    ## DB処理\n    try:\n        # Query作成\n        stmt = (\n            delete(TUploadObject)\n            .where(TUploadObject.task_id == task_id)\n            .returning(\n                TUploadObject.upload_object_id,\n                TUploadObject.upload_object_name,\n                TUploadObject.upload_object_type,\n                TUploadObject.full_path,\n                TUploadObject.task_id,\n                TUploadObject.user_id,\n            )\n        )\n        # Query実行\n        result = db.execute(stmt)\n        # DELETEした情報を取得\n        deleted_rows = result.fetchall()\n        # 問題なければコミット\n        db.commit()\n    except Exception as e:\n        # エラーが発生した場合はロールバック\n        db.rollback()\n        raise e\n    finally:\n        # セッションを閉じる\n        db.close()\n\n    # DELETEしたアップロードオブジェクト情報をDataFrameに成形\n    df_upload_object = pd.DataFrame(\n        deleted_rows,\n        columns=[\"upload_object_id\", \"upload_object_name\", \"upload_object_type\", \"full_path\", \"task_id\", \"user_id\"]\n    )\n\n    return df_upload_object"
+        }
+      },
+      {
+        "data": {
+          "id": "25",
+          "label": "select_result_file_by_task_id",
+          "qname": "select_result_file_by_task_id",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 481,
+          "col": 0,
+          "code": "############################################################\n## t_result_fileテーブル\n############################################################\ndef select_result_file_by_task_id(task_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_result_fileテーブルから該当するタスクIDを持つ変換結果ファイルの情報を取得する\n\n    Args\n    -----------------\n    - task_id: int,                 タスクID\n\n    Returns\n    -----------------\n    - df: pd.DataFrame,             取得した変換結果ファイル情報\n\n    \"\"\"\n    # SQLQueryの実行\n    df = pd.read_sql(text(\"SELECT * FROM [dbo].[t_result_file] WHERE task_id = :task_id\"), con=engine, params={\"task_id\": task_id})\n\n    return df"
+        }
+      },
+      {
+        "data": {
+          "id": "26",
+          "label": "insert_result_file",
+          "qname": "insert_result_file",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 500,
+          "col": 0,
+          "code": "def insert_result_file(result_file_name: str, original_file_id: int, task_id: int, user_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_result_fileテーブルに新しいファイルを追加する\n\n    Args\n    -----------------\n    - result_file_name: str,            追加するファイル名称\n    - original_file_id: str,            追加するファイルの変換元ファイルのID\n    - task_id: int,                     オブジェクトを追加したタスクのタスクID\n    - user_id: int,                     オブジェクトを追加したユーザのユーザID\n\n    Returns\n    -----------------\n    - df_file: pd.DataFrame,            DBにINSERTしたファイル情報からなるDataFrame\n\n    \"\"\"\n    # INSERTするデータを作成\n    file = TResultFile(\n        result_file_name=result_file_name,\n        original_file_id=original_file_id,\n        task_id=task_id,\n        user_id=user_id,\n    )\n\n    ## DB処理\n    try:\n        # INSERT処理実行\n        db.add(file)\n        # 問題なければコミット\n        db.commit()\n        # 自動採番された値を反映\n        db.refresh(file)\n    except Exception as e:\n        # エラーが発生した場合はロールバック\n        db.rollback()\n        raise e\n    finally:\n        # セッションを閉じる\n        db.close()\n\n    # INSERTしたファイル情報をDataFrameに成形\n    df_file = pd.DataFrame(\n        [\n            {\n                \"result_file_name\": file.result_file_name,\n                \"original_file_id\": file.original_file_id,\n                \"task_id\": file.task_id,\n                \"user_id\": file.user_id,\n            }\n        ]\n    )\n\n    return df_file"
+        }
+      },
+      {
+        "data": {
+          "id": "27",
+          "label": "insert_result_files",
+          "qname": "insert_result_files",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 555,
+          "col": 0,
+          "code": "def insert_result_files(file_info_list: list[dict[str, int | str]], task_id: int, user_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_result_fileテーブルに複数のファイルを一括で追加する\n\n    Args\n    -----------------\n    - file_info_list: list[dict],       追加するファイル情報のリスト ex) [{\"result_file_name\": \"1095.md\", \"original_file_id\": 1095}, ...]\n    - task_id: int,                     オブジェクトを追加したタスクのタスクID\n    - user_id: int,                     オブジェクトを追加したユーザのユーザID\n\n    Returns\n    -----------------\n    - df_files: pd.DataFrame,           DBにINSERTしたファイル情報からなるDataFrame\n\n    \"\"\"\n    # INSERTするデータのリストを作成\n    files = [\n        TResultFile(\n            result_file_name=file_info[\"result_file_name\"],\n            original_file_id=file_info[\"original_file_id\"],\n            task_id=task_id,\n            user_id=user_id,\n        )\n        for file_info in file_info_list\n    ]\n\n    ## DB処理\n    try:\n        # 一括INSERT処理実行\n        db.add_all(files)\n        # 問題なければコミット\n        db.commit()\n        # 自動採番された値を反映\n        for file in files:\n            db.refresh(file)\n    except Exception as e:\n        # エラーが発生した場合はロールバック\n        db.rollback()\n        raise e\n    finally:\n        # セッションを閉じる\n        db.close()\n\n    # INSERTしたファイル情報をDataFrameに成形\n    df_files = pd.DataFrame(\n        [\n            {\n                \"result_file_id\": file.result_file_id,\n                \"result_file_name\": file.result_file_name,\n                \"original_file_id\": file.original_file_id,\n                \"task_id\": file.task_id,\n                \"user_id\": file.user_id,\n            }\n            for file in files\n        ]\n    )\n\n    return df_files"
+        }
+      },
+      {
+        "data": {
+          "id": "28",
+          "label": "delete_result_file",
+          "qname": "delete_result_file",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\db_access_service.py",
+          "lineno": 615,
+          "col": 0,
+          "code": "def delete_result_file(task_id: int) -> pd.DataFrame:\n    \"\"\"\n    t_result_fileテーブルに存在するタスクIDに紐づくデータを削除する\n\n    Args\n    -----------------\n    - task_id: int,                     削除する変換結果ファイルのタスクID\n\n    Returns\n    -----------------\n    - df_result_file: pd.DataFrame,     DELETEした変換結果ファイル情報からなるDataFrame\n\n    \"\"\"\n    ## DB処理\n    try:\n        # Query作成\n        stmt = (\n            delete(TResultFile)\n            .where(TResultFile.task_id == task_id)\n            .returning(\n                TResultFile.result_file_id,\n                TResultFile.result_file_name,\n                TResultFile.original_file_id,\n                TResultFile.task_id,\n                TResultFile.user_id,\n            )\n        )\n        # Query実行\n        result = db.execute(stmt)\n        # DELETEした情報を取得\n        deleted_rows = result.fetchall()\n        # 問題なければコミット\n        db.commit()\n    except Exception as e:\n        # エラーが発生した場合はロールバック\n        db.rollback()\n        raise e\n    finally:\n        # セッションを閉じる\n        db.close()\n\n    # DELETEした変換結果ファイル情報をDataFrameに成形\n    df_result_file = pd.DataFrame(\n        deleted_rows,\n        columns=[\"result_file_id\", \"result_file_name\", \"original_file_id\", \"task_id\", \"user_id\"]\n    )\n\n    return df_result_file"
+        }
+      },
+      {
+        "data": {
+          "id": "29",
+          "label": "login",
+          "qname": "login",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\login_service.py",
+          "lineno": 7,
+          "col": 0,
+          "code": "def login(mail_address: str, password: str) -> LoginResponse:\n    \"\"\"\n    メールアドレスとパスワードでログインを行う\n    参考 : パスワードハッシュ化について\n    https://zenn.dev/417/scraps/43f1ffbe90132c\n\n    Args\n    -----------------\n    - mail_address: str,        メールアドレス\n    - password: str,            パスワード\n\n    Returns\n    -----------------\n    - response: LoginResponse,    レスポンス\n\n    \"\"\"\n    # メールアドレスからユーザ情報を取得\n    df = db_access_service.select_user(mail_address)\n    # 対象のユーザ情報が存在しない場合\n    if df.empty:\n        # 該当のエラーメッセージを取得\n        message_dict = db_access_service.select_message(\"msg-E-0001\")\n        # レスポンス返却\n        return LoginResponse(status=200, messages=[message_dict])\n    # 対象のユーザ情報が存在する場合\n    else:\n        # パスワードが正しいか確認\n        if bcrypt.checkpw(password.encode(\"utf-8\"), df[\"password\"].values[0]):\n            # レスポンス返却\n            return LoginResponse(\n                status=200,\n                messages=[],\n                user_id=df[\"user_id\"].values[0],\n                user_name=df[\"user_name\"].values[0]\n            )\n        # パスワードが誤っている場合\n        else:\n            # 該当のエラーメッセージを取得\n            message_dict = db_access_service.select_message(\"msg-E-0001\")\n            # レスポンス返却\n            return LoginResponse(status=200, messages=[message_dict])"
+        }
+      },
+      {
+        "data": {
+          "id": "30",
+          "label": "task_list",
+          "qname": "task_list",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\main.py",
+          "lineno": 37,
+          "col": 0,
+          "code": "def task_list(request: TaskListRequest):\n    \"\"\"\n    タスク一覧画面の処理を行う\n    \"\"\"\n    # タスクの一覧を取得\n    return task_list_service.get_task_list(request.user_id)"
+        }
+      },
+      {
+        "data": {
+          "id": "31",
+          "label": "task_detail",
+          "qname": "task_detail",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\main.py",
+          "lineno": 46,
+          "col": 0,
+          "code": "def task_detail(operation_mode: str, request: TaskDetailRequest):\n    \"\"\"\n    ファイル変換以外のタスク詳細画面の処理を行う\n    \"\"\"\n    ## タスク詳細画面の操作モードごとに処理振り分け\n    match operation_mode:\n        # 新規作成\n        case OperationType.CREATE.value:\n            # タスク新規作成処理\n            return task_detail_service.create_new_task(request.task_name, request.user_id)\n        # 情報取得\n        case OperationType.READ.value:\n            # タスク読み込み処理\n            return task_detail_service.get_task_detail(request.task_id)\n        # 名称更新\n        case OperationType.UPDATE.value:\n            # タスク名称変更処理\n            return task_detail_service.update_task_name(request.task_id, request.task_name)\n        # 削除\n        case OperationType.DELETE.value:\n            # タスク削除処理\n            return task_detail_service.delete_task(request.task_id)"
+        }
+      },
+      {
+        "data": {
+          "id": "32",
+          "label": "task_detail_translate",
+          "qname": "task_detail_translate",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\main.py",
+          "lineno": 71,
+          "col": 0,
+          "code": "async def task_detail_translate(\n    background_tasks: BackgroundTasks,\n    task_id: int=Form(...),\n    user_id: int=Form(...),\n    metadata: str=Form(...),\n    target_file_list: list[UploadFile]=File(...)\n):\n    \"\"\"\n    ファイル変換処理を行う\n    ※ ファイル変換時のAPIリクエストにはファイルの中身が含まれていてJSON形式で送信できないので分離する\n    \"\"\"\n    # アップロードされたファイルの情報を辞書形式の配列に変換\n    metadata_list = json.loads(metadata)\n    # ファイル変換処理\n    return task_detail_service.translate_files(target_file_list, metadata_list, task_id, user_id, background_tasks)"
+        }
+      },
+      {
+        "data": {
+          "id": "33",
+          "label": "file_filter",
+          "qname": "file_filter",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\main.py",
+          "lineno": 89,
+          "col": 0,
+          "code": "def file_filter(request: FileFilterRequest):\n    \"\"\"\n    登録されたファイルが変換対象として適切なファイルなのかを判定して返却する\n    \"\"\"\n    # 変換対象のファイルチェック処理\n    filter_result = common_validate.filter_data(request.target_data)\n    # レスポンス返却\n    return FileFilterResponse(status=200, filter_result=filter_result)"
+        }
+      },
+      {
+        "data": {
+          "id": "34",
+          "label": "chat_translate",
+          "qname": "chat_translate",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\main.py",
+          "lineno": 103,
+          "col": 0,
+          "code": "def chat_translate(operation_type: str, request: CodeTranslateRequest):\n    \"\"\"\n    チャット欄に入力されたコードと変換内容に基づいて処理を行う\n    \"\"\"\n    # 操作モードごとに処理\n    match operation_type:\n        case OperationType.TRANSLATE.value:\n            # コード変換処理\n            return chat_translate_service.code_text_to_markdown(request.code_text)\n        case OperationType.UPDATE.value:\n            # コード更新処理\n            return chat_translate_service.markdown_to_code_text(request.code_text, request.markdown_text, request.summary_flag, request.user_id, request.task_id)\n        case OperationType.REVIEW.value:\n            # コードレビュー処理\n            return chat_translate_service.review_code(request.code_text, request.markdown_text, request.summary_flag, request.user_id, request.task_id)\n        case OperationType.CREATE.value:\n            # タスクを作成して登録処理\n            return chat_translate_service.create_new_task(request.task_name, request.upload_file_name, request.markdown_text, request.user_id)"
+        }
+      },
+      {
+        "data": {
+          "id": "35",
+          "label": "file_download",
+          "qname": "file_download",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\main.py",
+          "lineno": 124,
+          "col": 0,
+          "code": "def file_download(request: FileDownloadRequest):\n    \"\"\"\n    ファイル共有からファイルのダウンロード処理を行う\n    \"\"\"\n    # 入れ物用意\n    error_list = []\n    try:\n        # ファイル共有からファイルの情報を取得\n        target_text = azure_files_operation_service.download_file(request.user_id, request.task_id, request.object_id, request.share_name)\n    except Exception:\n        # ファイルのダウンロードに失敗した場合は空文字を返却\n        target_text = \"\"\n        # 該当のエラーメッセージを作成\n        error_dict = {\n            \"message_id\": \"msg-E-XXXX\",\n            \"message_type\": \"error\",\n            \"message\": \"ファイルのダウンロードに失敗しました。お手数ですがしばらく時間を空けて再度お試しください。\",\n        }\n        # 配列に追加\n        error_list.append(error_dict)\n    # レスポンス返却\n    return FileDownloadResponse(status=200, messages=error_list, file_name=\"\", contents=target_text)"
+        }
+      },
+      {
+        "data": {
+          "id": "36",
+          "label": "get_task_detail",
+          "qname": "get_task_detail",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\task_detail_service.py",
+          "lineno": 40,
+          "col": 0,
+          "code": "def get_task_detail(task_id: int) -> TaskDetailResponse:\n    \"\"\"\n    タスク情報取得処理\n\n    Args\n    -----------------\n    - task_id: int,                     タスクID\n\n    Returns\n    -----------------\n    - response: TaskDetailResponse,     レスポンス\n\n    \"\"\"\n    # DBに接続してタスク情報を取得\n    df = db_access_service.select_task_by_task_id(task_id)\n    # タスク情報が取得できなかった場合\n    if df.empty:\n        # 該当のエラーメッセージを取得\n        error_dict = db_access_service.select_message(\"msg-E-0005\")\n        # エラーを返却\n        return TaskDetailResponse(status=200, messages=[error_dict], task_detail={})\n\n    # 取得したタスク情報を辞書に変換\n    task_dict = df.iloc[0].to_dict()\n    # タスクの状態を取得\n    task_state = task_dict[\"task_state_id\"]\n    # 取得したタスクの状態ごとに処理\n    match task_state:\n        case TaskState.WAITING.value:\n            # レスポンス返却\n            return TaskDetailResponse(status=200, messages=[], task_detail=task_dict)\n        case TaskState.DOING.value:\n            # 登録データテーブルからタスクIDに紐づく表示情報を取得\n            display_object_info = generate_display_info(task_id, task_state)\n            # レスポンス返却\n            return TaskDetailResponse(status=200, messages=[], task_detail=task_dict, display_object_info=display_object_info)\n        case TaskState.RERUN.value:\n            # 該当のエラーメッセージを取得\n            error_dict = db_access_service.select_message(\"msg-E-0010\")\n            # レスポンス返却\n            return TaskDetailResponse(status=200, messages=[error_dict], task_detail=task_dict)\n        case TaskState.DONE.value:\n            # 登録データテーブルと変換結果テーブルからタスクIDに紐づく表示情報を取得\n            display_object_info = generate_display_info(task_id, task_state)\n            # レスポンス返却\n            return TaskDetailResponse(status=200, messages=[], task_detail=task_dict, display_object_info=display_object_info)"
+        }
+      },
+      {
+        "data": {
+          "id": "37",
+          "label": "translate_files",
+          "qname": "translate_files",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\task_detail_service.py",
+          "lineno": 193,
+          "col": 0,
+          "code": "def translate_files(target_file_list: list[File], metadata_list: list[dict], task_id: int, user_id: int, background_tasks: BackgroundTasks) -> TaskDetailResponse:\n    \"\"\"\n    アップロードされたファイルをAIに送信して変換する処理\n\n    Args\n    -----------------\n    - target_file_list: list[File],         変換対象のファイル情報からなる配列\n        - File.filename: str,               ファイルのフルパス\n        - File.file.read(): str,            ファイルの中身\n    - metadata: list[dict],                 変換対象のオブジェクト情報(Metadata)からなる配列\n    - task_id: int,                         タスクID\n    - user_id: int,                         ユーザID\n    - background_tasks: BackgroundTasks,    バックグラウンドタスク\n\n    Returns\n    -----------------\n    - response: TaskDetailResponse,         レスポンス\n\n    \"\"\"\n    ## アップロードされたファイル情報をDBに登録する\n    try:\n        ## 変換対象のファイルが存在するか確認\n        # ファイルのデータのみ抽出\n        file_list = [file for file in metadata_list if file[\"upload_object_type\"] == \"file\"]\n        # 変換対象のファイルのみ抽出\n        TF_list = common_validate.filter_data(file_list)\n        # 変換可能なファイルが存在しなかった場合\n        if not (True in TF_list):\n            # 該当のエラーメッセージを取得\n            error_dict = db_access_service.select_message(\"msg-E-0009\")\n            # レスポンス返却\n            return TaskDetailResponse(status=200, messages=[error_dict], task_detail={})\n        else:\n            # 変換対象のファイル情報をフィルタ\n            target_file_list = [file for file, tf in zip(target_file_list, TF_list) if tf]\n        # フォルダを含めて再度フィルタ\n        TF_list = common_validate.filter_data(metadata_list)\n        # 変換対象外のファイルを削除\n        metadata_list = [md for md, tf in zip(metadata_list, TF_list) if tf]\n\n        ## 対象のタスクが存在するか確認\n        # ファイル登録対象のタスク情報取得\n        df = db_access_service.select_task_by_task_id(task_id)\n        # タスク情報が取得できなかった場合\n        if df.empty:\n            # 該当のエラーメッセージを取得\n            error_dict = db_access_service.select_message(\"msg-E-0005\")\n            # エラーを返却\n            return TaskDetailResponse(status=200, messages=[error_dict], task_detail={})\n\n        ## 対象のタスクが翻訳可能か確認\n        # 取得したタスク情報を辞書に変換\n        task_dict = df.iloc[0].to_dict()\n        # タスクの状態を取得\n        task_state = task_dict[\"task_state_id\"]\n        # ファイル登録対象のタスクが翻訳中 or 翻訳済の場合\n        if task_state in [TaskState.DOING.value, TaskState.DONE.value]:\n            # 該当のエラーメッセージを取得\n            error_dict = db_access_service.select_message(\"msg-E-0007\")\n            # エラーを返却\n            return TaskDetailResponse(status=200, messages=[error_dict], task_detail={})\n\n        # t_upload_objectテーブルに登録\n        df_upload = db_access_service.insert_upload_objects(metadata_list, task_id, user_id)\n    # ここまでの処理でエラーになった場合\n    except Exception as e:\n        # エラーが発生した場合はログに出力\n        print(f\"変換対象のファイル登録処理でエラーが発生しました。ユーザID : {user_id}, タスクID : {task_id}, エラー : {str(e)}\")\n        # 該当のエラーメッセージを取得\n        error_dict = db_access_service.select_message(\"msg-E-0007\")\n        # レスポンス返却\n        return TaskDetailResponse(status=200, messages=[error_dict], task_detail={})\n\n    ## 変換対象データの作成\n    # フルパスをキーに, オブジェクトIDを値に持つ辞書を作成\n    path_to_id_dict = df_upload.set_index(\"full_path\")[\"upload_object_id\"].to_dict()\n    # 入れ物用意\n    upload_file_dict = {}\n    # 全ての変換対象ファイルについて処理\n    for target_file in target_file_list:\n        # オブジェクトIDをキーに, ファイルの中身を値に持つ辞書を作成\n        upload_file_dict[int(path_to_id_dict[target_file.filename])] = target_file.file.read()\n    # アップロードされたオブジェクトからファイルのみ抽出\n    df_upload_file = df_upload[df_upload[\"upload_object_type\"].isin([\"file\"])]\n    # ファイル変換を行う非同期処理をバックグラウンドで実行\n    background_tasks.add_task(async_translate_file, df_upload_file, upload_file_dict, task_id, user_id)\n\n    \"\"\" ADVANCED機能 : プロジェクト要約 \"\"\"\n    ## プロジェクト要約データ作成\n    # 入れ物用意\n    project_list = []\n    # 変換対象の全ファイルの情報を持つJSON作成（既に読み込んだデータを再利用）\n    for target_file in target_file_list:\n        # 該当するオブジェクトIDを取得\n        object_id = int(path_to_id_dict[target_file.filename])\n        # 辞書用意\n        file_dict = {}\n        # 値設定（upload_file_dictから取得）\n        file_dict[\"full_path\"] = target_file.filename\n        file_dict[\"contents\"] = upload_file_dict[object_id].decode(\"utf-8\")\n        # 配列に追加\n        project_list.append(file_dict)\n    # 配列をJSON形式の文字列に変換\n    project_json = json.dumps(project_list, ensure_ascii=False, indent=4)\n    # プロジェクト要約を行う非同期処理をバックグラウンドで実行\n    background_tasks.add_task(async_summary_project, project_json, task_id, user_id)\n    \"\"\"\"\"\"\n\n    # タスクの状態を更新\n    df_task = db_access_service.update_task_state(task_id, TaskState.DOING.value)\n    # 更新したタスクの情報を辞書に変換\n    task_dict = df_task.iloc[0].to_dict()\n    # 該当メッセージを取得\n    message_dict = db_access_service.select_message(\"msg-I-0002\")\n    # レスポンス返却\n    return TaskDetailResponse(status=200, messages=[message_dict], task_detail=task_dict)"
+        }
+      },
+      {
+        "data": {
+          "id": "38",
+          "label": "async_translate_file",
+          "qname": "async_translate_file",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\task_detail_service.py",
+          "lineno": 311,
+          "col": 0,
+          "code": "def async_translate_file(target_file_df: pd.DataFrame, upload_file_dict: dict[int, str], task_id: int, user_id: int):\n    \"\"\"\n    アップロードされたファイルの情報とファイルの中身から, モデルにデータを送信して変換結果を取得するバックグラウンド処理\n\n    Args\n    -----------------\n    - target_file_df: pd.DataFrame,     変換対象ファイルのアップロードオブジェクトテーブル情報\n    - upload_file_dict: dict,           変換対象ファイルの中身  ex) {1: \"import datetime ... def function(): ...\", ... }\n    - task_id: int,                     タスクID\n    - user_id: int,                     ユーザID\n\n    \"\"\"\n    ## 変換処理をバックグラウンドで実行\n    try:\n        # 入れ物用意\n        file_info_list = []\n        result_data_list = []\n        # 変換対象ファイルごとに処理\n        for row in target_file_df.itertuples():\n            # アップロードされたファイルのオブジェクトIDを取得\n            object_id = int(row.upload_object_id)\n            # ファイルの中身を取得\n            code = upload_file_dict[object_id].decode(\"utf-8\")\n            # コード変換処理を実行\n            result_text = azure_ai_operation_service.translate_code(code)\n            # 変換結果の辞書を作成\n            file_dict = {}\n            result_dict = {}\n            # 変換結果を登録\n            file_dict[\"result_file_name\"] = str(object_id) + \".md\"\n            file_dict[\"original_file_id\"] = object_id\n            result_dict[\"object_id\"] = object_id\n            result_dict[\"text\"] = result_text\n            # 配列に追加\n            file_info_list.append(file_dict)\n            result_data_list.append(result_dict)\n        # 変換結果のファイルをファイル共有にアップロード\n        azure_files_operation_service.upload_multiple_files(result_data_list, user_id, task_id, FileShareName.RESULT.value)\n        # 変換結果のデータをt_result_fileテーブルに登録\n        db_access_service.insert_result_files(file_info_list, task_id, user_id)\n        # すべてのファイル変換処理が完了した場合はタスク状態をDoneに更新\n        db_access_service.update_task_state(task_id, TaskState.DONE.value)\n    except Exception as e:\n        # ファイル変換処理中にエラーが発生した場合はログに出力\n        print(f\"ファイル変換処理でエラーが発生しました。ユーザID : {user_id}, タスクID : {task_id}, エラー : {str(e)}\")\n        # 変換の途中で失敗した場合は登録されているデータの状態が確認できないため, 不整合が起きないように変換処理中に登録したデータをすべて削除する\n        try:\n            # t_upload_objectテーブルのデータを削除\n            db_access_service.delete_upload_object(task_id)\n            # t_result_fileテーブルのデータを削除\n            db_access_service.delete_result_file(task_id)\n            # ファイル共有のデータを削除\n            azure_files_operation_service.delete_task_directory(user_id, task_id, FileShareName.RESULT.value)\n        except Exception as err:\n            # 不完全データの削除中にエラーが発生した場合\n            print(f\"不完全データの削除処理でエラーが発生しました。DB、およびファイル共有のデータを確認してください。ユーザID : {user_id}, タスクID : {task_id}, エラー : {str(err)}\")\n        finally:\n            # タスク状態を中断に更新する\n            db_access_service.update_task_state(task_id, TaskState.RERUN.value)"
+        }
+      },
+      {
+        "data": {
+          "id": "39",
+          "label": "generate_display_info",
+          "qname": "generate_display_info",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\task_detail_service.py",
+          "lineno": 372,
+          "col": 0,
+          "code": "def generate_display_info(task_id: int, task_state: int) -> list[dict]:\n    \"\"\"\n    指定されたtask_idを持つタスクに紐づく表示用オブジェクト情報からなる配列を生成する\n\n    Args\n    -----------------\n    - task_id: int,                             タスクID\n    - task_state: int,                          タスク状態\n\n    Returns\n    -----------------\n    - display_object_info: list[dict],          表示用オブジェクト情報からなる配列\n\n    \"\"\"\n    ## タスクの状態ごとに処理\n    match task_state:\n        # タスクが変換中の場合\n        case TaskState.DOING.value:\n            # 登録データテーブルからタスクIDに紐づく表示情報を取得\n            df_object = db_access_service.select_upload_object_by_task_id(task_id)\n            # レスポンスの形式を合わせるために列追加\n            df_object[\"result_text\"] = \"\"\n            # データフレームを辞書形式の配列に変換して返却\n            return df_object.to_dict(orient=\"records\")\n        # タスクが変換済の場合\n        case TaskState.DONE.value:\n            # 登録データテーブルからタスクIDに紐づく表示情報を取得\n            df_object = db_access_service.select_upload_object_by_task_id(task_id)\n            # 念のため型変換\n            df_object[\"user_id\"] = df_object[\"user_id\"].astype(int)\n            df_object[\"task_id\"] = df_object[\"task_id\"].astype(int)\n            df_object[\"upload_object_id\"] = df_object[\"upload_object_id\"].astype(int)\n            # 変換結果データ用列を作成\n            df_object[\"result_text\"] = \"\"\n            # ファイル行のみ抽出\n            df_file = df_object[df_object[\"upload_object_type\"] == \"file\"]\n            # 変換結果のファイル行ごとに処理\n            for row in df_file.itertuples():\n                # ファイル共有から紐づく変換結果のファイルの中身を取得\n                result_text = azure_files_operation_service.download_file(row.user_id, row.task_id, row.upload_object_id, FileShareName.RESULT.value)\n                # 取得した変換結果をデータフレームにセット\n                df_object.loc[df_object[\"upload_object_id\"] == row.upload_object_id, \"result_text\"] = result_text\n            # データフレームを辞書形式の配列に変換して返却\n            return df_object.to_dict(orient=\"records\")"
+        }
+      },
+      {
+        "data": {
+          "id": "40",
+          "label": "async_summary_project",
+          "qname": "async_summary_project",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\task_detail_service.py",
+          "lineno": 419,
+          "col": 0,
+          "code": "def async_summary_project(project_json: str, task_id: int, user_id: int):\n    \"\"\"\n    アップロードされた全ファイルの情報をモデルにデータを送信して, プロジェクト全体の要約結果を取得するバックグラウンド処理\n\n    Args\n    -----------------\n    - project_json: str,                変換対象の全ファイルの情報からなるJSON\n    - task_id: int,                     タスクID\n    - user_id: int,                     ユーザID\n\n    \"\"\"\n    ## 変換処理をバックグラウンドで実行\n    try:\n        # プロジェクト要約処理を実行\n        _start = time.time()\n        summary_text = azure_ai_operation_service.summary_project(project_json)\n        print(\"プロジェクト要約処理時間 :\", time.time() - _start)\n        # 便宜上Object_idに値を設定\n        object_id = 0\n        # 変換結果のファイルをファイル共有にアップロード\n        azure_files_operation_service.upload_file(summary_text, user_id, task_id, object_id, target_share_name=FileShareName.SUMMARY.value)\n    except Exception as e:\n        # プロジェクト要約処理中にエラーが発生した場合はログに出力\n        print(f\"プロジェクト要約処理でエラーが発生しました。ユーザID : {user_id}, タスクID : {task_id}, エラー : {str(e)}\")"
+        }
+      },
+      {
+        "data": {
+          "id": "41",
+          "label": "get_task_list",
+          "qname": "get_task_list",
+          "kind": "function",
+          "file": "C:\\Users\\jack\\AppData\\Local\\Temp\\tmp_0cs808t\\task_list_service.py",
+          "lineno": 5,
+          "col": 0,
+          "code": "def get_task_list(user_id: int) -> TaskListResponse:\n    \"\"\"\n    user_idに紐づくタスク情報の一覧を取得する\n\n    Args\n    -----------------\n    - user_id: int,                     ユーザID\n\n    Returns\n    -----------------\n    - response: TaskListResponse,       レスポンス\n\n    \"\"\"\n    # DBからユーザIDに紐づくタスク情報を取得\n    df = db_access_service.select_task_by_user_id(user_id)\n    # 取得したタスク情報を辞書形式に変換\n    task_dict_list = df.to_dict(orient=\"records\")\n    # レスポンス返却\n    return TaskListResponse(status=200, messages=[], task_list=task_dict_list)"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "data": {
+          "id": "e1",
+          "source": "36",
+          "target": "39",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "get_task_detail",
+          "to": "generate_display_info"
+        }
+      },
+      {
+        "data": {
+          "id": "e2",
+          "source": "8",
+          "target": "0",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "code_text_to_markdown",
+          "to": "translate_code"
+        }
+      },
+      {
+        "data": {
+          "id": "e3",
+          "source": "9",
+          "target": "6",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "markdown_to_code_text",
+          "to": "download_file"
+        }
+      },
+      {
+        "data": {
+          "id": "e4",
+          "source": "9",
+          "target": "1",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "markdown_to_code_text",
+          "to": "update_code"
+        }
+      },
+      {
+        "data": {
+          "id": "e5",
+          "source": "3",
+          "target": "6",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "review_code",
+          "to": "download_file"
+        }
+      },
+      {
+        "data": {
+          "id": "e6",
+          "source": "3",
+          "target": "3",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "review_code",
+          "to": "review_code"
+        }
+      },
+      {
+        "data": {
+          "id": "e7",
+          "source": "10",
+          "target": "11",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "create_new_task",
+          "to": "length_validation"
+        }
+      },
+      {
+        "data": {
+          "id": "e8",
+          "source": "10",
+          "target": "17",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "create_new_task",
+          "to": "insert_task"
+        }
+      },
+      {
+        "data": {
+          "id": "e9",
+          "source": "10",
+          "target": "19",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "create_new_task",
+          "to": "update_task_state"
+        }
+      },
+      {
+        "data": {
+          "id": "e10",
+          "source": "10",
+          "target": "22",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "create_new_task",
+          "to": "insert_upload_object"
+        }
+      },
+      {
+        "data": {
+          "id": "e11",
+          "source": "10",
+          "target": "26",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "create_new_task",
+          "to": "insert_result_file"
+        }
+      },
+      {
+        "data": {
+          "id": "e12",
+          "source": "10",
+          "target": "5",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "create_new_task",
+          "to": "upload_file"
+        }
+      },
+      {
+        "data": {
+          "id": "e13",
+          "source": "11",
+          "target": "13",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "length_validation",
+          "to": "select_message"
+        }
+      },
+      {
+        "data": {
+          "id": "e14",
+          "source": "29",
+          "target": "14",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "login",
+          "to": "select_user"
+        }
+      },
+      {
+        "data": {
+          "id": "e15",
+          "source": "29",
+          "target": "13",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "login",
+          "to": "select_message"
+        }
+      },
+      {
+        "data": {
+          "id": "e16",
+          "source": "29",
+          "target": "29",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "login",
+          "to": "login"
+        }
+      },
+      {
+        "data": {
+          "id": "e17",
+          "source": "30",
+          "target": "41",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "task_list",
+          "to": "get_task_list"
+        }
+      },
+      {
+        "data": {
+          "id": "e18",
+          "source": "31",
+          "target": "36",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "task_detail",
+          "to": "get_task_detail"
+        }
+      },
+      {
+        "data": {
+          "id": "e19",
+          "source": "32",
+          "target": "37",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "task_detail_translate",
+          "to": "translate_files"
+        }
+      },
+      {
+        "data": {
+          "id": "e20",
+          "source": "33",
+          "target": "12",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "file_filter",
+          "to": "filter_data"
+        }
+      },
+      {
+        "data": {
+          "id": "e21",
+          "source": "34",
+          "target": "8",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "chat_translate",
+          "to": "code_text_to_markdown"
+        }
+      },
+      {
+        "data": {
+          "id": "e22",
+          "source": "34",
+          "target": "9",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "chat_translate",
+          "to": "markdown_to_code_text"
+        }
+      },
+      {
+        "data": {
+          "id": "e23",
+          "source": "34",
+          "target": "10",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "chat_translate",
+          "to": "create_new_task"
+        }
+      },
+      {
+        "data": {
+          "id": "e24",
+          "source": "35",
+          "target": "6",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "file_download",
+          "to": "download_file"
+        }
+      },
+      {
+        "data": {
+          "id": "e25",
+          "source": "36",
+          "target": "16",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "get_task_detail",
+          "to": "select_task_by_task_id"
+        }
+      },
+      {
+        "data": {
+          "id": "e26",
+          "source": "36",
+          "target": "13",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "get_task_detail",
+          "to": "select_message"
+        }
+      },
+      {
+        "data": {
+          "id": "e27",
+          "source": "18",
+          "target": "11",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "update_task_name",
+          "to": "length_validation"
+        }
+      },
+      {
+        "data": {
+          "id": "e28",
+          "source": "18",
+          "target": "18",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "update_task_name",
+          "to": "update_task_name"
+        }
+      },
+      {
+        "data": {
+          "id": "e29",
+          "source": "18",
+          "target": "13",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "update_task_name",
+          "to": "select_message"
+        }
+      },
+      {
+        "data": {
+          "id": "e30",
+          "source": "20",
+          "target": "16",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "delete_task",
+          "to": "select_task_by_task_id"
+        }
+      },
+      {
+        "data": {
+          "id": "e31",
+          "source": "20",
+          "target": "13",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "delete_task",
+          "to": "select_message"
+        }
+      },
+      {
+        "data": {
+          "id": "e32",
+          "source": "20",
+          "target": "20",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "delete_task",
+          "to": "delete_task"
+        }
+      },
+      {
+        "data": {
+          "id": "e33",
+          "source": "20",
+          "target": "24",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "delete_task",
+          "to": "delete_upload_object"
+        }
+      },
+      {
+        "data": {
+          "id": "e34",
+          "source": "20",
+          "target": "28",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "delete_task",
+          "to": "delete_result_file"
+        }
+      },
+      {
+        "data": {
+          "id": "e35",
+          "source": "20",
+          "target": "7",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "delete_task",
+          "to": "delete_task_directory"
+        }
+      },
+      {
+        "data": {
+          "id": "e36",
+          "source": "37",
+          "target": "12",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "translate_files",
+          "to": "filter_data"
+        }
+      },
+      {
+        "data": {
+          "id": "e37",
+          "source": "37",
+          "target": "13",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "translate_files",
+          "to": "select_message"
+        }
+      },
+      {
+        "data": {
+          "id": "e38",
+          "source": "37",
+          "target": "16",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "translate_files",
+          "to": "select_task_by_task_id"
+        }
+      },
+      {
+        "data": {
+          "id": "e39",
+          "source": "37",
+          "target": "23",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "translate_files",
+          "to": "insert_upload_objects"
+        }
+      },
+      {
+        "data": {
+          "id": "e40",
+          "source": "37",
+          "target": "19",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "translate_files",
+          "to": "update_task_state"
+        }
+      },
+      {
+        "data": {
+          "id": "e41",
+          "source": "38",
+          "target": "0",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "async_translate_file",
+          "to": "translate_code"
+        }
+      },
+      {
+        "data": {
+          "id": "e42",
+          "source": "38",
+          "target": "4",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "async_translate_file",
+          "to": "upload_multiple_files"
+        }
+      },
+      {
+        "data": {
+          "id": "e43",
+          "source": "38",
+          "target": "27",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "async_translate_file",
+          "to": "insert_result_files"
+        }
+      },
+      {
+        "data": {
+          "id": "e44",
+          "source": "38",
+          "target": "19",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "async_translate_file",
+          "to": "update_task_state"
+        }
+      },
+      {
+        "data": {
+          "id": "e45",
+          "source": "38",
+          "target": "24",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "async_translate_file",
+          "to": "delete_upload_object"
+        }
+      },
+      {
+        "data": {
+          "id": "e46",
+          "source": "38",
+          "target": "28",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "async_translate_file",
+          "to": "delete_result_file"
+        }
+      },
+      {
+        "data": {
+          "id": "e47",
+          "source": "38",
+          "target": "7",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "async_translate_file",
+          "to": "delete_task_directory"
+        }
+      },
+      {
+        "data": {
+          "id": "e48",
+          "source": "39",
+          "target": "21",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "generate_display_info",
+          "to": "select_upload_object_by_task_id"
+        }
+      },
+      {
+        "data": {
+          "id": "e49",
+          "source": "39",
+          "target": "6",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "generate_display_info",
+          "to": "download_file"
+        }
+      },
+      {
+        "data": {
+          "id": "e50",
+          "source": "40",
+          "target": "2",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "async_summary_project",
+          "to": "summary_project"
+        }
+      },
+      {
+        "data": {
+          "id": "e51",
+          "source": "40",
+          "target": "5",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "async_summary_project",
+          "to": "upload_file"
+        }
+      },
+      {
+        "data": {
+          "id": "e52",
+          "source": "41",
+          "target": "15",
+          "label": "CALLS",
+          "kind": "CALLS",
+          "from": "get_task_list",
+          "to": "select_task_by_user_id"
+        }
+      }
+    ]
+  }
+}

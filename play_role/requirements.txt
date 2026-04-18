@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+jinja2
+python-multipart
+openai-whisper
+opencv-python
+scikit-image

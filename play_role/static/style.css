@@ -1,0 +1,627 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #f5f7fb;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 100%;
+  margin: 24px auto;
+  padding: 0 2.5%;
+}
+
+/* 左右二列レイアウト */
+.layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* 左パネル: 文字起こし側 (約30%) */
+.left-panel {
+  flex: 0 0 30%;
+  min-width: 260px;
+  background: #ffffff;
+  padding: 0 0 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  position: sticky;
+  top: 16px;
+  overflow: hidden;
+}
+
+/* タブバー */
+.tab-bar {
+  display: flex;
+  border-bottom: 2px solid #e0e4ec;
+  background: #f5f7fb;
+}
+
+.tab-btn {
+  flex: 1 1 0;
+  padding: 10px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: transparent;
+  color: #888;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  border-radius: 0;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab-btn:hover {
+  color: #4a90e2;
+}
+
+.tab-btn.active {
+  color: #4a90e2;
+  border-bottom-color: #4a90e2;
+  background: #fff;
+}
+
+/* タブコンテンツ */
+.tab-content {
+  display: none;
+  padding: 16px 24px 0;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* ファイルアップロードエリア */
+.upload-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.file-label {
+  display: inline-block;
+  padding: 7px 14px;
+  background: #4a90e2;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.file-label:hover {
+  background: #357abd;
+}
+
+input[type="file"] {
+  display: none;
+}
+
+.file-name-display {
+  font-size: 12px;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+
+/* 動画プレビュー */
+#videoPreview {
+  display: none;
+  width: 100%;
+  margin-top: 8px;
+  border-radius: 6px;
+  max-height: 180px;
+  object-fit: contain;
+  background: #000;
+}
+
+/* 動画解析結果エリア */
+.video-result-area {
+  display: none;
+  margin-top: 16px;
+}
+
+.video-result-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a2b4a;
+  margin: 14px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e0e4ec;
+}
+
+/* スライドグリッド */
+.slide-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.slide-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #f5f7fb;
+  border: 1px solid #d0d7e3;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.slide-thumb {
+  width: 96px;
+  min-width: 96px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #ddd;
+}
+
+.slide-info {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.slide-meta {
+  font-weight: 600;
+  color: #4a90e2;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.slide-spoken {
+  color: #444;
+  line-height: 1.5;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* スライドごとのコメント */
+.review-slide-comments {
+  padding: 12px 14px;
+  border-top: 1px solid #d0d7e3;
+}
+
+.slide-comment-item {
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px dashed #e8ecf3;
+  line-height: 1.6;
+}
+
+.slide-comment-item:last-child {
+  border-bottom: none;
+}
+
+.slide-comment-index {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #4a90e2;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
+/* result-area と add-reviewer-wrapper は左パネル内のパディング調整 */
+.result-area,
+.add-reviewer-wrapper {
+  padding: 0 24px;
+}
+
+/* 右パネル: AIレビュー側 (残り) */
+.right-panel {
+  flex: 1 1 0;
+  min-width: 0;
+  background: #ffffff;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 1.2em;
+}
+
+h2 {
+  margin-top: 0;
+}
+
+.description {
+  color: #555;
+  font-size: 13px;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  background: #e0e4ec;
+  color: #333;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-area,
+.result-area {
+  margin-top: 16px;
+}
+
+audio {
+  width: 100%;
+  margin-top: 8px;
+}
+
+textarea {
+  width: 100%;
+  height: 28vh;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  resize: vertical;
+  font-size: 13px;
+  box-sizing: border-box;
+  line-height: 1.6;
+}
+
+.add-reviewer-wrapper {
+  margin-top: 16px;
+  text-align: center;
+}
+
+#addReviewerBtn {
+  background: #4a90e2;
+  color: #fff;
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+}
+
+#resetMemoryBtn {
+  background: #f0f0f0;
+  color: #888;
+  width: 100%;
+  padding: 7px;
+  font-size: 12px;
+  margin-top: 6px;
+  border: 1px dashed #ccc;
+}
+
+/* AIレビューセクション */
+.reviewer-section-header {
+  margin-bottom: 16px;
+}
+
+.reviewer-section-header h2 {
+  margin: 0;
+}
+
+/* レビュアーパネルを横並びに */
+#reviewersContainer {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.reviewer-panel {
+  flex: 1 1 280px;
+  min-width: 260px;
+  border: 1px solid #d0d7e3;
+  border-radius: 8px;
+  padding: 16px;
+  background: #f9fbff;
+  box-sizing: border-box;
+}
+
+.reviewer-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.role-select {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.get-comment-btn {
+  background: #27ae60;
+  color: #fff;
+}
+
+.remove-reviewer-btn {
+  background: #e74c3c;
+  color: #fff;
+  margin-left: auto;
+}
+
+.reviewer-status {
+  font-size: 12px;
+  color: #555;
+  width: 100%;
+}
+
+.comment-area {
+  margin-top: 8px;
+  border: 1px solid #d0d7e3;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #2c3e50;
+  overflow: hidden;
+}
+
+.comment-placeholder {
+  display: block;
+  padding: 16px;
+  color: #aaa;
+  font-style: italic;
+}
+
+/* 構造化レビュー表示 */
+.review-summary {
+  padding: 14px 16px;
+  background: #f0f4ff;
+  border-bottom: 1px solid #d0d7e3;
+}
+
+.review-summary p {
+  margin: 4px 0 0;
+}
+
+.review-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #4a90e2;
+  margin-bottom: 6px;
+}
+
+/* 3カラム行 */
+.review-cols-3 {
+  display: flex;
+  border-bottom: 1px solid #d0d7e3;
+}
+
+/* 2カラム行 */
+.review-cols-2 {
+  display: flex;
+}
+
+.review-col {
+  flex: 1 1 0;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.review-col + .review-col {
+  border-left: 1px solid #e6eaf3;
+}
+
+.review-col-good .review-section-label { color: #27ae60; }
+.review-col-improve .review-section-label { color: #e67e22; }
+.review-col-concern .review-section-label { color: #8e44ad; }
+.review-col-questions .review-section-label { color: #2980b9; }
+.review-col-actions .review-section-label { color: #16a085; }
+
+.review-col ul {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.review-col li {
+  margin-bottom: 5px;
+}
+
+.review-col p {
+  margin: 0;
+}
+
+/* ---- モーダル ---- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px 32px;
+  min-width: 320px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-box h3 {
+  margin: 0 0 20px;
+  font-size: 16px;
+  color: #1a2b4a;
+}
+
+.modal-field {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-field label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+}
+
+.modal-field input,
+.modal-field select {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+#confirmAddReviewer {
+  background: #4a90e2;
+  color: #fff;
+}
+
+/* ---- レビュアーパネル: 名前・バッジ行 ---- */
+.reviewer-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reviewer-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a2b4a;
+}
+
+.reviewer-name-input {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a2b4a;
+  border: 1px solid #4a90e2;
+  border-radius: 4px;
+  padding: 2px 6px;
+  width: 160px;
+}
+
+.rename-btn {
+  padding: 2px 5px;
+  font-size: 12px;
+  background: transparent;
+  color: #bbb;
+}
+
+.rename-btn:hover {
+  color: #4a90e2;
+}
+
+.reviewer-role-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: #e8f0fe;
+  color: #4a90e2;
+  border-radius: 10px;
+  padding: 2px 10px;
+  border: 1px solid #c5d8f7;
+}
+
+/* ---- レビュアーパネル: アクション行 ---- */
+.reviewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reviewer-actions .reviewer-status {
+  width: auto;
+}
+
+/* ---- レビュアーパネル内の記憶セクション ---- */
+.reviewer-memory-section {
+  margin-top: 10px;
+  border: 1px solid #d0d7e3;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.reviewer-memory-summary {
+  padding: 8px 14px;
+  background: #f5f0ff;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5b2d8e;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.reviewer-memory-summary::-webkit-details-marker { display: none; }
+.reviewer-memory-summary::before { content: '▶ '; font-size: 10px; }
+details[open] .reviewer-memory-summary::before { content: '▼ '; }
+
+.reviewer-memory-content {
+  padding: 10px 14px;
+  background: #fff;
+}
+
+.profile-summary-text {
+  font-size: 11px;
+  color: #777;
+  margin: 0 0 8px;
+}
+
+.profile-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prof-col {
+  flex: 1 1 160px;
+  min-width: 130px;
+}
+
+.prof-col ul {
+  margin: 4px 0 0;
+  padding-left: 1.3em;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.prof-good   .review-section-label { color: #27ae60; }
+.prof-weak   .review-section-label { color: #e74c3c; }
+.prof-recur  .review-section-label { color: #e67e22; }
+.prof-impr   .review-section-label { color: #8e44ad; }
+.prof-advice .review-section-label { color: #2980b9; }

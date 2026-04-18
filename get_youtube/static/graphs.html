@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>グラフ表示 - YouTube Live Archive Viewer</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --card: #ffffff;
+      --line: #d9deea;
+      --text: #1f2430;
+      --muted: #5c667a;
+      --accent: #cc0000;
+      --blue: #2563eb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Meiryo, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+    .page {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 16px 5vw 16px;
+      gap: 12px;
+    }
+    /* Header */
+    .page-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .page-header h1 { font-size: 20px; }
+    .back-btn {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--text);
+      padding: 6px 13px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .back-btn:hover { background: #eef1f7; }
+    /* Channel info bar */
+    .channel-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(24,39,75,0.05);
+      flex-shrink: 0;
+    }
+    .channel-row img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      object-fit: cover;
+    }
+    .channel-name { font-size: 15px; font-weight: 700; }
+    .channel-sub  { font-size: 12px; color: var(--muted); margin-top: 1px; }
+    /* Charts area — fills remaining height */
+    .charts-grid {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px 20px;
+      box-shadow: 0 4px 14px rgba(24,39,75,0.07);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .chart-header {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-shrink: 0;
+      margin-bottom: 12px;
+    }
+    .chart-title { font-size: 15px; font-weight: 700; }
+    .chart-note  { font-size: 12px; color: var(--muted); }
+    /* Canvas wrapper must have a defined height for Chart.js */
+    .chart-wrap {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+    /* Error */
+    .error-msg {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      border-radius: 12px;
+      padding: 20px;
+      color: #991b1b;
+      font-size: 14px;
+    }
+    @media (max-width: 700px) {
+      html, body { overflow: auto; }
+      .page { height: auto; overflow: visible; }
+      .charts-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <button class="back-btn" onclick="window.close()">← 閉じる</button>
+      <h1>推移グラフ</h1>
+    </div>
+
+    <div id="channelRow" class="channel-row" style="display:none;"></div>
+    <div id="errorMsg"></div>
+
+    <div class="charts-grid" id="chartsGrid">
+      <!-- Chart 1 -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <span class="chart-title">月別ライブ配信数</span>
+          <span class="chart-note" id="note1"></span>
+        </div>
+        <div class="chart-wrap"><canvas id="chartLiveCount"></canvas></div>
+      </div>
+      <!-- Chart 2 -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <span class="chart-title">月別視聴回数合計</span>
+          <span class="chart-note" id="note2"></span>
+        </div>
+        <div class="chart-wrap"><canvas id="chartViews"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const raw = sessionStorage.getItem('graphData');
+    if (!raw) {
+      document.getElementById('errorMsg').innerHTML =
+        '<div class="error-msg">データが見つかりません。メイン画面で「全動画を解析・表示」を実行してから「グラフを表示」を押してください。</div>';
+      document.getElementById('chartsGrid').style.display = 'none';
+    } else {
+      const { channel, videos } = JSON.parse(raw);
+
+      // Channel header
+      const channelRow = document.getElementById('channelRow');
+      channelRow.style.display = 'flex';
+      if (channel) {
+        channelRow.innerHTML = `
+          <img src="${esc(channel.thumbnail_url || '')}" alt="">
+          <div>
+            <div class="channel-name">${esc(channel.title || '')}</div>
+            <div class="channel-sub">解析動画数: ${videos.length.toLocaleString('ja-JP')} 件</div>
+          </div>
+        `;
+        document.title = `グラフ - ${channel.title || ''}`;
+      }
+
+      // ── Aggregate by month ──────────────────────────────────────
+      const monthMap = {};
+      videos.forEach(v => {
+        if (!v.published_at) return;
+        const month = v.published_at.substring(0, 7); // "2024/01"
+        if (!monthMap[month]) monthMap[month] = { live: 0, views: 0 };
+        if (v.is_live) monthMap[month].live++;
+        monthMap[month].views += Number(v.view_count) || 0;
+      });
+
+      const months    = Object.keys(monthMap).sort();
+      const liveData  = months.map(m => monthMap[m].live);
+      const viewsData = months.map(m => monthMap[m].views);
+
+      document.getElementById('note1').textContent = `集計: ${months.length} ヶ月`;
+      document.getElementById('note2').textContent = `集計: ${months.length} ヶ月`;
+
+      // Tick interval for dense data
+      const tickStep = months.length > 24 ? Math.ceil(months.length / 24) : 1;
+
+      const xScale = {
+        grid: { color: '#e8ecf3' },
+        ticks: {
+          font: { size: 11 },
+          maxRotation: 45,
+          callback: function(val, idx) {
+            return idx % tickStep === 0 ? this.getLabelForValue(val) : '';
+          },
+        },
+      };
+      const tooltipCb = label => ({
+        callbacks: { label: ctx => ` ${label}: ${ctx.parsed.y.toLocaleString('ja-JP')}` },
+      });
+
+      // ── Chart 1: 月別ライブ配信数（折れ線）──────────────────────
+      new Chart(document.getElementById('chartLiveCount'), {
+        type: 'line',
+        data: {
+          labels: months,
+          datasets: [{
+            label: 'ライブ配信数',
+            data: liveData,
+            borderColor: '#cc0000',
+            backgroundColor: 'rgba(204,0,0,0.08)',
+            borderWidth: 2,
+            pointRadius: months.length > 60 ? 0 : 3,
+            pointHoverRadius: 5,
+            fill: true,
+            tension: 0.3,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { font: { size: 12 } } },
+            tooltip: tooltipCb('ライブ配信数'),
+          },
+          scales: {
+            x: xScale,
+            y: {
+              beginAtZero: true,
+              grid: { color: '#e8ecf3' },
+              ticks: { font: { size: 11 }, stepSize: 1 },
+            },
+          },
+        },
+      });
+
+      // ── Chart 2: 月別視聴回数合計（折れ線）──────────────────────
+      new Chart(document.getElementById('chartViews'), {
+        type: 'line',
+        data: {
+          labels: months,
+          datasets: [{
+            label: '視聴回数合計',
+            data: viewsData,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37,99,235,0.08)',
+            borderWidth: 2,
+            pointRadius: months.length > 60 ? 0 : 3,
+            pointHoverRadius: 5,
+            fill: true,
+            tension: 0.3,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { font: { size: 12 } } },
+            tooltip: tooltipCb('視聴回数'),
+          },
+          scales: {
+            x: xScale,
+            y: {
+              beginAtZero: true,
+              grid: { color: '#e8ecf3' },
+              ticks: {
+                font: { size: 11 },
+                callback: v => v >= 1_000_000
+                  ? (v / 1_000_000).toFixed(1) + 'M'
+                  : v >= 1_000 ? (v / 1_000).toFixed(0) + 'K' : v,
+              },
+            },
+          },
+        },
+      });
+    }
+
+    function esc(text) {
+      return (text ?? '').replace(/[&<>'"]/g, c =>
+        ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":"&#39;", '"':'&quot;' }[c])
+      );
+    }
+  </script>
+</body>
+</html>

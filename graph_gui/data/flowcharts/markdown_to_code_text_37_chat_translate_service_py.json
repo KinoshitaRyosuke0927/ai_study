@@ -1,0 +1,93 @@
+{
+  "nodes": [
+    {
+      "data": {
+        "id": "n1",
+        "label": "開始: markdown_to_code_text()",
+        "kind": "start"
+      }
+    },
+    {
+      "data": {
+        "id": "n2",
+        "label": "MarkdownとコードをAIに送信して修正結果を返す関数定義",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n3",
+        "label": "error_listを初期化",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n4",
+        "label": "summary_textを空文字で初期化",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n5",
+        "label": "summary_flagがTrueならプロジェクト情報を取得\n取得失敗時は警告メッセージを返す",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n6",
+        "label": "AIにコード更新を依頼\n成功時は修正後コードを返し、失敗時はエラーメッセージを返す",
+        "kind": "process"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "data": {
+        "id": "e1",
+        "source": "n1",
+        "target": "n2",
+        "label": "関数定義へ"
+      }
+    },
+    {
+      "data": {
+        "id": "e2",
+        "source": "n2",
+        "target": "n3",
+        "label": "初期化処理へ"
+      }
+    },
+    {
+      "data": {
+        "id": "e3",
+        "source": "n3",
+        "target": "n4",
+        "label": "summary_text設定へ"
+      }
+    },
+    {
+      "data": {
+        "id": "e4",
+        "source": "n4",
+        "target": "n5",
+        "label": "プロジェクト情報読み込みへ"
+      }
+    },
+    {
+      "data": {
+        "id": "e5",
+        "source": "n5",
+        "target": "n6",
+        "label": "コード更新処理へ"
+      }
+    }
+  ],
+  "meta": {
+    "layout_hints": {
+      "switch_nodes": []
+    }
+  }
+}

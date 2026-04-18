@@ -1,0 +1,243 @@
+{
+  "nodes": [
+    {
+      "data": {
+        "id": "n1",
+        "label": "開始：get_task_detail()を実行",
+        "kind": "start"
+      }
+    },
+    {
+      "data": {
+        "id": "n2",
+        "label": "タスク情報取得処理（引数・戻り値の説明）",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n3",
+        "label": "DBからタスク情報を取得",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n4",
+        "label": "タスク情報が存在するか？",
+        "kind": "decision"
+      }
+    },
+    {
+      "data": {
+        "id": "n5",
+        "label": "エラーメッセージ(msg-E-0005)を取得",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n6",
+        "label": "エラーを返却（空のtask_detail）",
+        "kind": "return"
+      }
+    },
+    {
+      "data": {
+        "id": "n7",
+        "label": "タスク情報を辞書型に変換",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n8",
+        "label": "タスクの状態IDを取得",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n9",
+        "label": "タスク状態ごとの処理分岐",
+        "kind": "match"
+      }
+    },
+    {
+      "data": {
+        "id": "n10",
+        "label": "表示情報を生成（登録データテーブルから取得）",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n11",
+        "label": "レスポンス返却（task_detail＋display_object_info）",
+        "kind": "return"
+      }
+    },
+    {
+      "data": {
+        "id": "n12",
+        "label": "表示情報を生成（登録＆変換結果テーブルから取得）",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n13",
+        "label": "レスポンス返却（task_detail＋display_object_info）",
+        "kind": "return"
+      }
+    },
+    {
+      "data": {
+        "id": "n14",
+        "label": "エラーメッセージ(msg-E-0010)を取得",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n15",
+        "label": "レスポンス返却（エラー＋task_detail）",
+        "kind": "return"
+      }
+    },
+    {
+      "data": {
+        "id": "n16",
+        "label": "レスポンス返却（task_detailのみ）",
+        "kind": "return"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "data": {
+        "id": "e1",
+        "source": "n1",
+        "target": "n2",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e2",
+        "source": "n2",
+        "target": "n3",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e3",
+        "source": "n3",
+        "target": "n4",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e4",
+        "source": "n4",
+        "target": "n5",
+        "label": "はい（空）"
+      }
+    },
+    {
+      "data": {
+        "id": "e5",
+        "source": "n5",
+        "target": "n6",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e6",
+        "source": "n4",
+        "target": "n7",
+        "label": "いいえ（存在する）"
+      }
+    },
+    {
+      "data": {
+        "id": "e7",
+        "source": "n7",
+        "target": "n8",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e8",
+        "source": "n8",
+        "target": "n9",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e9",
+        "source": "n9",
+        "target": "n10",
+        "label": "状態：進行中（DOING）"
+      }
+    },
+    {
+      "data": {
+        "id": "e10",
+        "source": "n10",
+        "target": "n11",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e11",
+        "source": "n9",
+        "target": "n12",
+        "label": "状態：完了（DONE）"
+      }
+    },
+    {
+      "data": {
+        "id": "e12",
+        "source": "n12",
+        "target": "n13",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e13",
+        "source": "n9",
+        "target": "n14",
+        "label": "状態：再実行（RERUN）"
+      }
+    },
+    {
+      "data": {
+        "id": "e14",
+        "source": "n14",
+        "target": "n15",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e15",
+        "source": "n9",
+        "target": "n16",
+        "label": "状態：待機中（WAITING）"
+      }
+    }
+  ],
+  "meta": {
+    "layout_hints": {
+      "switch_nodes": []
+    }
+  }
+}

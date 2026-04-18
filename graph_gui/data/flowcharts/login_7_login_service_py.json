@@ -1,0 +1,153 @@
+{
+  "nodes": [
+    {
+      "data": {
+        "id": "n1",
+        "label": "開始: login()",
+        "kind": "start"
+      }
+    },
+    {
+      "data": {
+        "id": "n2",
+        "label": "メールアドレスとパスワードでログイン処理を行う",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n3",
+        "label": "ユーザ情報をメールアドレスから取得",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n4",
+        "label": "ユーザ情報は存在する？",
+        "kind": "decision"
+      }
+    },
+    {
+      "data": {
+        "id": "n5",
+        "label": "エラーメッセージ(msg-E-0001)を取得",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n6",
+        "label": "エラーレスポンスを返却",
+        "kind": "return"
+      }
+    },
+    {
+      "data": {
+        "id": "n7",
+        "label": "パスワードは正しい？",
+        "kind": "decision"
+      }
+    },
+    {
+      "data": {
+        "id": "n8",
+        "label": "正常レスポンスを返却（ユーザ情報含む）",
+        "kind": "return"
+      }
+    },
+    {
+      "data": {
+        "id": "n9",
+        "label": "エラーメッセージ(msg-E-0001)を取得",
+        "kind": "process"
+      }
+    },
+    {
+      "data": {
+        "id": "n10",
+        "label": "エラーレスポンスを返却",
+        "kind": "return"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "data": {
+        "id": "e1",
+        "source": "n1",
+        "target": "n2",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e2",
+        "source": "n2",
+        "target": "n3",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e3",
+        "source": "n3",
+        "target": "n4",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e4",
+        "source": "n4",
+        "target": "n5",
+        "label": "存在しない"
+      }
+    },
+    {
+      "data": {
+        "id": "e5",
+        "source": "n5",
+        "target": "n6",
+        "label": ""
+      }
+    },
+    {
+      "data": {
+        "id": "e6",
+        "source": "n4",
+        "target": "n7",
+        "label": "存在する"
+      }
+    },
+    {
+      "data": {
+        "id": "e7",
+        "source": "n7",
+        "target": "n8",
+        "label": "正しい"
+      }
+    },
+    {
+      "data": {
+        "id": "e8",
+        "source": "n7",
+        "target": "n9",
+        "label": "誤っている"
+      }
+    },
+    {
+      "data": {
+        "id": "e9",
+        "source": "n9",
+        "target": "n10",
+        "label": ""
+      }
+    }
+  ],
+  "meta": {
+    "layout_hints": {
+      "switch_nodes": []
+    }
+  }
+}

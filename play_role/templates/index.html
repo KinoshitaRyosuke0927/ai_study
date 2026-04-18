@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Whisper 音声文字起こし</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main class="container">
+    <div class="layout">
+      <!-- 左パネル: タブ切り替え + 文字起こし結果 -->
+      <aside class="left-panel">
+
+        <!-- タブバー -->
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="record">Whisper 文字起こし</button>
+          <button class="tab-btn" data-tab="audio">音声レビュー</button>
+          <button class="tab-btn" data-tab="video">動画レビュー</button>
+        </div>
+
+        <!-- タブ1: Whisper 録音 -->
+        <div class="tab-content active" id="tab-record">
+          <p class="description">ブラウザで録音した音声を Whisper で文字起こしします。</p>
+          <section class="controls">
+            <button id="startBtn">録音開始</button>
+            <button id="stopBtn" disabled>録音終了</button>
+            <button id="transcribeBtn" disabled>文字起こし開始</button>
+          </section>
+          <section class="status-area">
+            <p><strong>状態:</strong> <span id="recordStatus">待機中</span></p>
+            <audio id="audioPlayer" controls></audio>
+          </section>
+        </div>
+
+        <!-- タブ2: 音声ファイルアップロード -->
+        <div class="tab-content" id="tab-audio">
+          <p class="description">音声ファイルをアップロードして文字起こし・レビューができます。</p>
+          <section class="upload-area">
+            <label class="file-label" for="audioFileInput">ファイルを選択</label>
+            <input type="file" id="audioFileInput" accept="audio/*" />
+            <span id="audioFileName" class="file-name-display">未選択</span>
+          </section>
+          <audio id="uploadedAudioPlayer" controls></audio>
+          <section class="status-area">
+            <p><strong>状態:</strong> <span id="uploadStatus">待機中</span></p>
+          </section>
+          <section class="controls">
+            <button id="uploadTranscribeBtn" disabled>文字起こし開始</button>
+          </section>
+        </div>
+
+        <!-- タブ3: 動画解析 -->
+        <div class="tab-content" id="tab-video">
+          <p class="description">動画をアップロードしてスライド解析と AI コメントを生成します。対応形式: mp4 / webm / mov</p>
+          <section class="upload-area">
+            <label class="file-label" for="videoFileInput">動画を選択</label>
+            <input type="file" id="videoFileInput" accept=".mp4,.webm,.mov,video/*" />
+            <span id="videoFileName" class="file-name-display">未選択</span>
+          </section>
+          <video id="videoPreview" controls></video>
+          <section class="status-area">
+            <p><strong>状態:</strong> <span id="videoStatus">待機中</span></p>
+          </section>
+          <section class="controls">
+            <button id="analyzeBtn" disabled>解析開始</button>
+          </section>
+          <div id="videoResultArea" class="video-result-area">
+            <h3 class="video-result-title">スライド解析結果</h3>
+            <div id="slideGrid" class="slide-grid"></div>
+          </div>
+        </div>
+
+        <!-- 共通: 文字起こし結果 & レビュアー追加 -->
+        <section class="result-area">
+          <h2>文字起こし結果</h2>
+          <textarea id="result" placeholder="ここに文字起こし結果が表示されます。直接入力も可能です。"></textarea>
+        </section>
+        <div class="add-reviewer-wrapper">
+          <button id="addReviewerBtn">＋ レビュアーを追加</button>
+          <button id="resetMemoryBtn">記憶をリセット</button>
+        </div>
+
+      </aside>
+
+      <!-- 右パネル: AIレビュー -->
+      <section class="right-panel">
+        <div class="reviewer-section-header">
+          <h2>AIレビュー</h2>
+        </div>
+        <div id="reviewersContainer"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- レビュアー追加モーダル -->
+  <div id="addReviewerModal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <h3>レビュアーを追加</h3>
+      <div class="modal-field">
+        <label>名前</label>
+        <input type="text" id="newReviewerName" placeholder="例: 田中先生" />
+      </div>
+      <div class="modal-field">
+        <label>役割</label>
+        <select id="newReviewerRole"></select>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelAddReviewer">キャンセル</button>
+        <button id="confirmAddReviewer">追加</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---- タブ切り替え ----
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    const resultEl       = document.getElementById('result');
+    const addReviewerBtn = document.getElementById('addReviewerBtn');
+
+    // ---- タブ1: 録音 ----
+    let mediaRecorder;
+    let audioChunks = [];
+    let recordedBlob = null;
+
+    const startBtn      = document.getElementById('startBtn');
+    const stopBtn       = document.getElementById('stopBtn');
+    const transcribeBtn = document.getElementById('transcribeBtn');
+    const recordStatus  = document.getElementById('recordStatus');
+    const audioPlayer   = document.getElementById('audioPlayer');
+
+    startBtn.addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        recordedBlob = null;
+
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) audioChunks.push(event.data);
+        };
+        mediaRecorder.onstop = () => {
+          recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          audioPlayer.src = URL.createObjectURL(recordedBlob);
+          transcribeBtn.disabled = false;
+          recordStatus.textContent = '録音完了';
+          stream.getTracks().forEach(t => t.stop());
+        };
+
+        mediaRecorder.start();
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        transcribeBtn.disabled = true;
+        resultEl.value = '';
+        recordStatus.textContent = '録音中...';
+      } catch (error) {
+        recordStatus.textContent = `録音開始に失敗しました: ${error}`;
+      }
+    });
+
+    stopBtn.addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      }
+    });
+
+    transcribeBtn.addEventListener('click', async () => {
+      if (!recordedBlob) {
+        recordStatus.textContent = '録音データがありません';
+        return;
+      }
+      const formData = new FormData();
+      formData.append('audio', recordedBlob, 'recorded_audio.webm');
+      recordStatus.textContent = '文字起こし中...';
+      transcribeBtn.disabled = true;
+      try {
+        const data = await postTranscribe(formData);
+        resultEl.value = data.text || '';
+        recordStatus.textContent = '文字起こし完了';
+      } catch (error) {
+        recordStatus.textContent = `エラー: ${error.message}`;
+      } finally {
+        transcribeBtn.disabled = false;
+      }
+    });
+
+    // ---- タブ2: 音声ファイルアップロード ----
+    const audioFileInput       = document.getElementById('audioFileInput');
+    const audioFileName        = document.getElementById('audioFileName');
+    const uploadedAudioPlayer  = document.getElementById('uploadedAudioPlayer');
+    const uploadStatus         = document.getElementById('uploadStatus');
+    const uploadTranscribeBtn  = document.getElementById('uploadTranscribeBtn');
+    let uploadedFile = null;
+
+    audioFileInput.addEventListener('change', () => {
+      const file = audioFileInput.files[0];
+      if (!file) return;
+      uploadedFile = file;
+      audioFileName.textContent = file.name;
+      uploadedAudioPlayer.src = URL.createObjectURL(file);
+      uploadTranscribeBtn.disabled = false;
+      uploadStatus.textContent = 'ファイル選択済み';
+    });
+
+    uploadTranscribeBtn.addEventListener('click', async () => {
+      if (!uploadedFile) {
+        uploadStatus.textContent = 'ファイルを選択してください';
+        return;
+      }
+      const formData = new FormData();
+      formData.append('audio', uploadedFile, uploadedFile.name);
+      uploadStatus.textContent = '文字起こし中...';
+      uploadTranscribeBtn.disabled = true;
+      try {
+        const data = await postTranscribe(formData);
+        resultEl.value = data.text || '';
+        uploadStatus.textContent = '文字起こし完了';
+      } catch (error) {
+        uploadStatus.textContent = `エラー: ${error.message}`;
+      } finally {
+        uploadTranscribeBtn.disabled = false;
+      }
+    });
+
+    // ---- 共通: /transcribe 呼び出し ----
+    async function postTranscribe(formData) {
+      const response = await fetch('/transcribe', { method: 'POST', body: formData });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || '文字起こしに失敗しました');
+      return data;
+    }
+
+    // ---- AIレビュー機能 ----
+    const ROLES = [
+      { value: 'professor',    label: '大学教授' },
+      { value: 'colleague',    label: '同僚' },
+      { value: 'beginner',     label: '初学者' },
+      { value: 'superior',     label: '上司' },
+      { value: 'developer',    label: '開発者' },
+      { value: 'pm',           label: 'PM' },
+      { value: 'po',           label: 'PO' },
+      { value: 'friend',       label: '友人' },
+      { value: 'sakura_miko',  label: 'さくらみこ' },
+      { value: 'usada_pekora', label: '兎田ぺこら' },
+      { value: 'oozora_subaru',label: '大空スバル' },
+      { value: 'azki',         label: 'AZKi' },
+    ];
+
+    function getRoleLabel(roleValue) {
+      return (ROLES.find(r => r.value === roleValue) || {}).label || roleValue;
+    }
+
+    // モーダルの役割セレクトを初期化
+    const newReviewerRoleSelect = document.getElementById('newReviewerRole');
+    ROLES.forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.value;
+      opt.textContent = r.label;
+      newReviewerRoleSelect.appendChild(opt);
+    });
+
+    // ページ読み込み時にCSVのレビュアーを取得して描画
+    async function loadReviewers() {
+      try {
+        const res = await fetch('/reviewers');
+        const reviewers = await res.json();
+        reviewers.forEach(r => renderReviewerPanel(r));
+      } catch (e) {
+        console.error('レビュアー読み込みエラー:', e);
+      }
+    }
+
+    // レビュアーパネルを生成して右パネルに追加
+    function renderReviewerPanel(reviewer) {
+      const panel = document.createElement('div');
+      panel.className = 'reviewer-panel';
+      panel.dataset.reviewerId = reviewer.id;
+
+      // 名前・バッジ行
+      const identity = document.createElement('div');
+      identity.className = 'reviewer-identity';
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'reviewer-name';
+      nameEl.textContent = reviewer.name;
+      nameEl.title = 'クリックして名前を変更';
+      nameEl.style.cursor = 'pointer';
+
+      const renameBtn = document.createElement('button');
+      renameBtn.className = 'rename-btn';
+      renameBtn.title = '名前を変更';
+      renameBtn.textContent = '✏️';
+
+      const roleBadge = document.createElement('span');
+      roleBadge.className = 'reviewer-role-badge';
+      roleBadge.textContent = getRoleLabel(reviewer.role);
+
+      identity.appendChild(nameEl);
+      identity.appendChild(renameBtn);
+      identity.appendChild(roleBadge);
+
+      // アクション行
+      const actions = document.createElement('div');
+      actions.className = 'reviewer-actions';
+
+      const getBtn = document.createElement('button');
+      getBtn.className = 'get-comment-btn';
+      getBtn.textContent = 'コメントをもらう';
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'remove-reviewer-btn';
+      removeBtn.textContent = '削除';
+
+      const statusSpan = document.createElement('span');
+      statusSpan.className = 'reviewer-status';
+
+      actions.appendChild(getBtn);
+      actions.appendChild(removeBtn);
+      actions.appendChild(statusSpan);
+
+      const header = document.createElement('div');
+      header.className = 'reviewer-header';
+      header.appendChild(identity);
+      header.appendChild(actions);
+
+      const commentDiv = document.createElement('div');
+      commentDiv.className = 'comment-area';
+      commentDiv.innerHTML = '<span class="comment-placeholder">ここにAIコメントが表示されます</span>';
+
+      // このレビュアーの記憶セクション（レビュー後に更新）
+      const memorySection = document.createElement('details');
+      memorySection.className = 'reviewer-memory-section';
+      memorySection.style.display = 'none';
+      const memorySummary = document.createElement('summary');
+      memorySummary.className = 'reviewer-memory-summary';
+      memorySummary.textContent = 'この人の記憶';
+      const memoryContent = document.createElement('div');
+      memoryContent.className = 'reviewer-memory-content';
+      memorySection.appendChild(memorySummary);
+      memorySection.appendChild(memoryContent);
+
+      panel.appendChild(header);
+      panel.appendChild(commentDiv);
+      panel.appendChild(memorySection);
+      document.getElementById('reviewersContainer').appendChild(panel);
+
+      // 起動時に既存の記憶を読み込む
+      refreshReviewerMemory(reviewer.id, memoryContent);
+
+      // ---- 名前インライン編集 ----
+      function startRename() {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'reviewer-name-input';
+        input.value = reviewer.name;
+        nameEl.replaceWith(input);
+        input.focus();
+        input.select();
+
+        async function commitRename() {
+          const newName = input.value.trim();
+          if (newName && newName !== reviewer.name) {
+            try {
+              await fetch(`/reviewers/${reviewer.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName }),
+              });
+              reviewer.name = newName;
+            } catch (e) {
+              console.error('名前変更エラー:', e);
+            }
+          }
+          const span = document.createElement('span');
+          span.className = 'reviewer-name';
+          span.textContent = reviewer.name;
+          span.title = 'クリックして名前を変更';
+          span.style.cursor = 'pointer';
+          span.addEventListener('click', startRename);
+          input.replaceWith(span);
+        }
+        input.addEventListener('blur', commitRename);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { input.value = reviewer.name; input.blur(); } });
+      }
+
+      nameEl.addEventListener('click', startRename);
+      renameBtn.addEventListener('click', startRename);
+
+      // ---- コメント取得 ----
+      getBtn.addEventListener('click', async () => {
+        const transcript = resultEl.value.trim();
+        if (!transcript) {
+          statusSpan.textContent = '先に文字起こしを行ってください';
+          return;
+        }
+        getBtn.disabled = true;
+        statusSpan.textContent = 'コメント生成中...';
+        commentDiv.innerHTML = '<span class="comment-placeholder">生成中...</span>';
+        try {
+          const response = await fetch('/review', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reviewer_id: reviewer.id, transcript }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || 'コメント生成に失敗しました');
+          renderReviewData(commentDiv, data);
+          statusSpan.textContent = 'コメント取得完了';
+          // レビュー完了後にこのレビュアーの記憶セクションを更新
+          refreshReviewerMemory(reviewer.id, memoryContent);
+        } catch (error) {
+          commentDiv.innerHTML = '';
+          statusSpan.textContent = `エラー: ${error.message}`;
+        } finally {
+          getBtn.disabled = false;
+        }
+      });
+
+      // ---- 削除 ----
+      removeBtn.addEventListener('click', async () => {
+        try {
+          await fetch(`/reviewers/${reviewer.id}`, { method: 'DELETE' });
+        } catch (e) {
+          console.error('削除エラー:', e);
+        }
+        panel.remove();
+      });
+    }
+
+    // ---- モーダル制御 ----
+    addReviewerBtn.addEventListener('click', () => {
+      document.getElementById('newReviewerName').value = '';
+      document.getElementById('addReviewerModal').style.display = 'flex';
+      document.getElementById('newReviewerName').focus();
+    });
+
+    document.getElementById('cancelAddReviewer').addEventListener('click', () => {
+      document.getElementById('addReviewerModal').style.display = 'none';
+    });
+
+    document.getElementById('confirmAddReviewer').addEventListener('click', async () => {
+      const name = document.getElementById('newReviewerName').value.trim();
+      const role = document.getElementById('newReviewerRole').value;
+      if (!name) { document.getElementById('newReviewerName').focus(); return; }
+      try {
+        const res = await fetch('/reviewers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, role }),
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.detail || '追加に失敗しました'); }
+        const reviewer = await res.json();
+        renderReviewerPanel(reviewer);
+        document.getElementById('addReviewerModal').style.display = 'none';
+      } catch (e) {
+        alert(`エラー: ${e.message}`);
+      }
+    });
+
+    // ESCでモーダルを閉じる
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') document.getElementById('addReviewerModal').style.display = 'none';
+    });
+
+    // ---- レビュアーごとの記憶表示 ----
+    async function refreshReviewerMemory(reviewerId, contentEl) {
+      try {
+        const res = await fetch(`/profile/${encodeURIComponent(reviewerId)}`);
+        const p = await res.json();
+        const section = contentEl.closest('.reviewer-memory-section');
+        if (!p || !p.summary) { if (section) section.style.display = 'none'; return; }
+
+        if (section) section.style.display = 'block';
+        let html = `<p class="profile-summary-text">${escapeHtml(p.summary)}</p><div class="profile-grid">`;
+        const fields = [
+          { key: 'recurring_issues', label: '繰り返し指摘してきた点', cls: 'prof-recur' },
+          { key: 'improved_points',  label: '前回から改善された点',   cls: 'prof-impr' },
+          { key: 'weaknesses',       label: '気になっている弱み',     cls: 'prof-weak' },
+          { key: 'strengths',        label: 'よく褒める点',           cls: 'prof-good' },
+          { key: 'last_advice',      label: '前回のアドバイス',       cls: 'prof-advice' },
+        ];
+        for (const { key, label, cls } of fields) {
+          const items = p[key] || [];
+          if (!items.length) continue;
+          html += `<div class="prof-col ${cls}"><div class="review-section-label">${label}</div><ul>`;
+          items.forEach(i => { html += `<li>${escapeHtml(i)}</li>`; });
+          html += '</ul></div>';
+        }
+        html += '</div>';
+        contentEl.innerHTML = html;
+      } catch (e) {
+        console.error('記憶取得エラー:', e);
+      }
+    }
+
+    // ---- 記憶リセット ----
+    document.getElementById('resetMemoryBtn').addEventListener('click', async () => {
+      if (!confirm('全レビュアーの記憶（過去のコメント履歴）をリセットします。\nレビュアー自体は削除されません。\nよろしいですか？')) return;
+      try {
+        const res = await fetch('/memories', { method: 'DELETE' });
+        if (!res.ok) throw new Error('リセットに失敗しました');
+        // 各パネルの記憶表示を非表示にする
+        document.querySelectorAll('.reviewer-memory-section').forEach(el => {
+          el.style.display = 'none';
+          el.querySelector('.reviewer-memory-content').innerHTML = '';
+        });
+        alert('記憶をリセットしました。');
+      } catch (e) {
+        alert(`エラー: ${e.message}`);
+      }
+    });
+
+    // 起動時にCSVからレビュアーを復元
+    loadReviewers();
+
+    function renderReviewData(container, data) {
+      container.innerHTML = '';
+
+      const summaryBlock = document.createElement('div');
+      summaryBlock.className = 'review-summary';
+      summaryBlock.innerHTML = `<div class="review-section-label">総評</div><p>${escapeHtml(data.summary || '')}</p>`;
+      container.appendChild(summaryBlock);
+
+      const cols3 = document.createElement('div');
+      cols3.className = 'review-cols-3';
+      cols3.appendChild(makeListBlock('良かった点', 'good', data.good_points || []));
+      cols3.appendChild(makeListBlock('改善点', 'improve', data.improvement_points || []));
+      const concernBlock = document.createElement('div');
+      concernBlock.className = 'review-col review-col-concern';
+      concernBlock.innerHTML = `<div class="review-section-label">特に気になった点</div><p>${escapeHtml(data.role_specific_concern || '')}</p>`;
+      cols3.appendChild(concernBlock);
+      container.appendChild(cols3);
+
+      const cols2 = document.createElement('div');
+      cols2.className = 'review-cols-2';
+      cols2.appendChild(makeListBlock('質問', 'questions', data.questions || []));
+      cols2.appendChild(makeListBlock('次のアクション', 'actions', data.next_actions || []));
+      container.appendChild(cols2);
+    }
+
+    function makeListBlock(title, type, items) {
+      const block = document.createElement('div');
+      block.className = `review-col review-col-${type}`;
+      const label = document.createElement('div');
+      label.className = 'review-section-label';
+      label.textContent = title;
+      block.appendChild(label);
+      const ul = document.createElement('ul');
+      items.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        ul.appendChild(li);
+      });
+      block.appendChild(ul);
+      return block;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // ---- タブ3: 動画解析 ----
+    const videoFileInput  = document.getElementById('videoFileInput');
+    const videoFileName   = document.getElementById('videoFileName');
+    const videoPreview    = document.getElementById('videoPreview');
+    const videoStatus     = document.getElementById('videoStatus');
+    const analyzeBtn      = document.getElementById('analyzeBtn');
+    const slideGrid       = document.getElementById('slideGrid');
+
+    let videoFile = null;
+
+    videoFileInput.addEventListener('change', () => {
+      const file = videoFileInput.files[0];
+      if (!file) return;
+      videoFile = file;
+      videoFileName.textContent = file.name;
+      videoPreview.src = URL.createObjectURL(file);
+      videoPreview.style.display = 'block';
+      analyzeBtn.disabled = false;
+      videoStatus.textContent = 'ファイル選択済み';
+    });
+
+    analyzeBtn.addEventListener('click', async () => {
+      if (!videoFile) return;
+
+      const formData = new FormData();
+      formData.append('video', videoFile, videoFile.name);
+
+      analyzeBtn.disabled = true;
+      slideGrid.innerHTML = '';
+      videoStatus.textContent = '解析中... (動画によって数分かかる場合があります)';
+
+      try {
+        const response = await fetch('/analyze', { method: 'POST', body: formData });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || '解析に失敗しました');
+
+        // 全文を共有テキストエリアにセット → 右パネルのレビューも利用可能に
+        resultEl.value = data.full_text || '';
+
+        // スライドグリッド表示
+        (data.slide_speech || []).forEach(slide => {
+          const card = document.createElement('div');
+          card.className = 'slide-card';
+
+          if (slide.thumbnail_url) {
+            const img = document.createElement('img');
+            img.className = 'slide-thumb';
+            img.src = slide.thumbnail_url;
+            img.alt = `スライド ${slide.slide_index}`;
+            card.appendChild(img);
+          }
+
+          const info = document.createElement('div');
+          info.className = 'slide-info';
+          info.innerHTML =
+            `<div class="slide-meta">スライド ${slide.slide_index} &nbsp;` +
+            `${slide.start}s〜${slide.end}s (${slide.duration_sec}s)</div>` +
+            `<div class="slide-spoken">${escapeHtml(slide.spoken_text || '（発話なし）')}</div>`;
+          card.appendChild(info);
+
+          slideGrid.appendChild(card);
+        });
+
+        document.getElementById('videoResultArea').style.display = 'block';
+        videoStatus.textContent = '解析完了';
+      } catch (error) {
+        videoStatus.textContent = `エラー: ${error.message}`;
+      } finally {
+        analyzeBtn.disabled = false;
+      }
+    });
+
+  </script>
+</body>
+</html>

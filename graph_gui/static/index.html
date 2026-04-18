@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Graph GUI (Cytoscape.js)</title>
+  <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+  <style>
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .wrap { display:grid; grid-template-columns: 280px 1fr; height: 100vh; }
+    .panel { border-right: 1px solid #ddd; padding: 12px; overflow:auto; }
+    #cy { width: 100%; height: 100%; position: relative; }
+    #cy.dragover::before { content: '📁 ファイル/フォルダをドロップ'; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(77, 163, 255, 0.1); border: 3px dashed #4da3ff; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #4da3ff; z-index: 999; pointer-events: none; }
+    .btn { width: 100%; padding: 10px; margin: 6px 0; cursor: pointer; }
+    .row { display:flex; gap:8px; align-items:center; }
+    input, select { width: 100%; padding: 8px; }
+    .muted { color:#666; font-size: 12px; }
+    pre { background:#f6f6f6; padding: 10px; border-radius: 8px; overflow:auto; max-height: 400px; }
+    .status { padding: 8px; margin: 8px 0; border-radius: 4px; font-size: 12px; }
+    .status.success { background: #d4edda; color: #155724; }
+    .status.error { background: #f8d7da; color: #721c24; }
+    .status.info { background: #d1ecf1; color: #0c5460; }
+    
+    /* ポップアップモーダル */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
+    .modal-overlay.active { display: flex; align-items: center; justify-content: center; }
+    .modal-content { background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); width: 50vw; height: 70vh; overflow: auto; display: flex; flex-direction: column; }
+    .modal-header { padding: 16px 20px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    .modal-header h3 { margin: 0; font-size: 18px; }
+    .modal-header-left { display: flex; align-items: center; gap: 12px; }
+    .modal-btn { padding: 6px 12px; border: 1px solid #4da3ff; background: white; color: #4da3ff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .modal-btn:hover { background: #e8f4ff; }
+    .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #666; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
+    .modal-close:hover { color: #000; background: #f0f0f0; border-radius: 4px; }
+    .modal-tabs { display: flex; border-bottom: 1px solid #ddd; flex-shrink: 0; }
+    .modal-tab { padding: 12px 24px; cursor: pointer; border-bottom: 2px solid transparent; color: #666; }
+    .modal-tab.active { color: #4da3ff; border-bottom-color: #4da3ff; font-weight: 500; }
+    .modal-tab:hover { background: #f6f6f6; }
+    .modal-body { padding: 20px; flex: 1; overflow: auto; }
+    .modal-tab-content { display: none; height: 100%; }
+    .modal-tab-content.active { display: block; }
+    #flowchartCanvas { width: 100%; height: 100%; min-height: 400px; }
+    #tabFlowchart { padding: 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <h3>ファイル解析</h3>
+      
+      <div id="status"></div>
+
+      <hr>
+
+      <h4>レイアウト</h4>
+      <div class="row">
+        <select id="layout">
+          <option value="cose">cose（自動）</option>
+          <option value="breadthfirst">breadthfirst（階層）</option>
+          <option value="grid">grid</option>
+          <option value="circle">circle</option>
+        </select>
+      </div>
+      <button class="btn" id="btnLayout">レイアウト適用</button>
+
+      <hr>
+
+      <h4>凡例</h4>
+      <div id="legend" style="font-size: 12px;"></div>
+
+      <p class="muted" style="margin-top: 20px;">
+        Tips: グラフエリアにファイル/フォルダをドロップして解析<br>
+        ドラッグで移動 / ホイールでズーム / ノードクリックでコード表示
+      </p>
+    </div>
+
+    <div id="cy"></div>
+  </div>
+
+  <!-- ポップアップモーダル -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <h3>ノード情報詳細</h3>
+          <button class="modal-btn" id="btnShowFlowchart">フローチャート作成</button>
+        </div>
+        <button class="modal-close" id="modalClose">&times;</button>
+      </div>
+      <div class="modal-tabs">
+        <div class="modal-tab active" data-tab="detail">詳細</div>
+        <div class="modal-tab" data-tab="flowchart">フローチャート</div>
+      </div>
+      <div class="modal-body">
+        <div class="modal-tab-content active" id="tabDetail">
+          <div class="muted">ノードをクリックしてコードを表示</div>
+        </div>
+        <div class="modal-tab-content" id="tabFlowchart">
+          <div id="flowchartCanvas"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========================================
+    // API関数
+    // ========================================
+    
+    // 保存されているグラフデータを取得
+    const apiGet = () => fetch("/api/graph").then(r => r.json());
+
+    // 単一ファイルを解析
+    const apiAnalyze = async (file) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        body: formData
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || "解析に失敗しました");
+      }
+      return res.json();
+    };
+
+    // 複数ファイルを解析
+    const apiAnalyzeMultiple = async (files) => {
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append("files", file);
+      }
+      const res = await fetch("/api/analyze-multiple", {
+        method: "POST",
+        body: formData
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || "解析に失敗しました");
+      }
+      return res.json();
+    };
+
+    // ========================================
+    // グローバル変数
+    // ========================================
+    
+    let cy;                     // メイングラフのCytoscapeインスタンス
+    let flowchartCy;           // フローチャート用Cytoscapeインスタンス
+    let currentNodeCode = "";  // 現在表示中のノードのコード
+    const fileColors = {};      // ファイル名 → 色のマッピング
+    const colorPalette = [
+      '#4da3ff', '#ff7a59', '#66c2a5', '#fc8d62', '#8da0cb',
+      '#e78ac3', '#a6d854', '#ffd92f', '#e5c494', '#b3b3b3'
+    ];
+
+    // ========================================
+    // ユーティリティ関数
+    // ========================================
+    
+    /**
+     * ファイルパスから色を取得（自動割り当て）
+     */
+    function getFileColor(filePath) {
+      if (!filePath) return '#4da3ff';
+      
+      // ファイル名を抽出
+      const parts = filePath.split(/[/\\]/);
+      const fileName = parts[parts.length - 1];
+      
+      // 新しいファイルなら色を割り当て
+      if (!fileColors[fileName]) {
+        const colorIndex = Object.keys(fileColors).length % colorPalette.length;
+        fileColors[fileName] = colorPalette[colorIndex];
+      }
+      return fileColors[fileName];
+    }
+
+    /**
+     * 凡例を更新（ファイル名と色の対応を表示）
+     */
+    function updateLegend() {
+      const legendEl = document.getElementById("legend");
+      let html = '<div style="margin-top: 10px;">';
+      
+      const sortedFiles = Object.keys(fileColors).sort();
+      sortedFiles.forEach(fileName => {
+        const color = fileColors[fileName];
+        html += `<div style="margin: 4px 0; display: flex; align-items: center; gap: 6px;">
+          <div style="width: 12px; height: 12px; background: ${color}; border-radius: 3px;"></div>
+          <span>${fileName}</span>
+        </div>`;
+      });
+      
+      html += '</div>';
+      legendEl.innerHTML = html;
+    }
+
+    /**
+     * HTMLエスケープ処理
+     */
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    /**
+     * ステータスメッセージを表示
+     */
+    function showStatus(message, type = "info") {
+      const statusEl = document.getElementById("status");
+      statusEl.className = `status ${type}`;
+      statusEl.textContent = message;
+      if (type === "success") {
+        setTimeout(() => { statusEl.textContent = ""; statusEl.className = ""; }, 5000);
+      }
+    }
+
+    /**
+     * エッジIDを自動生成
+     */
+    function ensureEdgeId() {
+      let i = 1;
+      cy.edges().forEach(e => {
+        if (!e.data("id")) {
+          e.data("id", `e_auto_${i++}`);
+        }
+      });
+    }
+
+    /**
+     * ノード詳細をモーダルに表示
+     */
+    function renderInspector(node) {
+      const tabDetail = document.getElementById("tabDetail");
+      const modalOverlay = document.getElementById("modalOverlay");
+      
+      // ノードがnullの場合はモーダルを閉じる
+      if (!node) {
+        modalOverlay.classList.remove("active");
+        return;
+      }
+      
+      const data = node.data();
+      
+      // ファイル名を抽出（パスの最後の部分）
+      const fileParts = (data.file || '').split(/[/\\]/);
+      const fileName = fileParts[fileParts.length - 1] || 'unknown';
+      const code = data.code || '# コードが見つかりません';
+      
+      // フローチャート生成用にコードとノード情報を保存
+      currentNodeCode = code;
+      window.currentNodeData = {
+        qname: data.qname || data.label,
+        lineno: data.lineno,
+        file: data.file
+      };
+      
+      // 詳細タブの内容を構築
+      let html = `
+        <div style="margin-bottom: 20px;">
+          <div style="font-weight: bold; margin-bottom: 8px; color: #333;">関数名称</div>
+          <div style="padding: 10px; background: #f6f6f6; border-radius: 4px;">${data.qname || data.label}</div>
+        </div>
+        <div style="margin-bottom: 20px;">
+          <div style="font-weight: bold; margin-bottom: 8px; color: #333;">ファイル名称</div>
+          <div style="padding: 10px; background: #f6f6f6; border-radius: 4px;">${fileName}</div>
+        </div>
+        <div style="margin-bottom: 20px;">
+          <div style="font-weight: bold; margin-bottom: 8px; color: #333;">行数</div>
+          <div style="padding: 10px; background: #f6f6f6; border-radius: 4px;">${data.lineno || 'N/A'}</div>
+        </div>
+        <div>
+          <div style="font-weight: bold; margin-bottom: 8px; color: #333;">コード</div>
+          <pre style="font-size: 11px; line-height: 1.4;">${escapeHtml(code)}</pre>
+        </div>
+      `;
+      
+      tabDetail.innerHTML = html;
+      
+      // 詳細タブを表示してモーダルを開く
+      switchToTab('detail');
+      modalOverlay.classList.add("active");
+    }
+
+    /**
+     * 詳細タブとフローチャートタブを切り替え
+     */
+    function switchToTab(tabName) {
+      // タブボタンのアクティブ状態を更新
+      document.querySelectorAll('.modal-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+      });
+      
+      // タブコンテンツの表示/非表示を切り替え
+      document.querySelectorAll('.modal-tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === `tab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`);
+      });
+    }
+
+    /**
+     * フローチャート識別子を生成（qname + lineno + ファイル名のハッシュ）
+     */
+    function generateFlowchartId(qname, lineno, fileName) {
+      // 簡易的な識別子生成（英数字とアンダースコアのみ）
+      const sanitized = `${qname}_${lineno}_${fileName}`.replace(/[^a-zA-Z0-9_]/g, '_');
+      return sanitized;
+    }
+
+    /**
+     * フローチャートタブ選択時にキャッシュをチェックして表示
+     */
+    async function loadFlowchart() {
+      const flowchartCanvas = document.getElementById('flowchartCanvas');
+      
+      if (!window.currentNodeData) {
+        flowchartCanvas.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">ノード情報が見つかりません</div>';
+        return;
+      }
+
+      const { qname, lineno, file } = window.currentNodeData;
+      const fileParts = (file || '').split(/[/\\]/);
+      const fileName = fileParts[fileParts.length - 1] || 'unknown';
+      
+      // フローチャート識別子を生成
+      const identifier = generateFlowchartId(qname || 'unknown', lineno || 0, fileName);
+
+      // ローディング表示
+      flowchartCanvas.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">フローチャート確認中...</div>';
+
+      try {
+        // キャッシュされたフローチャートを取得試行
+        const cacheResponse = await fetch(`/api/flowchart/${identifier}`);
+        
+        if (cacheResponse.ok) {
+          // キャッシュが存在する場合は表示
+          const cacheResult = await cacheResponse.json();
+          const flowchartData = cacheResult.flowchart;
+          console.log('[フローチャート] キャッシュから読み込み:', identifier);
+          
+          // Cytoscape.jsでフローチャートを表示
+          renderFlowchart(flowchartData);
+        } else {
+          // キャッシュが存在しない場合はメッセージ表示
+          flowchartCanvas.innerHTML = '<div style="text-align: center; padding: 40px; color: #999; font-size: 14px;">まだフローチャートが作成されていません<br><br>「フローチャート作成」ボタンをクリックして作成してください</div>';
+        }
+      } catch (error) {
+        // エラーが発生した場合もメッセージ表示
+        flowchartCanvas.innerHTML = '<div style="text-align: center; padding: 40px; color: #999; font-size: 14px;">まだフローチャートが作成されていません<br><br>「フローチャート作成」ボタンをクリックして作成してください</div>';
+      }
+    }
+
+    /**
+     * フローチャートを新規生成して保存（フローチャート作成ボタン用）
+     */
+    async function showFlowchart() {
+      if (!currentNodeCode) {
+        alert('コードが読み込まれていません');
+        return;
+      }
+
+      // 現在のノード情報を取得
+      if (!window.currentNodeData) {
+        alert('ノード情報が見つかりません');
+        return;
+      }
+
+      const { qname, lineno, file } = window.currentNodeData;
+      const fileParts = (file || '').split(/[/\\]/);
+      const fileName = fileParts[fileParts.length - 1] || 'unknown';
+      
+      // フローチャート識別子を生成
+      const identifier = generateFlowchartId(qname || 'unknown', lineno || 0, fileName);
+
+      // フローチャートタブに切り替え
+      switchToTab('flowchart');
+
+      // ローディング表示
+      const flowchartCanvas = document.getElementById('flowchartCanvas');
+      flowchartCanvas.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">フローチャート生成中...</div>';
+
+      try {
+        // 常に新規生成して保存
+        const response = await fetch('/api/flowchart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            code: currentNodeCode,
+            identifier: identifier  // 識別子を送信して保存
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.detail || 'フローチャート生成に失敗しました');
+        }
+
+        const result = await response.json();
+        const flowchartData = result.flowchart;
+        console.log('[フローチャート] 新規生成して保存:', identifier);
+
+        // Cytoscape.jsでフローチャートを表示
+        renderFlowchart(flowchartData);
+
+      } catch (error) {
+        flowchartCanvas.innerHTML = `<div style="text-align: center; padding: 40px; color: #d32f2f;">エラー: ${error.message}</div>`;
+      }
+    }
+
+    /**
+     * フローチャートをCytoscape.jsでレンダリング
+     */
+    function renderFlowchart(flowchartData) {
+      const flowchartCanvas = document.getElementById('flowchartCanvas');
+      flowchartCanvas.innerHTML = '';
+      
+      // 既存のフローチャートインスタンスを破棄
+      if (flowchartCy) {
+        flowchartCy.destroy();
+      }
+
+      // フローチャート用Cytoscapeインスタンスを初期化
+      flowchartCy = cytoscape({
+        container: flowchartCanvas,
+        elements: flowchartData,
+        style: [
+          {
+            selector: 'node',
+            style: {
+              'label': 'data(label)',
+              'text-wrap': 'wrap',
+              'text-max-width': 200,
+              'text-valign': 'center',
+              'text-halign': 'center',
+              'font-size': 10,
+              'padding': '8px',
+              'shape': 'round-rectangle',
+              'border-width': 2,
+              'border-color': '#333'
+            }
+          },
+          { selector: 'node[kind = "start"]', style: { 'shape': 'ellipse', 'background-color': '#C7F9CC' } },
+          { selector: 'node[kind = "process"]', style: { 'background-color': '#D0E2FF' } },
+          { selector: 'node[kind = "decision"]', style: { 'shape': 'diamond', 'background-color': '#FFE8A3' } },
+          { selector: 'node[kind = "match"]', style: { 'background-color': '#E1BEE7', 'shape': 'hexagon' } },
+          { selector: 'node[kind = "return"]', style: { 'background-color': '#FFB3B3', 'border-style': 'dashed' } },
+          {
+            selector: 'edge',
+            style: {
+              'curve-style': 'bezier',
+              'target-arrow-shape': 'triangle',
+              'arrow-scale': 1,
+              'width': 1.6,
+              'line-color': '#666',
+              'target-arrow-color': '#666',
+              'label': 'data(label)',
+              'font-size': 9,
+              'text-rotation': 'autorotate',
+              'text-margin-y': -6
+            }
+          }
+        ],
+        layout: {
+          name: 'breadthfirst',
+          directed: true,
+          padding: 20,
+          spacingFactor: 1.5
+        },
+        wheelSensitivity: 0.15
+      });
+
+      // ビューをフィット（遅延実行で確実にレンダリング後に実行）
+      setTimeout(() => {
+        flowchartCy.fit(undefined, 20);
+      }, 100);
+    }
+
+    /**
+     * レイアウトアルゴリズムを適用
+     */
+    function applyLayout(name) {
+      cy.layout({ name, animate: true, animationDuration: 300 }).run();
+    }
+
+    /**
+     * グラフデータをキャンバスに読み込み
+     */
+    function loadGraphIntoCanvas(graphData) {
+      // 既存の要素をクリア
+      cy.elements().remove();
+      
+      // ファイルごとの色マッピングをリセット
+      Object.keys(fileColors).forEach(key => delete fileColors[key]);
+      
+      if (graphData.elements) {
+        const nodes = graphData.elements.nodes || [];
+        const edges = graphData.elements.edges || [];
+        
+        // ノード追加前に色を事前割り当て
+        nodes.forEach(n => {
+          const file = n.data.file || '';
+          getFileColor(file);
+        });
+        
+        // ノード・エッジを追加
+        cy.add(nodes);
+        cy.add(edges);
+        
+        // ファイルごとに色を適用
+        cy.nodes().forEach(node => {
+          const file = node.data('file');
+          const color = getFileColor(file);
+          node.style('background-color', color);
+        });
+      }
+      
+      updateLegend();
+      ensureEdgeId();
+      applyLayout("cose");
+    }
+
+    /**
+     * ファイルアップロードを処理（単一または複数ファイル）
+     */
+    async function handleFileUpload(files) {
+      if (!files || files.length === 0) {
+        showStatus("ファイルを選択してください", "error");
+        return;
+      }
+
+      // Pythonファイルのみフィルタ
+      const pyFiles = Array.from(files).filter(f => f.name.endsWith('.py'));
+      
+      if (pyFiles.length === 0) {
+        showStatus("Pythonファイル (.py) が含まれていません", "error");
+        return;
+      }
+
+      if (pyFiles.length === 1) {
+        // 単一ファイルの場合
+        showStatus(`解析中: ${pyFiles[0].name}...`, "info");
+        try {
+          const result = await apiAnalyze(pyFiles[0]);
+          showStatus(`解析完了: ${result.filename} (ノード: ${result.nodes}, エッジ: ${result.edges})`, "success");
+          loadGraphIntoCanvas(result.graph);
+        } catch (error) {
+          showStatus(`エラー: ${error.message}`, "error");
+        }
+      } else {
+        // 複数ファイルの場合
+        showStatus(`解析中: ${pyFiles.length} ファイル...`, "info");
+        try {
+          const result = await apiAnalyzeMultiple(pyFiles);
+          showStatus(`解析完了: ${result.files} ファイル (ノード: ${result.nodes}, エッジ: ${result.edges})`, "success");
+          loadGraphIntoCanvas(result.graph);
+        } catch (error) {
+          showStatus(`エラー: ${error.message}`, "error");
+        }
+      }
+    }
+
+    /**
+     * ドラッグ&ドロップ時にディレクトリ内のファイルを再帰的に収集
+     */
+    async function collectFiles(item, files) {
+      if (item.isFile) {
+        return new Promise((resolve) => {
+          item.file((file) => {
+            if (file.name.endsWith('.py')) {
+              files.push(file);
+            }
+            resolve();
+          });
+        });
+      } else if (item.isDirectory) {
+        const dirReader = item.createReader();
+        return new Promise((resolve) => {
+          dirReader.readEntries(async (entries) => {
+            const promises = [];
+            for (const entry of entries) {
+              promises.push(collectFiles(entry, files));
+            }
+            await Promise.all(promises);
+            resolve();
+          });
+        });
+      }
+    }
+
+    // ========================================
+    // メイン処理（初期化とイベントハンドラー）
+    // ========================================
+    
+    (async function main() {
+      try {
+        // 保存されているグラフデータを読み込み
+        const graph = await apiGet();
+
+        // メイングラフのCytoscapeインスタンスを初期化
+        cy = cytoscape({
+          container: document.getElementById("cy"),
+          elements: graph.elements || [],
+          style: [
+            {
+              selector: 'node',
+              style: {
+                'label': 'data(label)',
+                'font-size': 9,
+                'text-wrap': 'wrap',
+                'text-max-width': 120,
+                'background-color': '#4da3ff'
+              }
+            },
+            {
+              selector: 'edge',
+              style: {
+                'label': 'data(label)',
+                'font-size': 7,
+                'width': 1,
+                'line-color': '#aaa',
+                'target-arrow-color': '#aaa',
+                'target-arrow-shape': 'triangle',
+                'curve-style': 'bezier'
+              }
+            },
+            { 
+              selector: ':selected', 
+              style: { 
+                'background-color': '#ff7a59', 
+                'line-color': '#ff7a59', 
+                'target-arrow-color': '#ff7a59' 
+              } 
+            }
+          ],
+          selectionType: "additive"
+        });
+
+        // エッジIDの確保
+        ensureEdgeId();
+        
+        // ノードが存在する場合はレイアウトを適用
+        if (cy.nodes().length > 0) {
+          applyLayout("cose");
+        }
+
+        // ========================================
+        // イベントハンドラー - Cytoscapeグラフ
+        // ========================================
+
+        // ノードクリック時に詳細モーダルを表示
+        cy.on("tap", "node", (evt) => {
+          const node = evt.target;
+          renderInspector(node);
+        });
+
+        // 背景クリック時はモーダルを閉じる
+        cy.on("tap", (evt) => {
+          if (evt.target === cy) {
+            renderInspector(null);
+          }
+        });
+
+        // ========================================
+        // イベントハンドラー - モーダル
+        // ========================================
+
+        const modalOverlay = document.getElementById("modalOverlay");
+        const modalClose = document.getElementById("modalClose");
+        
+        // ×ボタンでモーダルを閉じる
+        modalClose.onclick = () => {
+          modalOverlay.classList.remove("active");
+        };
+        
+        // オーバーレイクリックでモーダルを閉じる
+        modalOverlay.onclick = (e) => {
+          if (e.target === modalOverlay) {
+            modalOverlay.classList.remove("active");
+          }
+        };
+        
+        // ESCキーでモーダルを閉じる
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            modalOverlay.classList.remove("active");
+          }
+        });
+
+        // モーダルタブの切り替え
+        document.querySelectorAll('.modal-tab').forEach(tab => {
+          tab.onclick = () => {
+            switchToTab(tab.dataset.tab);
+            // フローチャートタブに切り替えた場合はキャッシュをチェック
+            if (tab.dataset.tab === 'flowchart') {
+              loadFlowchart();
+            }
+          };
+        });
+
+        // フローチャート表示ボタン
+        document.getElementById('btnShowFlowchart').onclick = () => {
+          showFlowchart();
+        };
+
+        // ========================================
+        // イベントハンドラー - ドラッグ&ドロップ
+        // ========================================
+
+        const cyContainer = document.getElementById("cy");
+        
+        // ドラッグオーバー時
+        cyContainer.ondragover = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          cyContainer.classList.add("dragover");
+        };
+
+        // ドラッグ離脱時
+        cyContainer.ondragleave = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          cyContainer.classList.remove("dragover");
+        };
+
+        // ドロップ時
+        cyContainer.ondrop = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          cyContainer.classList.remove("dragover");
+          
+          // ファイルまたはディレクトリからPythonファイルを収集
+          const items = e.dataTransfer.items;
+          if (items) {
+            const files = [];
+            const promises = [];
+            
+            for (let i = 0; i < items.length; i++) {
+              const item = items[i].webkitGetAsEntry();
+              if (item) {
+                promises.push(collectFiles(item, files));
+              }
+            }
+            
+            Promise.all(promises).then(() => {
+              if (files.length > 0) {
+                handleFileUpload(files);
+              }
+            });
+          } else if (e.dataTransfer.files.length > 0) {
+            handleFileUpload(e.dataTransfer.files);
+          }
+        };
+
+        // ========================================
+        // イベントハンドラー - ボタン
+        // ========================================
+
+        // レイアウト適用ボタン
+        document.getElementById("btnLayout").onclick = () => {
+          applyLayout(document.getElementById("layout").value);
+        };
+
+      } catch (error) {
+        console.error('[ERROR] アプリケーション初期化エラー:', error);
+        alert('アプリケーションの初期化中にエラーが発生しました: ' + error.message);
+      }
+    })();
+  </script>
+</body>
+</html>
