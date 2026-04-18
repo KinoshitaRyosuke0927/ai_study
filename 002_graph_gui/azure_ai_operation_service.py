@@ -7,7 +7,7 @@ from typing import Dict, Any
 from dotenv import load_dotenv
 from openai import AzureOpenAI
 
-# プロジェクトルート（graph_gui の親ディレクトリ）の .env を読み込む
+# プロジェクトルート（002_graph_gui の親ディレクトリ）の .env を読み込む
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 
 from azure_constant import (

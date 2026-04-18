@@ -26,14 +26,14 @@ Azure OpenAI への接続に以下の環境変数が**必須**です。
 
 ### .env ファイルを使用する方法（推奨）
 
-アプリは起動時に **`graph_gui` の親ディレクトリ（`education/`）にある `.env` ファイル**を自動的に読み込みます。
+アプリは起動時に **`002_graph_gui` の親ディレクトリ（`education/`）にある `.env` ファイル**を自動的に読み込みます。
 
 `.env` ファイルが存在しない場合は以下の内容で作成してください。
 
 ```
 education/
 └── .env          ← このファイルを作成する
-    graph_gui/
+    002_graph_gui/
     └── app.py
 ```
 
@@ -73,14 +73,14 @@ export AZURE_OPENAI_KEY="<APIキー>"
 ## インストール
 
 ```powershell
-cd graph_gui
+cd 002_graph_gui
 pip install fastapi uvicorn openai rustworkx python-multipart python-dotenv
 ```
 
 ## アプリケーションの起動
 
 ```powershell
-cd graph_gui
+cd 002_graph_gui
 uvicorn app:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -105,7 +105,7 @@ http://localhost:8000
 ## ファイル構成
 
 ```
-graph_gui/
+002_graph_gui/
 ├── app.py                      # FastAPI サーバー（エントリーポイント）
 ├── analyze_and_visualize.py    # Pythonファイル解析 + Cytoscape形式への変換
 ├── generate_graph_json.py      # AST解析による呼び出しグラフ生成

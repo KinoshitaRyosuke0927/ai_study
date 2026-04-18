@@ -22,10 +22,10 @@ node_modules/
 */uploads/
 */outputs/
 
-# graph_gui 生成データ
-graph_gui/data/flowcharts/
-graph_gui/data/graph.json
+# 002_graph_gui 生成データ
+002_graph_gui/data/flowcharts/
+002_graph_gui/data/graph.json
 
-# play_role データ・設定
-play_role/data/
-play_role/reviewers.csv
+# 004_play_role データ・設定
+004_play_role/data/
+004_play_role/reviewers.csv
