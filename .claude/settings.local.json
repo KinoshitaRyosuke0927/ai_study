@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python)",
+      "Bash(python -c ' *)",
+      "Bash(python eda_writer.py)",
+      "Bash(python -c \"import pathlib; pathlib.Path\\('c:/azure_ai/education/005_kaggle/004_store_sales/store_sales_feature_selection.py'\\).write_text\\('# placeholder', encoding='utf-8'\\)\")",
+      "Bash(python -c \"import pathlib; pathlib.Path\\('c:/azure_ai/education/005_kaggle/004_store_sales/store_sales.py'\\).write_text\\('# placeholder', encoding='utf-8'\\)\")",
+      "Bash(python diagnose_nan.py)",
+      "Bash(python -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(conda run *)",
+      "Bash(python -m conda run -n kaggle python diagnose_nan.py)",
+      "Read(//c/Users/jack/anaconda3/**)",
+      "Read(//c/Users/jack/miniconda3/**)",
+      "Read(//c/ProgramData/anaconda3/**)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

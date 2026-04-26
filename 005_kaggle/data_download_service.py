@@ -6,7 +6,7 @@ import kagglehub
 # Kaggleにログイン
 kagglehub.login()
 # データ指定
-data_name = 'house-prices-advanced-regression-techniques'
+data_name = 'digit-recognizer'
 # 解析対象のデータをダウンロード
 path = kagglehub.competition_download(data_name)
 print("Kaggleからダウンロードしたデータ:", path)
