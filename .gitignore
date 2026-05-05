@@ -36,5 +36,11 @@ docs/Qiita/appendix/crs_extend_01/project_codes.json
 # Kaggle 提出ファイル（大容量・コードではないため管理不要）
 **/submission_*.csv
 
+# 学習済みモデルファイル（大容量・コードではないため管理不要）
+**/*.pt
+**/*.h5
+**/*.pkl
+**/*.joblib
+
 # CatBoost 学習ログ（自動生成される一時ファイル）
 catboost_info/
