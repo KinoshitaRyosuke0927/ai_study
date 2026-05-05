@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import torch; print\\('PyTorch:', torch.__version__\\); print\\('CUDA:', torch.cuda.is_available\\(\\)\\)\")",
+      "Bash(python -c \"import transformers; print\\('transformers:', transformers.__version__\\)\")",
+      "Bash(pip show *)",
+      "Bash(python -c \"import torch\")",
+      "Bash(pip install *)"
+    ]
+  }
+}

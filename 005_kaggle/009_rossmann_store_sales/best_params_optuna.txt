@@ -1,0 +1,19 @@
+# Optuna 最適パラメータ（50 trials）
+# valid RMSPE: 0.12674  best_iteration: 4960
+
+BEST_PARAMS = {
+    "objective":         "regression",
+    "metric":            "rmse",
+    "verbose":           -1,
+    "seed":              42,
+    "learning_rate": 0.025712018491695496,
+    "num_leaves": 359,
+    "min_child_samples": 146,
+    "feature_fraction": 0.5623737166333678,
+    "bagging_fraction": 0.9012873662882596,
+    "bagging_freq": 5,
+    "lambda_l1": 0.038529774921381765,
+    "lambda_l2": 5.269302870224163,
+    "min_split_gain": 0.0019331115902168428,
+    "max_depth": 10,
+}

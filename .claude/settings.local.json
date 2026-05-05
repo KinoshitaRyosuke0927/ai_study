@@ -12,7 +12,9 @@
       "Bash(python -m conda run -n kaggle python diagnose_nan.py)",
       "Read(//c/Users/jack/anaconda3/**)",
       "Read(//c/Users/jack/miniconda3/**)",
-      "Read(//c/ProgramData/anaconda3/**)"
+      "Read(//c/ProgramData/anaconda3/**)",
+      "Bash(python 005_kaggle/008_playground_series_s6e5/s6e5_external_data.py)",
+      "Bash(python 005_kaggle/008_playground_series_s6e5/s6e5_improved.py)"
     ],
     "additionalDirectories": [
       "\\tmp"
