@@ -32,3 +32,9 @@ node_modules/
 
 # シークレットが含まれるファイル
 docs/Qiita/appendix/crs_extend_01/project_codes.json
+
+# Kaggle 提出ファイル（大容量・コードではないため管理不要）
+**/submission_*.csv
+
+# CatBoost 学習ログ（自動生成される一時ファイル）
+catboost_info/
