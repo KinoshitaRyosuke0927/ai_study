@@ -1,0 +1,15 @@
+catboost
+kagglehub==1.0.0
+lightgbm==4.6.0
+matplotlib==3.10.9
+numpy==2.3.5
+optuna==4.8.0
+pandas==2.3.3
+scikit-learn==1.8.0
+scipy==1.17.1
+seaborn==0.13.2
+tensorflow==2.21.0
+torch==2.10.0
+tqdm==4.67.1
+transformers==5.7.0
+xgboost==3.2.0

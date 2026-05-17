@@ -1,6 +1,6 @@
-fastapi
-uvicorn[standard]
-openai
+fastapi==0.124.0
+uvicorn[standard]==0.38.0
+openai==1.96.0
 rustworkx
-python-multipart
-python-dotenv
+python-multipart==0.0.20
+python-dotenv==1.0.0

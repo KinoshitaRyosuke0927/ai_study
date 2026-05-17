@@ -1,7 +1,11 @@
-fastapi
-uvicorn
-jinja2
-python-multipart
-openai-whisper
-opencv-python
+fastapi==0.124.0
+uvicorn==0.38.0
+Jinja2==3.1.6
+python-multipart==0.0.20
+openai-whisper==20250625
+opencv-python==4.13.0.92
 scikit-image
+openai==1.96.0
+numpy==2.3.5
+pydantic==2.12.5
+python-dotenv==1.0.0
