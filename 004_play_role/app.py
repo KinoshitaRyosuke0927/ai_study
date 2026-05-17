@@ -113,10 +113,14 @@ async def transcribe(audio: UploadFile = File(...)):  # リクエストボディ
         result = get_model().transcribe(temp_path, language="ja", fp16=False)  # Whisper で日本語として文字起こし（GPU なしなので fp16=False）
         raw_text = result.get("text", "").strip()  # 認識結果のテキストを前後の空白を除いて取得
         print("##### 文字起こし終了 : " + str(time.time() - _start) + " #####")
+        # print("##### 校正前テキスト #####")
+        # print(raw_text)
         print("##### テキスト校正開始 #####")
         _start = time.time()
         refined_text = brushup_text(raw_text)  # Azure OpenAI で文章を推敲
         print("##### テキスト校正終了 : " + str(time.time() - _start) + " #####")
+        # print("##### 校正後テキスト #####")
+        # print(refined_text)
         return {"text": refined_text}  # 推敲済みテキストを返す
     except Exception as exc:
         # 文字起こし中に例外が発生した場合は 500 エラーとして返す
@@ -279,7 +283,11 @@ async def analyze(video: UploadFile = File(...)):
         ]
 
         # 3. 全文テキスト推敲（文字起こし直後に校正）
+        # print("##### 校正前テキスト（動画）#####")
+        # print(raw_text)
         refined_text = brushup_text(raw_text)
+        # print("##### 校正後テキスト（動画）#####")
+        # print(refined_text)
 
         # 4. スライド切替検出
         total_duration = get_video_duration(video_path)

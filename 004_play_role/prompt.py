@@ -208,7 +208,7 @@ DEVELOPER = """
 """
 
 # PM
-PRODUCT_MANAGER = """
+PROJECT_MANAGER = """
 以下はレビュー対象の内容です。
 あなたは指定された役割になりきって、この内容に対するフィードバックを行ってください。
 
@@ -734,7 +734,7 @@ ROLE_DICT = {
     "beginner": BEGINNER,
     "superior": SUPERIOR,
     "developer": DEVELOPER,
-    "pm": PRODUCT_MANAGER,
+    "pm": PROJECT_MANAGER,
     "po": PRODUCT_OWNER,
     "friend": FRIEND,
     "sakura_miko": SAKURA_MIKO,
