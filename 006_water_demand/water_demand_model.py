@@ -43,6 +43,10 @@ monthly_biz_days = (
 emp_cols = [c for c in work_day.columns if c.startswith("emp_")]
 # 日ごとの出社人数集計
 work_day["daily_attendance"] = work_day[emp_cols].sum(axis=1)
+# JBDカレンダーの営業日フラグを付与して営業日のみ出社にカウント
+work_day = work_day.merge(jbd_calendar[["date", "business_day_flag"]], on="date", how="left")
+# カレンダーにない日付は休日とする
+work_day["daily_attendance"] = work_day["daily_attendance"] * work_day["business_day_flag"].fillna(0)
 # 月ごとの延べ出社人数を合計
 monthly_attendance = (
     work_day.groupby("year_month")["daily_attendance"]
