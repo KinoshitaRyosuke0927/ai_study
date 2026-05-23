@@ -1,0 +1,153 @@
+<svg width="1000" height="520" xmlns="http://www.w3.org/2000/svg" font-family="'Hiragino Kaku Gothic ProN', 'Yu Gothic', Meiryo, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="520" fill="#f8fafc"/>
+
+  <!-- Title -->
+  <text x="500" y="34" text-anchor="middle" font-size="15" font-weight="bold" fill="#1e293b">4つのCSVを year_month キーで結合して月次特徴量テーブルを作る</text>
+
+  <!-- ── SOURCE CSV BOXES ── -->
+  <!-- bg:#eff6ff  border:#93c5fd  title:#1d4ed8  col:#334155 -->
+
+  <!-- 1: water_demand.csv  center-x=120 -->
+  <rect x="25" y="52" width="190" height="92" rx="8" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <text x="120" y="72" text-anchor="middle" font-size="11" font-weight="bold" fill="#1d4ed8">water_demand.csv</text>
+  <line x1="25" y1="79" x2="215" y2="79" stroke="#93c5fd" stroke-width="1"/>
+  <text x="42" y="96"  font-size="10.5" fill="#334155">date_ym</text>
+  <text x="42" y="112" font-size="10.5" fill="#334155">order_quantity</text>
+  <text x="42" y="135" font-size="9.5" fill="#94a3b8">（月次データ）</text>
+
+  <!-- 2: jbd_calendar.csv  center-x=360 -->
+  <rect x="265" y="52" width="190" height="92" rx="8" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <text x="360" y="72" text-anchor="middle" font-size="11" font-weight="bold" fill="#1d4ed8">jbd_calendar.csv</text>
+  <line x1="265" y1="79" x2="455" y2="79" stroke="#93c5fd" stroke-width="1"/>
+  <text x="282" y="96"  font-size="10.5" fill="#334155">date</text>
+  <text x="282" y="112" font-size="10.5" fill="#334155">business_day_flag</text>
+  <text x="282" y="135" font-size="9.5" fill="#94a3b8">（日次データ）</text>
+
+  <!-- 3: work_day.csv  center-x=635 -->
+  <rect x="540" y="52" width="190" height="92" rx="8" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <text x="635" y="72" text-anchor="middle" font-size="11" font-weight="bold" fill="#1d4ed8">work_day.csv</text>
+  <line x1="540" y1="79" x2="730" y2="79" stroke="#93c5fd" stroke-width="1"/>
+  <text x="557" y="96"  font-size="10.5" fill="#334155">date</text>
+  <text x="557" y="112" font-size="10.5" fill="#334155">emp_01 〜 emp_12</text>
+  <text x="557" y="135" font-size="9.5" fill="#94a3b8">（日次データ）</text>
+
+  <!-- 4: weather_data.csv  center-x=880 -->
+  <rect x="785" y="52" width="190" height="92" rx="8" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <text x="880" y="72" text-anchor="middle" font-size="11" font-weight="bold" fill="#1d4ed8">weather_data.csv</text>
+  <line x1="785" y1="79" x2="975" y2="79" stroke="#93c5fd" stroke-width="1"/>
+  <text x="802" y="96"  font-size="10.5" fill="#334155">date</text>
+  <text x="802" y="112" font-size="10.5" fill="#334155">tavg / tmin / tmax</text>
+  <text x="802" y="135" font-size="9.5" fill="#94a3b8">（日次データ）</text>
+
+  <!-- ── AGGREGATION ARROWS ── (y=144 → y=222) -->
+
+  <!-- 1: year_month追加のみ -->
+  <line x1="120" y1="144" x2="120" y2="222" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="120" y="173" text-anchor="middle" font-size="9.5" fill="#64748b">year_month 追加</text>
+
+  <!-- 2: year_month追加 + 月ごとに合計 -->
+  <line x1="360" y1="144" x2="360" y2="222" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="360" y="166" text-anchor="middle" font-size="9.5" fill="#64748b">year_month 追加</text>
+  <text x="360" y="181" text-anchor="middle" font-size="9.5" fill="#64748b">→ 月ごとに合計</text>
+
+  <!-- 3: year_month追加 + 月ごとに集計 -->
+  <line x1="635" y1="144" x2="635" y2="222" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="635" y="166" text-anchor="middle" font-size="9.5" fill="#64748b">year_month 追加</text>
+  <text x="635" y="181" text-anchor="middle" font-size="9.5" fill="#64748b">→ 月ごとに集計</text>
+
+  <!-- 4: year_month追加 + 月ごとに平均 -->
+  <line x1="880" y1="144" x2="880" y2="222" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="880" y="166" text-anchor="middle" font-size="9.5" fill="#64748b">year_month 追加</text>
+  <text x="880" y="181" text-anchor="middle" font-size="9.5" fill="#64748b">→ 月ごとに平均</text>
+
+  <!-- ── MONTHLY AGGREGATED BOXES ── -->
+  <!-- bg:#f0fdf4  border:#86efac  title:#166534  text:#166534 -->
+
+  <!-- 1 center-x=120 -->
+  <rect x="33" y="222" width="175" height="63" rx="7" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="120" y="242" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#166534">注文量実績（月次）</text>
+  <text x="50"  y="259" font-size="10" fill="#166534">year_month</text>
+  <text x="50"  y="275" font-size="10" fill="#166534">order_quantity</text>
+
+  <!-- 2 center-x=360 -->
+  <rect x="273" y="222" width="175" height="63" rx="7" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="360" y="242" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#166534">営業日数（月次）</text>
+  <text x="290" y="259" font-size="10" fill="#166534">year_month</text>
+  <text x="290" y="275" font-size="10" fill="#166534">business_days</text>
+
+  <!-- 3 center-x=635 -->
+  <rect x="548" y="222" width="175" height="63" rx="7" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="635" y="242" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#166534">出社人数（月次）</text>
+  <text x="565" y="259" font-size="10" fill="#166534">year_month</text>
+  <text x="565" y="275" font-size="10" fill="#166534">attendance_rate</text>
+
+  <!-- 4 center-x=880 -->
+  <rect x="793" y="222" width="175" height="63" rx="7" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="880" y="242" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#166534">月平均気温（月次）</text>
+  <text x="810" y="259" font-size="10" fill="#166534">year_month</text>
+  <text x="810" y="275" font-size="10" fill="#166534">tavg_mean</text>
+
+  <!-- ── CONVERGING LINES ── -->
+  <!-- Vertical drops from each monthly box bottom (y=285) to collection line (y=322) -->
+  <line x1="120" y1="285" x2="120" y2="322" stroke="#94a3b8" stroke-width="1.5"/>
+  <line x1="360" y1="285" x2="360" y2="322" stroke="#94a3b8" stroke-width="1.5"/>
+  <line x1="635" y1="285" x2="635" y2="322" stroke="#94a3b8" stroke-width="1.5"/>
+  <line x1="880" y1="285" x2="880" y2="322" stroke="#94a3b8" stroke-width="1.5"/>
+  <!-- Horizontal collection line -->
+  <line x1="120" y1="322" x2="880" y2="322" stroke="#94a3b8" stroke-width="1.5"/>
+  <!-- Single arrow from center down to JOIN box -->
+  <line x1="500" y1="322" x2="500" y2="348" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── JOIN BOX ── -->
+  <!-- bg:#fefce8  border:#fbbf24  text:#92400e -->
+  <rect x="310" y="348" width="380" height="52" rx="9" fill="#fefce8" stroke="#fbbf24" stroke-width="2"/>
+  <text x="500" y="370" text-anchor="middle" font-size="12" font-weight="bold" fill="#92400e">year_month キーで結合（LEFT JOIN）</text>
+  <text x="500" y="389" text-anchor="middle" font-size="10.5" fill="#92400e">注文量実績テーブルを基準に他3テーブルを結合</text>
+
+  <!-- Arrow from JOIN box to result table -->
+  <line x1="500" y1="400" x2="500" y2="420" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── RESULT FEATURE TABLE ── -->
+  <!-- bg:#f5f3ff  border:#c4b5fd  title:#5b21b6  header:#6d28d9  value:#7c3aed -->
+  <rect x="55" y="420" width="890" height="88" rx="9" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="2"/>
+  <text x="500" y="440" text-anchor="middle" font-size="12" font-weight="bold" fill="#5b21b6">月次特徴量テーブル（学習・予測に使用）</text>
+
+  <!-- Column dividers -->
+  <line x1="55" y1="448" x2="945" y2="448" stroke="#c4b5fd" stroke-width="1"/>
+  <line x1="195" y1="448" x2="195" y2="508" stroke="#c4b5fd" stroke-width="1"/>
+  <line x1="365" y1="448" x2="365" y2="508" stroke="#c4b5fd" stroke-width="1"/>
+  <line x1="565" y1="448" x2="565" y2="508" stroke="#c4b5fd" stroke-width="1"/>
+  <line x1="755" y1="448" x2="755" y2="508" stroke="#c4b5fd" stroke-width="1"/>
+
+  <!-- Header row -->
+  <text x="125" y="464" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#6d28d9">year_month</text>
+  <text x="280" y="464" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#6d28d9">order_quantity</text>
+  <text x="465" y="464" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#6d28d9">business_days</text>
+  <text x="660" y="464" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#6d28d9">attendance_rate</text>
+  <text x="850" y="464" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#6d28d9">tavg_mean</text>
+
+  <!-- Sample data row separator -->
+  <line x1="55" y1="472" x2="945" y2="472" stroke="#e9d5ff" stroke-width="1"/>
+
+  <!-- Sample data row 1 -->
+  <text x="125" y="487" text-anchor="middle" font-size="10" fill="#7c3aed">2025-05</text>
+  <text x="280" y="487" text-anchor="middle" font-size="10" fill="#7c3aed">60</text>
+  <text x="465" y="487" text-anchor="middle" font-size="10" fill="#7c3aed">20</text>
+  <text x="660" y="487" text-anchor="middle" font-size="10" fill="#7c3aed">6.3</text>
+  <text x="850" y="487" text-anchor="middle" font-size="10" fill="#7c3aed">18.4</text>
+
+  <!-- Sample data row 2 -->
+  <line x1="55" y1="494" x2="945" y2="494" stroke="#e9d5ff" stroke-width="1"/>
+  <text x="125" y="506" text-anchor="middle" font-size="10" fill="#7c3aed">2025-06</text>
+  <text x="280" y="506" text-anchor="middle" font-size="10" fill="#7c3aed">60</text>
+  <text x="465" y="506" text-anchor="middle" font-size="10" fill="#7c3aed">20</text>
+  <text x="660" y="506" text-anchor="middle" font-size="10" fill="#7c3aed">6.1</text>
+  <text x="850" y="506" text-anchor="middle" font-size="10" fill="#7c3aed">22.4</text>
+</svg>
