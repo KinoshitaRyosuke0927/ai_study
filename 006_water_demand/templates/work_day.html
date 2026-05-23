@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>出社状況登録</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    .container {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+      padding: 40px 48px;
+      width: 900px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .btn-back-arrow {
+      font-size: 1.2rem;
+      color: #64748b;
+      text-decoration: none;
+      line-height: 1;
+      margin-right: 10px;
+      transition: color 0.15s;
+    }
+
+    .btn-back-arrow:hover { color: #1a2e44; }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #1a2e44;
+    }
+
+    .period-info {
+      font-size: 0.875rem;
+      color: #475569;
+      margin-bottom: 24px;
+      padding: 10px 14px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border-left: 3px solid #94a3b8;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .controls label {
+      font-size: 0.9rem;
+      color: #475569;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    select {
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: #1a2e44;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      min-width: 140px;
+    }
+
+    select:focus { border-color: #3b82f6; }
+
+    .btn-show {
+      background: #3b82f6;
+      color: #ffffff;
+      border: none;
+      padding: 8px 22px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-show:hover { background: #2563eb; }
+
+    .btn-update {
+      background: #10b981;
+      color: #ffffff;
+      border: none;
+      padding: 8px 22px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-update:hover { background: #059669; }
+
+    .msg {
+      font-size: 0.875rem;
+      font-weight: 600;
+      min-height: 1.4em;
+      margin-bottom: 12px;
+    }
+
+    #calendar-area { display: none; }
+
+    .calendar-emp-label {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a2e44;
+      margin-bottom: 12px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      font-size: 0.8rem;
+      color: #475569;
+      align-items: center;
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+
+    .legend-box {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+    }
+
+    .legend-box.present { background: #dbeafe; border: 1px solid #93c5fd; }
+    .legend-box.absent  { background: #f8fafc; border: 1px solid #e2e8f0; }
+
+    /* アコーディオン */
+    .year-section { margin-bottom: 8px; }
+
+    .year-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #475569;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    .year-label:hover { background: #f1f5f9; }
+
+    .year-label .chevron {
+      font-size: 0.75rem;
+      transition: transform 0.2s;
+      display: inline-block;
+    }
+
+    .year-label.collapsed .chevron { transform: rotate(-90deg); }
+
+    .months-wrap {
+      padding: 12px 0 4px;
+    }
+
+    .months-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .month-calendar {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .month-header {
+      background: #f8fafc;
+      text-align: center;
+      padding: 8px;
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: #334155;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      padding: 6px;
+      gap: 2px;
+    }
+
+    .weekday-header {
+      text-align: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #94a3b8;
+      padding: 4px 0;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.12s;
+    }
+
+    .weekday-header:hover { background: #f1f5f9; }
+    .weekday-header.sun { color: #f87171; }
+    .weekday-header.sat { color: #60a5fa; }
+
+    .day-cell {
+      text-align: center;
+      font-size: 0.75rem;
+      padding: 4px 2px;
+      border-radius: 4px;
+      line-height: 1.6;
+      cursor: pointer;
+      transition: opacity 0.1s;
+    }
+
+    .day-cell:hover { opacity: 0.75; }
+    .day-cell.empty { visibility: hidden; cursor: default; }
+    .day-cell.empty:hover { opacity: 1; }
+
+    .day-cell.present {
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-weight: 600;
+    }
+
+    .day-cell.absent { color: #cbd5e1; }
+
+    /* 一括変更パネル */
+    .bulk-panel {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+    }
+
+    .bulk-panel-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 12px;
+    }
+
+    .bulk-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .bulk-row:last-child { margin-bottom: 0; }
+
+    .bulk-label {
+      font-size: 0.85rem;
+      color: #475569;
+      font-weight: 600;
+      min-width: 36px;
+    }
+
+    input[type="date"] {
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: #1a2e44;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="date"]:focus { border-color: #3b82f6; }
+
+    .dow-checkboxes {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .dow-check-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.85rem;
+      color: #334155;
+      cursor: pointer;
+    }
+
+    .dow-check-item input[type="checkbox"] { cursor: pointer; }
+
+    .dow-check-item.sun { color: #ef4444; }
+    .dow-check-item.sat { color: #3b82f6; }
+
+    .bulk-btns { display: flex; gap: 8px; }
+
+    .btn-bulk-present {
+      background: #dbeafe;
+      color: #1d4ed8;
+      border: 1px solid #93c5fd;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-bulk-present:hover { background: #bfdbfe; }
+
+    .btn-bulk-absent {
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-bulk-absent:hover { background: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="/" class="btn-back-arrow">←</a>
+      <h1>出社状況登録</h1>
+    </div>
+
+    <div class="period-info">
+      登録期間：{{ min_date }} 〜 {{ max_date }}
+    </div>
+
+    <div class="controls">
+      <label for="emp-select">社員</label>
+      <select id="emp-select">
+        {% for emp in employees %}
+        <option value="{{ emp }}">{{ emp }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn-show" onclick="showCalendar()">表示</button>
+      <button class="btn-update" onclick="updateCalendar()">更新</button>
+    </div>
+    <p class="msg" id="msg"></p>
+
+    <div id="calendar-area">
+      <p class="calendar-emp-label" id="calendar-emp-label"></p>
+
+      <div class="bulk-panel">
+        <div class="bulk-panel-title">期間・曜日指定 一括変更</div>
+        <div class="bulk-row">
+          <span class="bulk-label">期間</span>
+          <input type="date" id="bulk-start" />
+          <span style="color:#94a3b8">〜</span>
+          <input type="date" id="bulk-end" />
+        </div>
+        <div class="bulk-row">
+          <span class="bulk-label">曜日</span>
+          <div class="dow-checkboxes">
+            <label class="dow-check-item sun"><input type="checkbox" class="dow-checkbox" value="0" />日</label>
+            <label class="dow-check-item"><input type="checkbox" class="dow-checkbox" value="1" />月</label>
+            <label class="dow-check-item"><input type="checkbox" class="dow-checkbox" value="2" />火</label>
+            <label class="dow-check-item"><input type="checkbox" class="dow-checkbox" value="3" />水</label>
+            <label class="dow-check-item"><input type="checkbox" class="dow-checkbox" value="4" />木</label>
+            <label class="dow-check-item"><input type="checkbox" class="dow-checkbox" value="5" />金</label>
+            <label class="dow-check-item sat"><input type="checkbox" class="dow-checkbox" value="6" />土</label>
+          </div>
+        </div>
+        <div class="bulk-row">
+          <span class="bulk-label"></span>
+          <div class="bulk-btns">
+            <button class="btn-bulk-present" onclick="bulkChange(1)">出社にする</button>
+            <button class="btn-bulk-absent"  onclick="bulkChange(0)">不在にする</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-box present"></div>
+          <span>出社</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-box absent"></div>
+          <span>不在</span>
+        </div>
+        <span style="font-size:0.78rem;color:#94a3b8;">（日付クリックで個別切り替え、曜日ヘッダークリックで月内一括切り替え）</span>
+      </div>
+      <div id="calendar-container"></div>
+    </div>
+  </div>
+
+  <script>
+    const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+    let currentData = {};
+    let currentEmp = '';
+
+    async function showCalendar() {
+      const emp = document.getElementById('emp-select').value;
+      const res = await fetch(`/work_day/data?emp=${encodeURIComponent(emp)}`);
+      if (!res.ok) { alert('データの取得に失敗しました'); return; }
+
+      currentEmp = emp;
+      currentData = await res.json();
+
+      // 一括変更パネルの期間初期値をデータ範囲に設定
+      const dates = Object.keys(currentData).sort();
+      if (dates.length > 0) {
+        document.getElementById('bulk-start').value = dates[0];
+        document.getElementById('bulk-end').value   = dates[dates.length - 1];
+      }
+
+      clearMsg();
+      document.getElementById('calendar-emp-label').textContent = `${emp} の出社カレンダー`;
+      document.getElementById('calendar-area').style.display = 'block';
+      renderCalendars();
+    }
+
+    async function updateCalendar() {
+      if (!currentEmp) { alert('先に表示ボタンを押してください'); return; }
+
+      const res = await fetch('/work_day/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emp: currentEmp, data: currentData }),
+      });
+
+      const msg = document.getElementById('msg');
+      if (res.ok) {
+        msg.style.color = '#16a34a';
+        msg.textContent = '更新しました';
+        setTimeout(clearMsg, 3000);
+      } else {
+        msg.style.color = '#dc2626';
+        msg.textContent = '更新に失敗しました';
+      }
+    }
+
+    function clearMsg() {
+      document.getElementById('msg').textContent = '';
+    }
+
+    function bulkChange(newVal) {
+      const startStr = document.getElementById('bulk-start').value;
+      const endStr   = document.getElementById('bulk-end').value;
+      const checkedDows = Array.from(document.querySelectorAll('.dow-checkbox:checked'))
+                               .map(cb => parseInt(cb.value));
+
+      if (!startStr || !endStr) { alert('期間を入力してください'); return; }
+      if (checkedDows.length === 0) { alert('曜日を選択してください'); return; }
+
+      const start = new Date(startStr);
+      const end   = new Date(endStr);
+      if (start > end) { alert('開始日が終了日より後になっています'); return; }
+
+      let count = 0;
+      for (const dateStr of Object.keys(currentData)) {
+        const d = new Date(dateStr);
+        if (d >= start && d <= end && checkedDows.includes(d.getDay())) {
+          currentData[dateStr] = newVal;
+          const cell = document.querySelector(`.day-cell[data-date="${dateStr}"]`);
+          if (cell) {
+            cell.classList.toggle('present', newVal === 1);
+            cell.classList.toggle('absent',  newVal === 0);
+          }
+          count++;
+        }
+      }
+
+      if (count === 0) alert('対象の日付が見つかりませんでした');
+    }
+
+    function toggleWeekday(grid, dow) {
+      const cells = Array.from(grid.querySelectorAll(`.day-cell[data-dow="${dow}"]`))
+                         .filter(c => c.dataset.date);
+      if (cells.length === 0) return;
+      const allPresent = cells.every(c => c.classList.contains('present'));
+      const newVal = allPresent ? 0 : 1;
+      cells.forEach(c => {
+        c.classList.toggle('present', newVal === 1);
+        c.classList.toggle('absent', newVal === 0);
+        currentData[c.dataset.date] = newVal;
+      });
+    }
+
+    function toggleDay(cell, dateStr) {
+      const isPresent = cell.classList.contains('present');
+      cell.classList.toggle('present', !isPresent);
+      cell.classList.toggle('absent', isPresent);
+      currentData[dateStr] = isPresent ? 0 : 1;
+    }
+
+    function toggleYear(header) {
+      const wrap = header.nextElementSibling;
+      const isCollapsed = wrap.style.display === 'none';
+      wrap.style.display = isCollapsed ? '' : 'none';
+      header.classList.toggle('collapsed', !isCollapsed);
+    }
+
+    function renderCalendars() {
+      const dates = Object.keys(currentData).sort();
+      if (dates.length === 0) return;
+
+      const [sy, sm] = dates[0].split('-').map(Number);
+      const [ey, em] = dates[dates.length - 1].split('-').map(Number);
+
+      // 年ごとに月をまとめる（月は昇順）
+      const byYear = {};
+      let y = sy, m = sm;
+      while (y < ey || (y === ey && m <= em)) {
+        if (!byYear[y]) byYear[y] = [];
+        byYear[y].push(m);
+        m++;
+        if (m > 12) { m = 1; y++; }
+      }
+
+      const maxYear = Math.max(...Object.keys(byYear).map(Number));
+      // 年は降順
+      const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
+
+      const container = document.getElementById('calendar-container');
+      container.innerHTML = '';
+
+      for (const year of years) {
+        const isLatest = year === maxYear;
+        const section = document.createElement('div');
+        section.className = 'year-section';
+
+        const header = document.createElement('div');
+        header.className = 'year-label' + (isLatest ? '' : ' collapsed');
+        header.innerHTML = `<span class="chevron">▼</span>${year}年`;
+        header.onclick = () => toggleYear(header);
+        section.appendChild(header);
+
+        const wrap = document.createElement('div');
+        wrap.className = 'months-wrap';
+        wrap.style.display = isLatest ? '' : 'none';
+
+        const grid = document.createElement('div');
+        grid.className = 'months-grid';
+        for (const mon of byYear[year]) {
+          grid.appendChild(renderMonth(year, mon));
+        }
+        wrap.appendChild(grid);
+        section.appendChild(wrap);
+        container.appendChild(section);
+      }
+    }
+
+    function renderMonth(year, month) {
+      const wrap = document.createElement('div');
+      wrap.className = 'month-calendar';
+
+      const header = document.createElement('div');
+      header.className = 'month-header';
+      header.textContent = `${year}年${month}月`;
+      wrap.appendChild(header);
+
+      const grid = document.createElement('div');
+      grid.className = 'calendar-grid';
+
+      WEEKDAYS.forEach((d, i) => {
+        const cell = document.createElement('div');
+        cell.className = 'weekday-header' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '');
+        cell.textContent = d;
+        cell.onclick = () => toggleWeekday(grid, i);
+        grid.appendChild(cell);
+      });
+
+      const firstDow = new Date(year, month - 1, 1).getDay();
+      const daysInMonth = new Date(year, month, 0).getDate();
+
+      for (let i = 0; i < firstDow; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'day-cell empty';
+        grid.appendChild(cell);
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const val = currentData[dateStr];
+        const dow = (firstDow + d - 1) % 7;
+        const cell = document.createElement('div');
+        cell.className = 'day-cell ' + (val === 1 ? 'present' : 'absent');
+        cell.textContent = d;
+        cell.dataset.date = dateStr;
+        cell.dataset.dow = dow;
+        if (val !== undefined) {
+          cell.onclick = () => toggleDay(cell, dateStr);
+        }
+        grid.appendChild(cell);
+      }
+
+      wrap.appendChild(grid);
+      return wrap;
+    }
+  </script>
+</body>
+</html>

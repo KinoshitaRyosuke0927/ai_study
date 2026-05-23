@@ -5,7 +5,9 @@
       "Bash(python -c \"import transformers; print\\('transformers:', transformers.__version__\\)\")",
       "Bash(pip show *)",
       "Bash(python -c \"import torch\")",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/water_demand)",
+      "PowerShell($conn = Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue; if \\($conn\\) { Stop-Process -Id $conn.OwningProcess -Force; \"stopped\" } else { \"not running\" })"
     ]
   }
 }

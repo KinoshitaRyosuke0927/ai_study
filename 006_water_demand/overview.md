@@ -33,7 +33,7 @@ AICで毎月購入しているウォーターサーバーの水の注文量を�
 | --- | --- |
 | date_ym | 年月 |
 | order_quantity | その月に注文した水の量[L] |
-| <span style="color: red; ">rest_quantity</span> | <span style="color: red; ">その月に残った水の量[L]</span> |
+| <span style="color: red; ">remaining_quantity</span> | <span style="color: red; ">その月に残った水の量[L]</span> |
 
 #### jbd_calendar.csv
 JBDの営業日カレンダー

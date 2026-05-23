@@ -97,15 +97,3 @@ def get_daily_weather(start_date: datetime.datetime, end_date: datetime.datetime
     df["date"] = pd.to_datetime(df["date"])
     # 整形したデータを返却
     return df
-
-
-if __name__ == "__main__":
-    from dotenv import load_dotenv
-
-    # 環境変数読み込み
-    load_dotenv()
-    # データ取得
-    result_df = get_daily_weather(datetime.datetime(2024, 10, 1), datetime.datetime(2026, 5, 31))
-    # csv出力
-    print("=========================== 気候データcsv出力 ===========================")
-    result_df.to_csv(r"C:\azure_ai\education\006_water_demand\raw_data\weather_data.csv", index=False)

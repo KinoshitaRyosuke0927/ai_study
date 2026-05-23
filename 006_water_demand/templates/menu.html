@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>水の注文量管理システム</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+      padding: 48px 56px;
+      width: 480px;
+      text-align: center;
+    }
+
+    .title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1a2e44;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: #6b7280;
+      margin-bottom: 40px;
+    }
+
+    .menu-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .menu-btn {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      padding: 20px 24px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      background: #ffffff;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.2s, background 0.2s, transform 0.1s;
+      text-align: left;
+    }
+
+    .menu-btn:hover {
+      border-color: #3b82f6;
+      background: #eff6ff;
+      transform: translateY(-2px);
+    }
+
+    .menu-btn:active {
+      transform: translateY(0);
+    }
+
+    .menu-btn .icon {
+      font-size: 2rem;
+      flex-shrink: 0;
+    }
+
+    .menu-btn .text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .menu-btn .label {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #1a2e44;
+    }
+
+    .menu-btn .desc {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="title">水の注文量管理システム</h1>
+    <p class="subtitle">メニューを選択してください</p>
+
+    <nav class="menu-list">
+      <a href="/water_demand" class="menu-btn">
+        <span class="icon">📋</span>
+        <span class="text">
+          <span class="label">水の注文量登録</span>
+          <span class="desc">月ごとの注文量・残量を記録する</span>
+        </span>
+      </a>
+
+      <a href="/work_day" class="menu-btn">
+        <span class="icon">🏢</span>
+        <span class="text">
+          <span class="label">出社状況登録</span>
+          <span class="desc">社員の出社カレンダーを更新する</span>
+        </span>
+      </a>
+
+      <a href="/predict" class="menu-btn">
+        <span class="icon">📊</span>
+        <span class="text">
+          <span class="label">注文量予測</span>
+          <span class="desc">翌月の推奨注文量を予測する</span>
+        </span>
+      </a>
+    </nav>
+  </div>
+</body>
+</html>
