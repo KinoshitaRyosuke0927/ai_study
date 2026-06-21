@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trello カード管理</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Trello 日報カード連携</h1>
+
+    <div class="panels">
+
+      <!-- ========== 左: 日付 + カード情報 ========== -->
+      <div class="panel panel-left">
+
+        <section class="section">
+          <h2>日付を選択</h2>
+          <div class="form-group">
+            <input type="date" id="view-date" disabled>
+            <p class="hint" id="view-date-preview"></p>
+          </div>
+          <div id="view-search-message" class="message hidden"></div>
+        </section>
+
+        <section class="section last card-info-section">
+          <h2>カード情報</h2>
+          <div class="card-detail">
+            <p class="card-detail-placeholder">日付を選択するとカード情報が表示されます</p>
+            <div id="card-detail-body" class="hidden">
+              <div class="detail-row">
+                <span class="detail-label">タイトル</span>
+                <span id="detail-name"></span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">説明</span>
+                <pre id="detail-desc" class="detail-desc"></pre>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">URL</span>
+                <a id="detail-url" href="#" target="_blank" rel="noopener"></a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /panel-left -->
+
+      <div class="panel-divider"></div>
+
+      <!-- ========== 右: コメント + カード追加 ========== -->
+      <div class="panel panel-right">
+
+        <section class="section">
+          <h2>新入社員向けのフィードバックを投稿</h2>
+          <textarea id="comment-input"
+            placeholder="カードが見つかるとコメントを入力できます" disabled></textarea>
+          <button id="comment-submit-btn" disabled>コメントを投稿</button>
+          <div id="comment-message" class="message hidden"></div>
+        </section>
+
+        <section class="section last">
+          <h2>先輩社員向けのフィードバックを投稿</h2>
+          <textarea id="create-desc" placeholder="説明を入力（任意）"></textarea>
+          <button id="create-submit-btn">カードを追加</button>
+          <div id="create-message" class="message hidden"></div>
+        </section>
+
+      </div><!-- /panel-right -->
+
+    </div><!-- /panels -->
+  </div><!-- /container -->
+
+  <script>const SETTINGS = {{ settings | tojson }};</script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

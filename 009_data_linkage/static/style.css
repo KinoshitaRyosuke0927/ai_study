@@ -1,0 +1,246 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+  background-color: #f0f2f5;
+  color: #333;
+  padding: 32px 16px;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 80%;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 8px;
+  padding: 32px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  /* コンテナ自体をビューポート高さに合わせて伸ばす */
+  min-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin-bottom: 24px;
+  color: #0052cc;
+  flex-shrink: 0;
+}
+
+h2 {
+  font-size: 1rem;
+  font-weight: bold;
+  color: #444;
+  margin-bottom: 14px;
+}
+
+/* ========== 2カラムレイアウト ========== */
+
+.panels {
+  display: flex;
+  align-items: stretch;
+  flex: 1; /* コンテナの残り高さをすべて使う */
+  gap: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-left {
+  flex: 0 0 42%;
+}
+
+.panel-right {
+  flex: 1;
+}
+
+.panel-divider {
+  width: 1px;
+  background-color: #e2e8f0;
+  margin: 0 28px;
+  flex-shrink: 0;
+}
+
+/* ========== セクション ========== */
+
+.section {
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.section.last {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* カード情報セクションは縦に伸びてパネルの残り高さを埋める */
+.card-info-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-info-section .card-detail {
+  flex: 1;
+}
+
+/* 右パネル: 2つのセクションが縦に均等に伸びる */
+.panel-right .section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-right textarea {
+  flex: 1;       /* 残り高さをテキストエリアが埋める */
+  resize: none;
+  min-height: 120px;
+  margin-bottom: 12px;
+}
+
+/* ========== フォームパーツ ========== */
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+input[type="date"],
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+input[type="date"]:focus,
+textarea:focus {
+  outline: none;
+  border-color: #0052cc;
+}
+
+input[type="date"]:disabled,
+textarea:disabled {
+  background-color: #f7fafc;
+  color: #a0aec0;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 0.82rem;
+  color: #0052cc;
+  margin-top: 6px;
+  min-height: 1.2em;
+}
+
+/* ========== ボタン ========== */
+
+button {
+  width: 100%;
+  padding: 11px;
+  background-color: #0052cc;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+button:hover:not(:disabled) {
+  background-color: #0041a3;
+}
+
+button:disabled {
+  background-color: #a0aec0;
+  cursor: not-allowed;
+}
+
+/* ========== カード情報表示 ========== */
+
+.card-detail {
+  background-color: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 16px;
+  min-height: 80px;
+  overflow-y: auto;
+}
+
+.card-detail-placeholder {
+  color: #a0aec0;
+  font-size: 0.9rem;
+}
+
+.detail-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.detail-row:last-child {
+  margin-bottom: 0;
+}
+
+.detail-label {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #718096;
+  min-width: 50px;
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+
+.detail-desc {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.9rem;
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+#detail-url {
+  font-size: 0.85rem;
+  color: #0052cc;
+  word-break: break-all;
+}
+
+/* ========== メッセージ ========== */
+
+.message {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.message.hidden {
+  display: none;
+}
+
+.message.success {
+  background-color: #f0fff4;
+  color: #276749;
+  border: 1px solid #9ae6b4;
+}
+
+.message.error {
+  background-color: #fff5f5;
+  color: #c53030;
+  border: 1px solid #feb2b2;
+}
