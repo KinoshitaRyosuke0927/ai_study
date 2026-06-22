@@ -10,8 +10,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 # データ読み込み
-train = pd.read_csv("create/train_data_v2.csv", encoding="utf-8-sig")
-test  = pd.read_csv("create/test_data_channel_name_v2.csv", encoding="utf-8-sig")
+train = pd.read_csv("create/train_data_code.csv", encoding="utf-8-sig")
+test  = pd.read_csv("create/test_data_channel_name_code.csv", encoding="utf-8-sig")
 
 ## 特徴量エンジニアリング
 # title を文字 n-gram TF-IDF でベクトル化
