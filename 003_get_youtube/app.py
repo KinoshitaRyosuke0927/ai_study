@@ -353,9 +353,12 @@ def download_all_videos_csv(req: ChannelRequest):
     video_map = {item.get('id'): item for item in details}
     category_map = fetch_category_map()
 
+    raw_custom_url = channel_item.get('snippet', {}).get('customUrl', '')
+    channel_name = raw_custom_url.lstrip('@')
+
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(['id', 'date', 'time', 'views', 'title', 'tag', 'category'])
+    writer.writerow(['channel_name', 'date', 'time', 'views', 'title', 'category'])
 
     for entry in uploads:
         video = video_map.get(entry['video_id'])
@@ -364,15 +367,13 @@ def download_all_videos_csv(req: ChannelRequest):
         snippet = video.get('snippet', {})
         content_details = video.get('contentDetails', {})
         statistics = video.get('statistics', {})
-        tags = snippet.get('tags') or []
         category_id = snippet.get('categoryId', '')
         writer.writerow([
-            video.get('id', ''),
+            channel_name,
             format_date_csv(snippet.get('publishedAt', '')),
             format_duration_csv(content_details.get('duration', '')),
             statistics.get('viewCount', '0'),
             snippet.get('title', ''),
-            '|'.join(tags),
             category_map.get(category_id, category_id),
         ])
 
