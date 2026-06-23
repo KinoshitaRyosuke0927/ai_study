@@ -41,6 +41,62 @@ uvicorn app:app --reload
 
 起動後、ブラウザで http://127.0.0.1:8000 にアクセスするとメニュー画面が表示されます。
 
+## exe化（PyInstaller）
+
+### 1. PyInstallerのインストール
+
+```bash
+pip install pyinstaller
+```
+
+### 2. ビルド
+
+`006_water_demand/` ディレクトリで以下を実行します。
+
+```bash
+pyinstaller --onedir `
+  --add-data "templates;templates" `
+  --hidden-import weather_data_service `
+  --hidden-import uvicorn `
+  --hidden-import uvicorn.logging `
+  --hidden-import uvicorn.loops `
+  --hidden-import uvicorn.loops.auto `
+  --hidden-import uvicorn.protocols `
+  --hidden-import uvicorn.protocols.http `
+  --hidden-import uvicorn.protocols.http.auto `
+  --hidden-import uvicorn.protocols.websockets `
+  --hidden-import uvicorn.protocols.websockets.auto `
+  --hidden-import uvicorn.lifespan `
+  --hidden-import uvicorn.lifespan.on `
+  app.py
+```
+
+### 3. train_dataの配置
+
+ビルド完了後、`train_data/` フォルダを `dist/app/` と同じ階層に手動でコピーしてください。
+
+```
+dist/app/
+├── app.exe
+├── train_data/       ← 手動でコピー
+│   ├── water_demand.csv
+│   ├── weather_data.csv
+│   ├── work_day.csv
+│   └── jbd_calendar.csv
+├── templates/        ← ビルド時に自動同梱
+└── _internal/        ← ライブラリ群（変更不要）
+```
+
+### 4. 起動
+
+`app.exe` をダブルクリックするか、ターミナルから実行します。
+
+```bash
+.\dist\app\app.exe
+```
+
+起動後、ブラウザで http://127.0.0.1:8000 にアクセスするとメニュー画面が表示されます。
+
 ## 主な機能
 
 | パス | 機能 |
