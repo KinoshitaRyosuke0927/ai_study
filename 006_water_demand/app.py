@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from datetime import datetime
 from fastapi import FastAPI, Request
@@ -9,8 +10,11 @@ from sklearn.linear_model import Ridge
 from sklearn.model_selection import LeaveOneOut, cross_val_score
 
 ## 定数
-# ベースディレクトリ
-BASE_DIR = Path(__file__).parent
+# ベースディレクトリ（exe実行時はexe本体のディレクトリ、通常実行時はスクリプトのディレクトリ）
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).parent
 # 水の注文量実績CSVパス
 DATA_PATH        = BASE_DIR / "train_data" / "water_demand.csv"
 # AIC出社カレンダーCSVパス
@@ -402,3 +406,8 @@ async def predict_register(request: Request):
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(DATA_PATH, index=False)
     return JSONResponse({"status": "ok"})
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
