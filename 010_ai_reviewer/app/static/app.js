@@ -357,15 +357,6 @@ function saveCurrentInput() {
   }
 }
 
-function buildPerSlideMessagesStr() {
-  const lines = [];
-  for (let i = 1; i <= slideCount; i++) {
-    const msg = (perSlideMessages[i] || "").trim();
-    if (msg) lines.push(`${i}: ${msg}`);
-  }
-  return lines.join("\n");
-}
-
 reviewBtn.addEventListener("click", async () => {
   if (!currentFile) return;
 
@@ -375,12 +366,18 @@ reviewBtn.addEventListener("click", async () => {
   reviewBtn.innerHTML = '<span class="loading"></span>AIがレビュー中...';
 
   try {
-    const form = new FormData();
-    form.append("file", currentFile);
-    form.append("overall_intended_message", intendedMessage.value.trim());
-    form.append("per_slide_intended_messages", buildPerSlideMessagesStr());
+    const overallMsg = intendedMessage.value.trim();
+    const slides = thumbnails.map((thumb, i) => ({
+      slide_number: i + 1,
+      image_jpeg_b64: thumb,
+      intended_message: (perSlideMessages[i + 1] || "").trim() || overallMsg,
+    }));
 
-    const res  = await fetch("/api/review", { method: "POST", body: form });
+    const res  = await fetch("/api/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ overall_intended_message: overallMsg, slides }),
+    });
     const data = await res.json();
 
     if (!res.ok) {

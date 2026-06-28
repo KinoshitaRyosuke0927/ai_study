@@ -3,15 +3,26 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from pydantic import BaseModel
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.prompt import build_prompt_package
+from app.prompt import build_overall_prompt_package, build_slides_prompt_package
 from app.renderer import render_pptx_to_images, images_to_base64_dict
-from app.pptx_parser import parse_pptx
 from app.azure_ai_service import call_review
+
+
+class SlideInput(BaseModel):
+    slide_number: int
+    image_jpeg_b64: str
+    intended_message: str = ""
+
+
+class ReviewRequest(BaseModel):
+    overall_intended_message: str = ""
+    slides: list[SlideInput]
 
 # フロントエンドのHTMLパス
 BASE_DIR = Path(__file__).resolve().parent
@@ -95,41 +106,33 @@ async def upload_pptx(file: UploadFile = File(...)) -> dict:
 
 
 @app.post("/api/review")
-async def review_pptx(
-    file: UploadFile = File(...),
-    overall_intended_message: str = Form(""),
-    per_slide_intended_messages: str = Form(""),
-) -> dict:
+async def review_pptx(request: ReviewRequest) -> dict:
     """
-    PowerPointのスライドと伝えたい内容をもとにAIがレビューを行い結果を返す
+    スライド画像と伝えたい内容をもとにAIがレビューを行い結果を返す
     """
-    # ファイル形式を検証
-    if not file.filename or not file.filename.lower().endswith(".pptx"):
-        raise HTTPException(status_code=400, detail=".pptx ファイルを指定してください。")
+    # スライド情報が読み取れなかった場合
+    if not request.slides:
+        raise HTTPException(status_code=400, detail="スライドデータがありません。")
 
-    # ファイル読み込み
-    file_bytes = await file.read()
-    # ファイルのサイズが取得できなかった場合
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="ファイルが空です。")
+    # レビュー対象のデータを取得
+    data = request.model_dump()
 
-    # PPTXを解析
+    # スライド全体に対するレビューを行う
     try:
-        parsed = parse_pptx(
-            file_bytes=file_bytes,
-            filename=file.filename,
-            overall_intended_message=overall_intended_message,
-            per_slide_intended_messages=per_slide_intended_messages,
-        )
+        # AIに送信
+        overall_result = call_review(build_overall_prompt_package(data))
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"PPTX解析に失敗しました: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"AIレビュー（全体評価）に失敗しました: {exc}") from exc
 
-    # プロンプトパッケージを構築してAIレビューを実行
-    prompt_package = build_prompt_package(parsed)
-
+    # スライドごとに個別レビューを行う
     try:
-        review_result = call_review(prompt_package)
+        # AIに送信
+        slides_result = call_review(build_slides_prompt_package(data))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"AIレビューに失敗しました: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"AIレビュー（スライド評価）に失敗しました: {exc}") from exc
 
-    return review_result
+    # レスポンス作成
+    return {
+        "presentation_summary": overall_result.get("presentation_summary", {}),
+        "slides": slides_result.get("slides", []),
+    }
