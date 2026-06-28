@@ -29,9 +29,12 @@ def parse_per_slide_intents(raw_text: str | None) -> dict[int, str]:
     # テキストが空の場合は空辞書を返却
     if not raw_text:
         return {}
+
+    # 入れ物用意
     intents: dict[int, str] = {}
     # 行ごとに解析
     for line in raw_text.splitlines():
+        # 行取得
         line = line.strip()
         # 空行はスキップ
         if not line:
@@ -165,28 +168,6 @@ def _bbox(shape: Any) -> dict[str, float]:
     }
 
 
-def _bbox_ratios(shape: Any, slide_width: int, slide_height: int) -> dict[str, float]:
-    """
-    シェイプの座標をスライドサイズに対する比率で返す
-
-    Args
-    -----------------
-    - shape: Any,                       PPTXのシェイプオブジェクト
-    - slide_width: int,                 スライドの幅（EMU単位）
-    - slide_height: int,                スライドの高さ（EMU単位）
-
-    Returns
-    -----------------
-    - ratios: dict[str, float],         x_ratio, y_ratio, w_ratio, h_ratio（0.0〜1.0）
-
-    """
-    return {
-        "x_ratio": round(float(shape.left) / slide_width, 4) if slide_width else 0.0,
-        "y_ratio": round(float(shape.top) / slide_height, 4) if slide_height else 0.0,
-        "w_ratio": round(float(shape.width) / slide_width, 4) if slide_width else 0.0,
-        "h_ratio": round(float(shape.height) / slide_height, 4) if slide_height else 0.0,
-    }
-
 
 def _slide_heuristics(slide_data: dict[str, Any], slide_width: int, slide_height: int) -> dict[str, Any]:
     """
@@ -266,7 +247,8 @@ def _slide_heuristics(slide_data: dict[str, Any], slide_width: int, slide_height
 
 def parse_pptx(file_bytes: bytes, filename: str, overall_intended_message: str = "", per_slide_intended_messages: str | None = None) -> dict[str, Any]:
     """
-    PPTXファイルのバイト列を解析してスライド情報の辞書を返す
+    PPTXファイルのバイト列を解析してスライドごとの情報の辞書を返す
+    スライドを表示する時とAIに送信する時の両方で呼ばれる
 
     Args
     -----------------
@@ -288,14 +270,15 @@ def parse_pptx(file_bytes: bytes, filename: str, overall_intended_message: str =
     # スライドごとの意図メッセージを解析
     per_slide_intent_map = parse_per_slide_intents(per_slide_intended_messages)
 
-    # 入れ物を用意
+    # 入れ物用意
     slides: list[dict[str, Any]] = []
     deck_shape_counter: Counter[str] = Counter()
 
     ## スライドごとに解析
     for index, slide in enumerate(prs.slides, start=1):
-        # タイトルシェイプを取得
+        # タイトル要素を抽出
         title_shape = slide.shapes.title if hasattr(slide.shapes, "title") else None
+        # タイトル文字列を抽出
         title = _safe_text(getattr(title_shape, "text", "")) if title_shape is not None else ""
 
         # スライドデータの初期値を設定
@@ -352,7 +335,6 @@ def parse_pptx(file_bytes: bytes, filename: str, overall_intended_message: str =
                     "shape_name": getattr(shape, "name", ""),
                     "shape_type": shape_name,
                     "bbox": _bbox(shape),
-                    "bbox_ratios": _bbox_ratios(shape, slide_width, slide_height),
                     "text": text_info["text"],
                     "paragraphs": text_info["paragraphs"],
                     "bullet_count": text_info["bullet_count"],
@@ -396,7 +378,6 @@ def parse_pptx(file_bytes: bytes, filename: str, overall_intended_message: str =
             "height_inches": round(slide_height / EMU_PER_INCH, 2),
         },
         "overall_intended_message": overall_intended_message.strip(),
-        "per_slide_intended_messages": per_slide_intent_map,
         "deck_shape_counts": dict(deck_shape_counter),
         "slides": slides,
     }

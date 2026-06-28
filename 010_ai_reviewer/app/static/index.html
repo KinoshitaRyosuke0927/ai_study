@@ -56,19 +56,11 @@
         <!-- スライド選択後のコンテンツ -->
         <div id="right-content" class="hidden">
 
-          <!-- 全体評価（レビュー後にタブの上に表示） -->
-          <div id="overall-summary-section" class="overall-summary-section hidden">
-            <div class="accordion-header" id="overall-summary-toggle">
-              <h3>全体評価</h3>
-              <span class="accordion-chevron">▼</span>
-            </div>
-            <div id="overall-summary-body" class="accordion-body"></div>
-          </div>
-
           <!-- タブバー -->
           <div class="tab-bar">
             <button class="tab-btn active" data-tab="input">伝えたいこと</button>
-            <button class="tab-btn" data-tab="review">レビュー結果</button>
+            <button class="tab-btn" data-tab="summary">総評</button>
+            <button class="tab-btn" data-tab="review">詳細評価</button>
           </div>
 
           <!-- 伝えたいことタブ -->
@@ -99,6 +91,16 @@
                 <img id="review-slide-img" src="" alt="">
               </div>
               <div id="review-slide-details"></div>
+            </div>
+          </div>
+
+          <!-- 総評タブ -->
+          <div id="tab-summary" class="tab-content hidden">
+            <div id="summary-placeholder" class="placeholder-text">
+              「AIでレビューする」を実行すると結果が表示されます
+            </div>
+            <div id="summary-content" class="hidden">
+              <div id="summary-body"></div>
             </div>
           </div>
 

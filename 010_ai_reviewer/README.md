@@ -21,20 +21,10 @@ pip install -r requirements.txt
 [LibreOffice 公式サイト](https://www.libreoffice.org/download/) からインストーラーをダウンロードして実行します。
 インストール後、`C:\Program Files\LibreOffice\program\soffice.exe` が自動的に検出されます。
 
-**Ubuntu / Debian**
-```bash
-sudo apt install libreoffice
-```
-
 ### 3. Poppler のインストール（PDF→画像変換に必要）
 
 **Windows**
 [poppler-windows releases](https://github.com/oschwartz10612/poppler-windows/releases/) から最新版の zip をダウンロードし、展開後に `bin` フォルダをシステム PATH に追加してください。
-
-**Ubuntu / Debian**
-```bash
-sudo apt install poppler-utils
-```
 
 ### 4. 環境変数の設定
 `education/.env` に Azure OpenAI の接続情報を記載してください：
@@ -47,7 +37,7 @@ AZURE_MODEL_NAME=gpt-4o
 
 ### 5. サーバー起動
 ```bash
-uvicorn app.main:app --reload --port 8010
+uvicorn app.main:app --reload --port 8000
 ```
 
 ブラウザで `http://127.0.0.1:8010` を開いてください。

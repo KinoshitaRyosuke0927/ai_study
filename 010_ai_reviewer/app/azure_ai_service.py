@@ -1,23 +1,24 @@
 from __future__ import annotations
 
-import json
 import os
+import json
+from typing import Any
 from pathlib import Path
 from urllib.parse import urlparse
-from typing import Any
 
 from dotenv import load_dotenv
 from openai import AzureOpenAI
 
-# education 直下の .env を読み込む
+# 環境変数(.env)を読み込む
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 ## Azure OpenAI の接続情報を環境変数から取得
 _raw_endpoint = os.environ["AZURE_OPENAI_ENDPOINT"]
-# .env のエンドポイントが完全 URL の場合はベース URL だけを取り出す
+# .envのエンドポイントが完全URLの場合はベースURLだけを取り出す
 _parsed = urlparse(_raw_endpoint)
+# エンドポイントURL設定
 AZURE_OPENAI_ENDPOINT = f"{_parsed.scheme}://{_parsed.netloc}/"
-
+# 環境変数
 AZURE_OPENAI_KEY = os.environ["AZURE_OPENAI_KEY"]
 API_VERSION = os.environ.get("AZURE_API_VERSION", "2024-12-01-preview")
 MODEL_NAME = os.environ.get("AZURE_MODEL_NAME", "gpt-4o")

@@ -36,14 +36,15 @@ const slideList          = document.getElementById("slide-list");
 const reviewAction       = document.getElementById("review-action");
 const reviewBtn          = document.getElementById("review-btn");
 const reviewMessage      = document.getElementById("review-message");
-const overallSumSection  = document.getElementById("overall-summary-section");
-const overallSumBody     = document.getElementById("overall-summary-body");
-
 // 右パネル
 const rightContent       = document.getElementById("right-content");
 const tabBtns            = document.querySelectorAll(".tab-btn");
 const tabInputEl         = document.getElementById("tab-input");
 const tabReviewEl        = document.getElementById("tab-review");
+const tabSummaryEl       = document.getElementById("tab-summary");
+const summaryPlaceholder = document.getElementById("summary-placeholder");
+const summaryContent     = document.getElementById("summary-content");
+const summaryBody        = document.getElementById("summary-body");
 
 // 伝えたいことタブ
 const inputSlideLabel    = document.getElementById("input-slide-label");
@@ -70,7 +71,7 @@ let slideCount        = 0;
 let selectedSlide     = null;      // 現在選択中のスライド番号（1始まり）
 let perSlideMessages  = {};        // slideNum -> string
 let reviewData        = null;      // APIから返ってきたレビュー結果
-let activeTab         = "input";   // "input" | "review"
+let activeTab         = "input";   // "input" | "review" | "summary"
 
 // ============================================================
 // ファイル選択
@@ -148,7 +149,8 @@ uploadBtn.addEventListener("click", async () => {
     overallSection.classList.remove("hidden");
     slideListSection.classList.remove("hidden");
     reviewAction.classList.remove("hidden");
-    overallSumSection.classList.add("hidden");
+    if (summaryPlaceholder) summaryPlaceholder.classList.remove("hidden");
+    if (summaryContent) summaryContent.classList.add("hidden");
 
     // スライド一覧を構築
     buildSlideList(thumbnails, slideCount);
@@ -235,8 +237,7 @@ tabBtns.forEach((btn) => {
     btn.classList.add("active");
     tabInputEl.classList.toggle("hidden", activeTab !== "input");
     tabReviewEl.classList.toggle("hidden", activeTab !== "review");
-    // 全体評価はレビュー結果タブ表示時のみ表示
-    overallSumSection.classList.toggle("hidden", activeTab !== "review" || !reviewData);
+    tabSummaryEl.classList.toggle("hidden", activeTab !== "summary");
     refreshRightPanel();
   });
 });
@@ -246,13 +247,12 @@ tabBtns.forEach((btn) => {
 // ============================================================
 
 function refreshRightPanel() {
-  if (!selectedSlide) return;
-
   if (activeTab === "input") {
-    renderInputTab(selectedSlide);
-  } else {
-    renderReviewTab(selectedSlide);
+    if (selectedSlide) renderInputTab(selectedSlide);
+  } else if (activeTab === "review") {
+    if (selectedSlide) renderReviewTab(selectedSlide);
   }
+  // summary タブはレビュー実行時に描画済みのため再描画不要
 }
 
 function renderInputTab(num) {
@@ -392,13 +392,13 @@ reviewBtn.addEventListener("click", async () => {
 
     showMessage(reviewMessage, "レビューが完了しました", "success");
 
-    // レビュー結果タブに切り替えてスライド1を選択・表示
-    activeTab = "review";
-    tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "review"));
+    // 総評タブに切り替えて全体サマリーを表示
+    activeTab = "summary";
+    tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "summary"));
     tabInputEl.classList.add("hidden");
-    tabReviewEl.classList.remove("hidden");
+    tabReviewEl.classList.add("hidden");
+    tabSummaryEl.classList.remove("hidden");
 
-    // 全体サマリーをタブ上部に表示（レビュー結果タブ時のみ）
     renderOverallSummary(data.presentation_summary);
 
     selectSlide(1);
@@ -411,21 +411,22 @@ reviewBtn.addEventListener("click", async () => {
 });
 
 // ============================================================
-// 全体サマリー（タブ上部）
+// 全体サマリー（総評タブ）
 // ============================================================
 
 function renderOverallSummary(summary) {
   if (!summary) return;
 
   const alignment = summary.overall_alignment
-    ? `<p>${escHtml(summary.overall_alignment)}</p>`
+    ? `<div class="summary-alignment"><p>${escHtml(summary.overall_alignment)}</p></div>`
     : "";
 
   const risks = renderTagList(summary.overall_risks, "risk", "リスク");
   const actions = renderTagList(summary.priority_actions, "action", "優先アクション");
 
-  overallSumBody.innerHTML = alignment + risks + actions;
-  overallSumSection.classList.remove("hidden");
+  summaryBody.innerHTML = alignment + risks + actions;
+  summaryPlaceholder.classList.add("hidden");
+  summaryContent.classList.remove("hidden");
 }
 
 function renderTagList(items, tagClass, label) {
@@ -445,14 +446,3 @@ slideMessageInput.addEventListener("input", () => {
   }
 });
 
-// ============================================================
-// 全体評価アコーディオン
-// ============================================================
-
-document.getElementById("overall-summary-toggle").addEventListener("click", () => {
-  const body    = document.getElementById("overall-summary-body");
-  const chevron = document.querySelector(".accordion-chevron");
-  const closing = !body.classList.contains("closed");
-  body.classList.toggle("closed", closing);
-  chevron.classList.toggle("closed", closing);
-});
