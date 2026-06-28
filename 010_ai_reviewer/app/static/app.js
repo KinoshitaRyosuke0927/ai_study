@@ -303,45 +303,47 @@ function renderReviewTab(num) {
 // レビュー結果の各スライドHTML生成
 // ============================================================
 
+let _accordionCounter = 0;
+
 function buildSlideReviewHtml(slide) {
-  // 概要エリア（summary + good_point をまとめて表示）
-  const summaryParts = [];
-  if (slide.summary) {
-    summaryParts.push(`<p class="review-summary-text">${escHtml(slide.summary)}</p>`);
-  }
-  if (slide.good_point) {
-    summaryParts.push(`<div class="good-point">✓ ${escHtml(slide.good_point)}</div>`);
-  }
-  const summarySection = summaryParts.length > 0
-    ? `<div class="review-section-block">
-         <div class="review-section-label">概要</div>
-         ${summaryParts.join("")}
-       </div>`
-    : "";
+  const perspectives = slide.perspectives || [];
+  if (perspectives.length === 0) return "<p class='placeholder-text'>レビュー結果がありません</p>";
 
-  // 観点別エリア（構造・ビジュアル・内容）
-  const gridSection = `
-    <div class="review-section-block">
-      <div class="review-section-label">観点別</div>
-      <div class="review-grid">
-        ${buildReviewItem("構造", slide.structure_review)}
-        ${buildReviewItem("ビジュアル", slide.visual_review)}
-        ${buildReviewItem("内容", slide.content_review)}
+  return perspectives.map((p) => {
+    const label   = escHtml(p.label || p.type || "");
+    const summary = escHtml(p.summary || "");
+    const bodyId  = `accordion-body-${++_accordionCounter}`;
+    return `
+      <div class="accordion open">
+        <button class="accordion-btn" data-target="${bodyId}" onclick="toggleAccordion(this)">
+          <span>${label}</span>
+          <span class="accordion-icon">▼</span>
+        </button>
+        <div class="accordion-body open" id="${bodyId}">
+          <p class="perspective-summary">${summary}</p>
+        </div>
       </div>
-    </div>
-  `;
-
-  return summarySection + gridSection;
+    `;
+  }).join("");
 }
 
-function buildReviewItem(label, review) {
-  if (!review) return "";
-  const findings    = (review.findings    || []).map((f) => `<li>${escHtml(f)}</li>`).join("");
-  const suggestions = (review.suggestions || []).map((s) => `<li class="suggestion">${escHtml(s)}</li>`).join("");
+function toggleAccordion(btn) {
+  const bodyId = btn.dataset.target;
+  const body = document.getElementById(bodyId);
+  const isOpen = body.classList.toggle("open");
+  btn.closest(".accordion").classList.toggle("open", isOpen);
+}
+
+function buildReviewPointHtml(r) {
+  const question = escHtml(r.question || "");
+  const result   = escHtml(r.result   || "");
+  let resultClass = "review-result issue";
+  if (result === "指摘事項はありません") resultClass = "review-result ok";
+  else if (result === "判断ができません") resultClass = "review-result unknown";
   return `
-    <div class="review-item">
-      <div class="review-item-title">${label}</div>
-      <ul>${findings}${suggestions}</ul>
+    <div class="review-point">
+      <div class="review-point-question">${question}</div>
+      <div class="${resultClass}">${result}</div>
     </div>
   `;
 }
@@ -413,24 +415,12 @@ reviewBtn.addEventListener("click", async () => {
 
 function renderOverallSummary(summary) {
   if (!summary) return;
-
-  const alignment = summary.overall_alignment
-    ? `<div class="summary-alignment"><p>${escHtml(summary.overall_alignment)}</p></div>`
-    : "";
-
-  const risks = renderTagList(summary.overall_risks, "risk", "リスク");
-  const actions = renderTagList(summary.priority_actions, "action", "優先アクション");
-
-  summaryBody.innerHTML = alignment + risks + actions;
+  const reviews = summary.reviews || [];
+  summaryBody.innerHTML = reviews.length > 0
+    ? reviews.map((r) => buildReviewPointHtml(r)).join("")
+    : "<p class='placeholder-text'>レビュー結果がありません</p>";
   summaryPlaceholder.classList.add("hidden");
   summaryContent.classList.remove("hidden");
-}
-
-function renderTagList(items, tagClass, label) {
-  if (!items || items.length === 0) return "";
-  const tags = items.map((t) => `<span class="tag ${tagClass}">${escHtml(t)}</span>`).join("");
-  return `<p style="font-size:0.75rem;color:#718096;margin:8px 0 4px;">${label}</p>
-          <div class="tag-list">${tags}</div>`;
 }
 
 // ============================================================

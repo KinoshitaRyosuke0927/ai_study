@@ -523,6 +523,111 @@ button:disabled {
   color: #888;
 }
 
+/* ========== アコーディオン ========== */
+
+.accordion {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.accordion-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 14px;
+  background: #f7fafc;
+  color: #444;
+  border: none;
+  border-radius: 0;
+  font-size: 0.875rem;
+  font-weight: bold;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.accordion-btn:hover:not(:disabled) {
+  background: #edf2f7;
+  color: #444;
+}
+
+.accordion.open > .accordion-btn {
+  background: #e8f0fe;
+  color: #0052cc;
+}
+
+.accordion-icon {
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.accordion.open > .accordion-btn .accordion-icon {
+  transform: rotate(180deg);
+}
+
+.accordion-body {
+  display: none;
+  padding: 10px 12px 4px;
+}
+
+.accordion-body.open {
+  display: block;
+}
+
+/* ========== 観点別集約文章 ========== */
+
+.perspective-summary {
+  font-size: 0.875rem;
+  line-height: 1.75;
+  color: #444;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* ========== レビュー観点リスト ========== */
+
+.review-point {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.review-point-question {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: #444;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.review-result {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.review-result.ok {
+  background-color: #f0fff4;
+  color: #276749;
+}
+
+.review-result.unknown {
+  background-color: #fffff0;
+  color: #744210;
+}
+
+.review-result.issue {
+  background-color: #fff5f5;
+  color: #c53030;
+}
+
 /* ========== ローディング ========== */
 
 .loading {
