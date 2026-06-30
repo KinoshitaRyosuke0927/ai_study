@@ -40,7 +40,6 @@ const reviewMessage      = document.getElementById("review-message");
 const rightContent       = document.getElementById("right-content");
 const tabBtns            = document.querySelectorAll(".tab-btn");
 const tabInputEl         = document.getElementById("tab-input");
-const tabReviewEl        = document.getElementById("tab-review");
 const tabSummaryEl       = document.getElementById("tab-summary");
 const summaryPlaceholder = document.getElementById("summary-placeholder");
 const summaryContent     = document.getElementById("summary-content");
@@ -50,13 +49,6 @@ const summaryBody        = document.getElementById("summary-body");
 const inputSlideLabel    = document.getElementById("input-slide-label");
 const slidePreviewImg    = document.getElementById("slide-preview-img");
 const slideMessageInput  = document.getElementById("slide-message-input");
-
-// レビュー結果タブ
-const reviewSlideLabel   = document.getElementById("review-slide-label");
-const reviewSlideImg     = document.getElementById("review-slide-img");
-const reviewSlidePlaceholder = document.getElementById("review-slide-placeholder");
-const reviewSlideContent = document.getElementById("review-slide-content");
-const reviewSlideDetails = document.getElementById("review-slide-details");
 
 // ============================================================
 // 状態
@@ -236,7 +228,6 @@ tabBtns.forEach((btn) => {
     tabBtns.forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     tabInputEl.classList.toggle("hidden", activeTab !== "input");
-    tabReviewEl.classList.toggle("hidden", activeTab !== "review");
     tabSummaryEl.classList.toggle("hidden", activeTab !== "summary");
     refreshRightPanel();
   });
@@ -249,8 +240,6 @@ tabBtns.forEach((btn) => {
 function refreshRightPanel() {
   if (activeTab === "input") {
     if (selectedSlide) renderInputTab(selectedSlide);
-  } else if (activeTab === "review") {
-    if (selectedSlide) renderReviewTab(selectedSlide);
   }
   // summary タブはレビュー実行時に描画済みのため再描画不要
 }
@@ -271,36 +260,8 @@ function renderInputTab(num) {
   slideMessageInput.value = perSlideMessages[num] || "";
 }
 
-function renderReviewTab(num) {
-  const label = `スライド ${num}`;
-  reviewSlideLabel.textContent = label;
-
-  const src  = slidePngs[num - 1] || thumbnails[num - 1];
-  const mime = slidePngs[num - 1] ? "image/png" : thumbnailMime;
-  reviewSlideImg.src = src ? `data:${mime};base64,${src}` : "";
-  reviewSlideImg.alt = label;
-
-  if (!reviewData) {
-    reviewSlidePlaceholder.classList.remove("hidden");
-    reviewSlideContent.classList.add("hidden");
-    return;
-  }
-
-  const slideResult = (reviewData.slides || []).find((s) => s.slide_number === num);
-  if (!slideResult) {
-    reviewSlidePlaceholder.textContent = "このスライドのレビュー結果がありません";
-    reviewSlidePlaceholder.classList.remove("hidden");
-    reviewSlideContent.classList.add("hidden");
-    return;
-  }
-
-  reviewSlideDetails.innerHTML = buildSlideReviewHtml(slideResult);
-  reviewSlidePlaceholder.classList.add("hidden");
-  reviewSlideContent.classList.remove("hidden");
-}
-
 // ============================================================
-// レビュー結果の各スライドHTML生成
+// レビュー結果HTML生成
 // ============================================================
 
 let _accordionCounter = 0;
@@ -332,20 +293,6 @@ function toggleAccordion(btn) {
   const body = document.getElementById(bodyId);
   const isOpen = body.classList.toggle("open");
   btn.closest(".accordion").classList.toggle("open", isOpen);
-}
-
-function buildReviewPointHtml(r) {
-  const question = escHtml(r.question || "");
-  const result   = escHtml(r.result   || "");
-  let resultClass = "review-result issue";
-  if (result === "指摘事項はありません") resultClass = "review-result ok";
-  else if (result === "判断ができません") resultClass = "review-result unknown";
-  return `
-    <div class="review-point">
-      <div class="review-point-question">${question}</div>
-      <div class="${resultClass}">${result}</div>
-    </div>
-  `;
 }
 
 // ============================================================
@@ -395,7 +342,6 @@ reviewBtn.addEventListener("click", async () => {
     activeTab = "summary";
     tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "summary"));
     tabInputEl.classList.add("hidden");
-    tabReviewEl.classList.add("hidden");
     tabSummaryEl.classList.remove("hidden");
 
     renderOverallSummary(data.presentation_summary);
@@ -415,9 +361,9 @@ reviewBtn.addEventListener("click", async () => {
 
 function renderOverallSummary(summary) {
   if (!summary) return;
-  const reviews = summary.reviews || [];
-  summaryBody.innerHTML = reviews.length > 0
-    ? reviews.map((r) => buildReviewPointHtml(r)).join("")
+  const perspectives = summary.perspectives || [];
+  summaryBody.innerHTML = perspectives.length > 0
+    ? buildSlideReviewHtml({ perspectives })
     : "<p class='placeholder-text'>レビュー結果がありません</p>";
   summaryPlaceholder.classList.add("hidden");
   summaryContent.classList.remove("hidden");
