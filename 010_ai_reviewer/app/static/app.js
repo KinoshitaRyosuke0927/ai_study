@@ -38,12 +38,15 @@ const reviewBtn          = document.getElementById("review-btn");
 const reviewMessage      = document.getElementById("review-message");
 // 右パネル
 const rightContent       = document.getElementById("right-content");
-const tabBtns            = document.querySelectorAll(".tab-btn");
-const tabInputEl         = document.getElementById("tab-input");
-const tabSummaryEl       = document.getElementById("tab-summary");
-const summaryPlaceholder = document.getElementById("summary-placeholder");
-const summaryContent     = document.getElementById("summary-content");
-const summaryBody        = document.getElementById("summary-body");
+const tabBtns               = document.querySelectorAll(".tab-btn");
+const tabInputEl            = document.getElementById("tab-input");
+const tabSummaryEl          = document.getElementById("tab-summary");
+const summaryPlaceholder    = document.getElementById("summary-placeholder");
+const summaryContent        = document.getElementById("summary-content");
+const summarySlideLabel     = document.getElementById("summary-slide-label");
+const summarySlideImg       = document.getElementById("summary-slide-img");
+const perspectiveSelectorEl = document.getElementById("perspective-selector");
+const summaryPerspectiveBody = document.getElementById("summary-perspective-body");
 
 // 伝えたいことタブ
 const inputSlideLabel    = document.getElementById("input-slide-label");
@@ -62,8 +65,9 @@ let renderMethod      = "none";    // "libre_office" | "pillow" | "none"
 let slideCount        = 0;
 let selectedSlide     = null;      // 現在選択中のスライド番号（1始まり）
 let perSlideMessages  = {};        // slideNum -> string
-let reviewData        = null;      // APIから返ってきたレビュー結果
-let activeTab         = "input";   // "input" | "review" | "summary"
+let reviewData              = null;  // APIから返ってきたレビュー結果
+let activeTab               = "input"; // "input" | "summary"
+let activePerspectiveIndex  = 0;
 
 // ============================================================
 // ファイル選択
@@ -240,8 +244,9 @@ tabBtns.forEach((btn) => {
 function refreshRightPanel() {
   if (activeTab === "input") {
     if (selectedSlide) renderInputTab(selectedSlide);
+  } else if (activeTab === "summary") {
+    if (selectedSlide) renderSummaryTab(selectedSlide);
   }
-  // summary タブはレビュー実行時に描画済みのため再描画不要
 }
 
 function renderInputTab(num) {
@@ -261,38 +266,33 @@ function renderInputTab(num) {
 }
 
 // ============================================================
-// レビュー結果HTML生成
+// 総評タブ — スライド画像・観点セレクタ
 // ============================================================
 
-let _accordionCounter = 0;
-
-function buildSlideReviewHtml(slide) {
-  const perspectives = slide.perspectives || [];
-  if (perspectives.length === 0) return "<p class='placeholder-text'>レビュー結果がありません</p>";
-
-  return perspectives.map((p) => {
-    const label   = escHtml(p.label || p.type || "");
-    const summary = escHtml(p.summary || "");
-    const bodyId  = `accordion-body-${++_accordionCounter}`;
-    return `
-      <div class="accordion open">
-        <button class="accordion-btn" data-target="${bodyId}" onclick="toggleAccordion(this)">
-          <span>${label}</span>
-          <span class="accordion-icon">▼</span>
-        </button>
-        <div class="accordion-body open" id="${bodyId}">
-          <p class="perspective-summary">${summary}</p>
-        </div>
-      </div>
-    `;
-  }).join("");
+function renderSummaryTab(num) {
+  const src  = slidePngs[num - 1] || thumbnails[num - 1];
+  const mime = slidePngs[num - 1] ? "image/png" : thumbnailMime;
+  summarySlideLabel.textContent = `スライド ${num}`;
+  summarySlideImg.src = src ? `data:${mime};base64,${src}` : "";
+  summarySlideImg.alt = `スライド ${num}`;
 }
 
-function toggleAccordion(btn) {
-  const bodyId = btn.dataset.target;
-  const body = document.getElementById(bodyId);
-  const isOpen = body.classList.toggle("open");
-  btn.closest(".accordion").classList.toggle("open", isOpen);
+function selectPerspective(index) {
+  activePerspectiveIndex = index;
+  perspectiveSelectorEl.querySelectorAll(".tab-btn").forEach((btn, i) => {
+    btn.classList.toggle("active", i === index);
+  });
+  const perspectives = reviewData?.presentation_summary?.perspectives || [];
+  showPerspective(perspectives, index);
+}
+
+function showPerspective(perspectives, index) {
+  const p = perspectives[index];
+  if (!p) {
+    summaryPerspectiveBody.innerHTML = "<p class='placeholder-text'>レビュー結果がありません</p>";
+    return;
+  }
+  summaryPerspectiveBody.innerHTML = `<p class="perspective-summary">${escHtml(p.summary || "")}</p>`;
 }
 
 // ============================================================
@@ -362,9 +362,15 @@ reviewBtn.addEventListener("click", async () => {
 function renderOverallSummary(summary) {
   if (!summary) return;
   const perspectives = summary.perspectives || [];
-  summaryBody.innerHTML = perspectives.length > 0
-    ? buildSlideReviewHtml({ perspectives })
-    : "<p class='placeholder-text'>レビュー結果がありません</p>";
+
+  perspectiveSelectorEl.className = "tab-bar";
+  perspectiveSelectorEl.innerHTML = perspectives.map((p, i) =>
+    `<button class="tab-btn${i === 0 ? " active" : ""}" onclick="selectPerspective(${i})">${escHtml(p.label || p.type || "")}</button>`
+  ).join("");
+
+  activePerspectiveIndex = 0;
+  showPerspective(perspectives, 0);
+
   summaryPlaceholder.classList.add("hidden");
   summaryContent.classList.remove("hidden");
 }
