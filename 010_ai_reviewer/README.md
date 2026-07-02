@@ -51,22 +51,9 @@ uvicorn app.main:app --reload --port 8000
 | POST | `/api/upload` | PPTX アップロード・スライド画像化 |
 | POST | `/api/review` | PPTX 解析 + AI レビュー実行 |
 
-## スライド画像の仕組み
-
-| 種別 | 形式 | 用途 |
-|------|------|------|
-| LibreOffice PNG (200 DPI) | PNG | スライドプレビュー（高品質）/ 将来の AI ビジョン API 用 |
-| LibreOffice JPEG | JPEG | スライド一覧サムネイル（軽量） |
-| Pillow 簡易レンダリング | PNG | LibreOffice 未インストール時のフォールバック |
-
-LibreOffice が未インストールの場合、自動的に Pillow による簡易レンダリングにフォールバックします。
-画面左上のスライドラベルに `LibreOffice` バッジが表示された場合は高品質レンダリングが有効です。
-
 ## ファイル構成
 - `app/main.py` — FastAPI エントリポイント
 - `app/renderer.py` — LibreOffice + pdf2image によるスライド画像化
-- `app/slide_renderer.py` — Pillow による簡易サムネイル（フォールバック用）
-- `app/pptx_parser.py` — `.pptx` の構造解析（テキスト・フォント・ヒューリスティックフラグ抽出）
 - `app/prompt.py` — AI レビュー用プロンプト定義・レビュー観点・出力スキーマ
 - `app/azure_ai_service.py` — Azure OpenAI 呼び出し
 - `app/static/` — フロントエンド（HTML / CSS / JS）

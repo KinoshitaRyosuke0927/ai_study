@@ -36,6 +36,7 @@ const slideList          = document.getElementById("slide-list");
 const reviewAction       = document.getElementById("review-action");
 const reviewBtn          = document.getElementById("review-btn");
 const reviewMessage      = document.getElementById("review-message");
+const downloadCsvBtn     = document.getElementById("download-csv-btn");
 // 右パネル
 const rightContent       = document.getElementById("right-content");
 const tabBtns               = document.querySelectorAll(".tab-btn");
@@ -140,6 +141,7 @@ uploadBtn.addEventListener("click", async () => {
     reviewData    = null;
     selectedSlide = null;
     perSlideMessages = {};
+    downloadCsvBtn.disabled = true;
 
     // 左パネルの各セクションを表示
     overallSection.classList.remove("hidden");
@@ -335,6 +337,7 @@ reviewBtn.addEventListener("click", async () => {
     }
 
     reviewData = data;
+    downloadCsvBtn.disabled = false;
 
     showMessage(reviewMessage, "レビューが完了しました", "success");
 
@@ -383,5 +386,36 @@ slideMessageInput.addEventListener("input", () => {
   if (selectedSlide) {
     perSlideMessages[selectedSlide] = slideMessageInput.value;
   }
+});
+
+// ============================================================
+// レビュー結果のMarkdownダウンロード
+// ============================================================
+
+function markdownTableEscape(value) {
+  const str = String(value ?? "");
+  return str.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
+}
+
+downloadCsvBtn.addEventListener("click", () => {
+  const perspectives = reviewData?.presentation_summary?.perspectives || [];
+  if (perspectives.length === 0) return;
+
+  const lines = ["| No | 観点 | 指摘事項 |", "| --- | --- | --- |"];
+  perspectives.forEach((p, i) => {
+    lines.push(`| ${i + 1} | ${markdownTableEscape(p.label || p.type || "")} | ${markdownTableEscape(p.summary || "")} |`);
+  });
+
+  const markdownContent = lines.join("\n") + "\n";
+  const blob = new Blob([markdownContent], { type: "text/markdown;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "review_result.md";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 });
 

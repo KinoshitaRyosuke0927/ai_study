@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import tempfile
 from pathlib import Path
 
@@ -30,6 +31,17 @@ class ReviewRequest(BaseModel):
 # フロントエンドのHTMLパス
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
+# 観点一覧
+PTYPE_LABELS: dict[str, str] = {
+    "assignment":  "課題設定",
+    "evaluation":  "評価・検証",
+    "feasibility": "実現可能性",
+    "plan":        "計画・戦略",
+    "priority":    "優先度・差別化",
+    "purpose":     "目的・意図",
+    "story":       "構成・表現",
+}
+
 
 # アプリケーション実行
 app = FastAPI(title="AI PowerPoint Reviewer", version="1.0.0")
@@ -108,7 +120,32 @@ async def upload_pptx(file: UploadFile = File(...)) -> dict:
     }
 
 
-import time
+def _review_perspective(ptype: str, pkg: dict) -> dict:
+    """
+    1つのperspective_typeについて、Q&Aレビューと集約文章生成を順番に行う（同期処理）
+    """
+
+    # Step1: 観点ごとのQ&Aレビュー
+    try:
+        qa_result = call_review(pkg)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AIレビュー（全体観点評価）に失敗しました: {exc}") from exc
+
+    reviews = qa_result.get("reviews", [])
+
+    # Step2: Q&A結果を集約文章に変換
+    label = PTYPE_LABELS.get(ptype, ptype)
+    try:
+        summary_result = call_review(build_overall_per_type_summarize_prompt_package(label, reviews))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AIレビュー（集約）に失敗しました: {exc}") from exc
+
+    return {
+        "type": ptype,
+        "label": label,
+        "summary": summary_result.get("summary", ""),
+    }
+
 
 @app.post("/api/review")
 async def review_pptx(request: ReviewRequest) -> dict:
@@ -123,52 +160,15 @@ async def review_pptx(request: ReviewRequest) -> dict:
     data = request.model_dump()
 
     # perspective_typeごとにプレゼンテーション全体のレビューを行い、集約文章を生成する
-    _PTYPE_LABELS: dict[str, str] = {
-        "assignment":  "課題設定",
-        "evaluation":  "評価・検証",
-        "feasibility": "実現可能性",
-        "plan":        "計画・戦略",
-        "priority":    "優先度・差別化",
-        "purpose":     "目的・意図",
-        "story":       "構成・表現",
-    }
-    perspectives: list[dict] = []
-
-    for ptype, pkg in build_overall_per_type_prompt_packages_by_type(data):
-        _start = time.time()
-
-        # Step1: 観点ごとのQ&Aレビュー（全体）
-        try:
-            qa_result = call_review(pkg)
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"AIレビュー（全体観点評価）に失敗しました: {exc}") from exc
-
-        reviews = qa_result.get("reviews", [])
-
-        print("##################################################")
-        print("観点 :", ptype)
-        print("レビュー処理時間 :", time.time() - _start)
-        _start = time.time()
-
-        # Step2: Q&A結果を集約文章に変換
-        label = _PTYPE_LABELS.get(ptype, ptype)
-        try:
-            summary_result = call_review(build_overall_per_type_summarize_prompt_package(label, reviews))
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"AIレビュー（集約）に失敗しました: {exc}") from exc
-
-        perspectives.append({
-            "type": ptype,
-            "label": label,
-            "summary": summary_result.get("summary", ""),
-        })
-
-        print("要約処理時間 :", time.time() - _start)
+    packages = build_overall_per_type_prompt_packages_by_type(data)
+    perspectives = await asyncio.gather(
+        *(asyncio.to_thread(_review_perspective, ptype, pkg) for ptype, pkg in packages)
+    )
 
     # レスポンス作成
     return {
         "presentation_summary": {
-            "perspectives": perspectives,
+            "perspectives": list(perspectives),
         },
         "slides": [],
     }
