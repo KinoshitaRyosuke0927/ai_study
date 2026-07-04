@@ -177,6 +177,17 @@ button {
   flex-shrink: 0;
 }
 
+#suggest-btn {
+  margin-top: 12px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .btn-download {
   flex: 0 0 auto;
   width: auto;
@@ -351,6 +362,10 @@ button:disabled {
   color: #276749;
 }
 
+#summary-perspective-body {
+  margin-top: 20px;
+}
+
 /* ========== タブ ========== */
 
 .tab-bar {
@@ -478,6 +493,13 @@ button:disabled {
   padding: 0;
 }
 
+.review-item p {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: #444;
+  margin-bottom: 6px;
+}
+
 .review-item li {
   font-size: 0.82rem;
   line-height: 1.55;
@@ -545,8 +567,42 @@ button:disabled {
   font-size: 0.875rem;
   line-height: 1.75;
   color: #444;
-  margin: 0;
-  white-space: pre-wrap;
+}
+
+/* ========== Markdown表示 ========== */
+
+.markdown-body p {
+  margin: 0 0 8px;
+}
+
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0 0 8px 1.3em;
+}
+
+.markdown-body ul:last-child,
+.markdown-body ol:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body li {
+  line-height: 1.7;
+  margin-bottom: 4px;
+}
+
+.markdown-body strong {
+  color: #222;
+}
+
+.markdown-body code {
+  background: #eef1f5;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.85em;
 }
 
 

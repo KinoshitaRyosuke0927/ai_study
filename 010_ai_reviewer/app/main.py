@@ -13,6 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.prompt import (
     build_overall_per_type_prompt_packages_by_type,
     build_overall_per_type_summarize_prompt_package,
+    build_revision_findings_text,
+    build_revision_suggestion_prompt_package,
 )
 from app.renderer import render_pptx_to_images, images_to_base64_dict
 from app.azure_ai_service import call_review
@@ -28,18 +30,34 @@ class ReviewRequest(BaseModel):
     overall_intended_message: str = ""
     slides: list[SlideInput]
 
+
+class SuggestionSlideInput(BaseModel):
+    slide_number: int
+    image_jpeg_b64: str
+
+
+class PerspectiveResult(BaseModel):
+    type: str
+    label: str
+    summary: str
+
+
+class SuggestionRequest(BaseModel):
+    slides: list[SuggestionSlideInput]
+    perspectives: list[PerspectiveResult]
+
 # フロントエンドのHTMLパス
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 # 観点一覧
 PTYPE_LABELS: dict[str, str] = {
-    "assignment":  "課題設定",
-    "evaluation":  "評価・検証",
-    "feasibility": "実現可能性",
-    "plan":        "計画・戦略",
-    "priority":    "優先度・差別化",
-    "purpose":     "目的・意図",
+    "overall":     "全体",
     "story":       "構成・表現",
+    "plan":        "計画・戦略",
+    "assignment":  "課題設定",
+    "priority":    "優先度・差別化",
+    "feasibility": "実現可能性",
+    "evaluation":  "評価・検証",
 }
 
 
@@ -161,6 +179,9 @@ async def review_pptx(request: ReviewRequest) -> dict:
 
     # perspective_typeごとにプレゼンテーション全体のレビューを行い、集約文章を生成する
     packages = build_overall_per_type_prompt_packages_by_type(data)
+    # タブの表示順がPTYPE_LABELSの定義順になるよう並び替える
+    ptype_order = list(PTYPE_LABELS.keys())
+    packages.sort(key=lambda item: ptype_order.index(item[0]) if item[0] in ptype_order else len(ptype_order))
     perspectives = await asyncio.gather(
         *(asyncio.to_thread(_review_perspective, ptype, pkg) for ptype, pkg in packages)
     )
@@ -171,4 +192,48 @@ async def review_pptx(request: ReviewRequest) -> dict:
             "perspectives": list(perspectives),
         },
         "slides": [],
+    }
+
+
+def _suggest_revision_for_slide(slide: dict, findings_text: str) -> dict:
+    """
+    1枚のスライドについて、修正方針提案をAIに問い合わせる（同期処理）
+    """
+    package = build_revision_suggestion_prompt_package(slide, findings_text)
+    try:
+        result = call_review(package)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AIレビュー（修正方針提案）に失敗しました: {exc}") from exc
+
+    return {
+        "slide_number": slide["slide_number"],
+        "summary": result.get("summary", ""),
+        "issues": result.get("issues", []),
+        "actions": result.get("actions", []),
+        "example_text": result.get("example_text", {}),
+        "expected_outcome": result.get("expected_outcome", ""),
+    }
+
+
+@app.post("/api/suggest")
+async def suggest_revision(request: SuggestionRequest) -> dict:
+    """
+    観点別レビュー結果とスライド画像をもとに、AIがスライドごとの修正方針を提案する
+    """
+    # スライド情報が読み取れなかった場合
+    if not request.slides:
+        raise HTTPException(status_code=400, detail="スライドデータがありません。")
+    # レビュー結果が存在しない場合
+    if not request.perspectives:
+        raise HTTPException(status_code=400, detail="レビュー結果がありません。先にAIレビューを実行してください。")
+
+    data = request.model_dump()
+    findings_text = build_revision_findings_text(data["perspectives"])
+
+    slide_suggestions = await asyncio.gather(
+        *(asyncio.to_thread(_suggest_revision_for_slide, slide, findings_text) for slide in data["slides"])
+    )
+
+    return {
+        "slide_suggestions": list(slide_suggestions),
     }

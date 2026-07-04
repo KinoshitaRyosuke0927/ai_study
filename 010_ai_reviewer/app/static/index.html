@@ -10,7 +10,10 @@
   <div class="container">
     <div class="header-row">
       <h1>AI PowerPoint レビュアー</h1>
-      <button id="download-csv-btn" class="btn-download" disabled>レビュー結果をダウンロード</button>
+      <div class="header-actions">
+        <button id="download-csv-btn" class="btn-download" disabled>指摘事項をダウンロード</button>
+        <button id="download-suggestion-btn" class="btn-download" disabled>修正方針をダウンロード</button>
+      </div>
     </div>
 
     <div class="panels">
@@ -45,8 +48,10 @@
         </section>
 
         <div class="hidden" id="review-action">
-          <button id="review-btn">AIでレビューする</button>
+          <button id="review-btn">レビューする</button>
           <div id="review-message" class="message hidden"></div>
+          <button id="suggest-btn" disabled>修正方針を提示する</button>
+          <div id="suggest-message" class="message hidden"></div>
         </div>
 
       </div><!-- /panel-left -->
@@ -62,7 +67,8 @@
           <!-- タブバー -->
           <div class="tab-bar">
             <button class="tab-btn active" data-tab="input">伝えたいこと</button>
-            <button class="tab-btn" data-tab="summary">総評</button>
+            <button class="tab-btn" data-tab="summary">指摘事項</button>
+            <button class="tab-btn" data-tab="suggestion">修正方針</button>
           </div>
 
           <!-- 伝えたいことタブ -->
@@ -85,7 +91,7 @@
           <!-- 総評タブ -->
           <div id="tab-summary" class="tab-content hidden">
             <div id="summary-placeholder" class="placeholder-text">
-              「AIでレビューする」を実行すると結果が表示されます
+              「レビューする」を実行すると結果が表示されます
             </div>
             <div id="summary-content" class="hidden">
               <div class="slide-panel-label" id="summary-slide-label">スライド 1</div>
@@ -94,6 +100,20 @@
               </div>
               <div id="perspective-selector" class="perspective-selector"></div>
               <div id="summary-perspective-body"></div>
+            </div>
+          </div>
+
+          <!-- 修正方針タブ -->
+          <div id="tab-suggestion" class="tab-content hidden">
+            <div id="suggestion-placeholder" class="placeholder-text">
+              「修正方針を提示する」を実行すると結果が表示されます
+            </div>
+            <div id="suggestion-content" class="hidden">
+              <div class="slide-panel-label" id="suggestion-slide-label">スライド 1</div>
+              <div class="slide-image-wrap">
+                <img id="suggestion-slide-img" src="" alt="">
+              </div>
+              <div id="suggestion-body"></div>
             </div>
           </div>
 

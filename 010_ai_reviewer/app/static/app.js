@@ -20,6 +20,63 @@ function escHtml(str) {
 }
 
 // ============================================================
+// 簡易Markdownレンダリング（箇条書き・太字・インラインコード対応）
+// ============================================================
+
+function inlineMarkdown(text) {
+  return escHtml(text)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/`(.+?)`/g, "<code>$1</code>");
+}
+
+function renderMarkdown(text) {
+  const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
+  const htmlParts = [];
+  let currentListTag = null;
+  let paragraphLines = [];
+
+  const flushParagraph = () => {
+    if (paragraphLines.length) {
+      htmlParts.push(`<p>${paragraphLines.map(inlineMarkdown).join("<br>")}</p>`);
+      paragraphLines = [];
+    }
+  };
+  const closeList = () => {
+    if (currentListTag) {
+      htmlParts.push(`</${currentListTag}>`);
+      currentListTag = null;
+    }
+  };
+
+  lines.forEach((rawLine) => {
+    const bulletMatch = rawLine.match(/^\s*[-*+]\s+(.*)$/);
+    const orderedMatch = rawLine.match(/^\s*\d+[.)]\s+(.*)$/);
+    const match = bulletMatch || orderedMatch;
+
+    if (match) {
+      flushParagraph();
+      const tag = bulletMatch ? "ul" : "ol";
+      if (currentListTag !== tag) {
+        closeList();
+        htmlParts.push(`<${tag}>`);
+        currentListTag = tag;
+      }
+      htmlParts.push(`<li>${inlineMarkdown(match[1])}</li>`);
+    } else if (rawLine.trim() === "") {
+      closeList();
+      flushParagraph();
+    } else {
+      closeList();
+      paragraphLines.push(rawLine.trim());
+    }
+  });
+  closeList();
+  flushParagraph();
+
+  return htmlParts.join("");
+}
+
+// ============================================================
 // DOM 参照
 // ============================================================
 
@@ -36,18 +93,27 @@ const slideList          = document.getElementById("slide-list");
 const reviewAction       = document.getElementById("review-action");
 const reviewBtn          = document.getElementById("review-btn");
 const reviewMessage      = document.getElementById("review-message");
+const suggestBtn         = document.getElementById("suggest-btn");
+const suggestMessage     = document.getElementById("suggest-message");
 const downloadCsvBtn     = document.getElementById("download-csv-btn");
+const downloadSuggestionBtn = document.getElementById("download-suggestion-btn");
 // 右パネル
 const rightContent       = document.getElementById("right-content");
 const tabBtns               = document.querySelectorAll(".tab-btn");
 const tabInputEl            = document.getElementById("tab-input");
 const tabSummaryEl          = document.getElementById("tab-summary");
+const tabSuggestionEl       = document.getElementById("tab-suggestion");
 const summaryPlaceholder    = document.getElementById("summary-placeholder");
 const summaryContent        = document.getElementById("summary-content");
 const summarySlideLabel     = document.getElementById("summary-slide-label");
 const summarySlideImg       = document.getElementById("summary-slide-img");
 const perspectiveSelectorEl = document.getElementById("perspective-selector");
 const summaryPerspectiveBody = document.getElementById("summary-perspective-body");
+const suggestionPlaceholder = document.getElementById("suggestion-placeholder");
+const suggestionContent     = document.getElementById("suggestion-content");
+const suggestionSlideLabel  = document.getElementById("suggestion-slide-label");
+const suggestionSlideImg    = document.getElementById("suggestion-slide-img");
+const suggestionBody        = document.getElementById("suggestion-body");
 
 // 伝えたいことタブ
 const inputSlideLabel    = document.getElementById("input-slide-label");
@@ -67,7 +133,8 @@ let slideCount        = 0;
 let selectedSlide     = null;      // 現在選択中のスライド番号（1始まり）
 let perSlideMessages  = {};        // slideNum -> string
 let reviewData              = null;  // APIから返ってきたレビュー結果
-let activeTab               = "input"; // "input" | "summary"
+let suggestionBySlide       = {};    // slide_number -> 修正方針テキスト
+let activeTab               = "input"; // "input" | "summary" | "suggestion"
 let activePerspectiveIndex  = 0;
 
 // ============================================================
@@ -139,9 +206,12 @@ uploadBtn.addEventListener("click", async () => {
     renderMethod  = data.render_method || "none";
     slideCount    = data.slide_count || 0;
     reviewData    = null;
+    suggestionBySlide = {};
     selectedSlide = null;
     perSlideMessages = {};
     downloadCsvBtn.disabled = true;
+    suggestBtn.disabled = true;
+    downloadSuggestionBtn.disabled = true;
 
     // 左パネルの各セクションを表示
     overallSection.classList.remove("hidden");
@@ -149,6 +219,8 @@ uploadBtn.addEventListener("click", async () => {
     reviewAction.classList.remove("hidden");
     if (summaryPlaceholder) summaryPlaceholder.classList.remove("hidden");
     if (summaryContent) summaryContent.classList.add("hidden");
+    if (suggestionPlaceholder) suggestionPlaceholder.classList.remove("hidden");
+    if (suggestionContent) suggestionContent.classList.add("hidden");
 
     // スライド一覧を構築
     buildSlideList(thumbnails, slideCount);
@@ -235,6 +307,7 @@ tabBtns.forEach((btn) => {
     btn.classList.add("active");
     tabInputEl.classList.toggle("hidden", activeTab !== "input");
     tabSummaryEl.classList.toggle("hidden", activeTab !== "summary");
+    tabSuggestionEl.classList.toggle("hidden", activeTab !== "suggestion");
     refreshRightPanel();
   });
 });
@@ -248,6 +321,8 @@ function refreshRightPanel() {
     if (selectedSlide) renderInputTab(selectedSlide);
   } else if (activeTab === "summary") {
     if (selectedSlide) renderSummaryTab(selectedSlide);
+  } else if (activeTab === "suggestion") {
+    if (selectedSlide) renderSuggestionTab(selectedSlide);
   }
 }
 
@@ -288,13 +363,65 @@ function selectPerspective(index) {
   showPerspective(perspectives, index);
 }
 
+const ACTION_TYPE_LABELS = {
+  structure: "構成",
+  content: "内容",
+  expression: "表現",
+};
+
+function actionTypeLabel(type) {
+  return ACTION_TYPE_LABELS[type] || type || "";
+}
+
+function renderSuggestionTab(num) {
+  const src  = slidePngs[num - 1] || thumbnails[num - 1];
+  const mime = slidePngs[num - 1] ? "image/png" : thumbnailMime;
+  suggestionSlideLabel.textContent = `スライド ${num}`;
+  suggestionSlideImg.src = src ? `data:${mime};base64,${src}` : "";
+  suggestionSlideImg.alt = `スライド ${num}`;
+
+  const data = suggestionBySlide[num];
+  if (!data) {
+    suggestionBody.innerHTML = "<p class='placeholder-text'>このスライドの修正方針はありません</p>";
+    return;
+  }
+
+  const example = data.example_text || {};
+  const issuesHtml = (data.issues || []).map((i) => `<li>${escHtml(i)}</li>`).join("") || "<li>特になし</li>";
+  const actionsHtml = (data.actions || [])
+    .map((a) => `<li class="suggestion"><strong>[${escHtml(actionTypeLabel(a.type))}]</strong> ${escHtml(a.instruction || "")}</li>`)
+    .join("") || "<li>特になし</li>";
+  const bodyHtml = (example.body || []).map((b) => `<li>${escHtml(b)}</li>`).join("");
+
+  suggestionBody.innerHTML = `
+    <div class="review-summary-text">${escHtml(data.summary || "")}</div>
+    <div class="review-section-block">
+      <div class="review-section-label">問題点</div>
+      <div class="review-item"><ul>${issuesHtml}</ul></div>
+    </div>
+    <div class="review-section-block">
+      <div class="review-section-label">修正アクション</div>
+      <div class="review-item"><ul>${actionsHtml}</ul></div>
+    </div>
+    <div class="review-section-block">
+      <div class="review-section-label">差し替え文案</div>
+      <div class="review-item">
+        <p><strong>タイトル案:</strong> ${escHtml(example.title || "")}</p>
+        <p><strong>リード文案:</strong> ${escHtml(example.lead || "")}</p>
+        <ul>${bodyHtml}</ul>
+      </div>
+    </div>
+    <div class="good-point">${escHtml(data.expected_outcome || "")}</div>
+  `;
+}
+
 function showPerspective(perspectives, index) {
   const p = perspectives[index];
   if (!p) {
     summaryPerspectiveBody.innerHTML = "<p class='placeholder-text'>レビュー結果がありません</p>";
     return;
   }
-  summaryPerspectiveBody.innerHTML = `<p class="perspective-summary">${escHtml(p.summary || "")}</p>`;
+  summaryPerspectiveBody.innerHTML = `<div class="perspective-summary markdown-body">${renderMarkdown(p.summary || "")}</div>`;
 }
 
 // ============================================================
@@ -337,7 +464,12 @@ reviewBtn.addEventListener("click", async () => {
     }
 
     reviewData = data;
+    suggestionBySlide = {};
     downloadCsvBtn.disabled = false;
+    suggestBtn.disabled = false;
+    downloadSuggestionBtn.disabled = true;
+    if (suggestionPlaceholder) suggestionPlaceholder.classList.remove("hidden");
+    if (suggestionContent) suggestionContent.classList.add("hidden");
 
     showMessage(reviewMessage, "レビューが完了しました", "success");
 
@@ -346,6 +478,7 @@ reviewBtn.addEventListener("click", async () => {
     tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "summary"));
     tabInputEl.classList.add("hidden");
     tabSummaryEl.classList.remove("hidden");
+    tabSuggestionEl.classList.add("hidden");
 
     renderOverallSummary(data.presentation_summary);
 
@@ -355,6 +488,70 @@ reviewBtn.addEventListener("click", async () => {
   } finally {
     reviewBtn.disabled = false;
     reviewBtn.textContent = "AIでレビューする";
+  }
+});
+
+// ============================================================
+// 修正方針の提案
+// ============================================================
+
+suggestBtn.addEventListener("click", async () => {
+  const perspectives = reviewData?.presentation_summary?.perspectives || [];
+  if (!currentFile || perspectives.length === 0) return;
+
+  hideMessage(suggestMessage);
+  suggestBtn.disabled = true;
+  suggestBtn.innerHTML = '<span class="loading"></span>AIが修正方針を検討中...';
+
+  try {
+    const slides = thumbnails.map((thumb, i) => ({
+      slide_number: i + 1,
+      image_jpeg_b64: thumb,
+    }));
+
+    const res  = await fetch("/api/suggest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        slides,
+        perspectives: perspectives.map((p) => ({
+          type: p.type || "",
+          label: p.label || "",
+          summary: p.summary || "",
+        })),
+      }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showMessage(suggestMessage, `エラー: ${data.detail}`, "error");
+      return;
+    }
+
+    suggestionBySlide = {};
+    (data.slide_suggestions || []).forEach((s) => {
+      suggestionBySlide[s.slide_number] = s;
+    });
+    downloadSuggestionBtn.disabled = false;
+
+    showMessage(suggestMessage, "修正方針の提案が完了しました", "success");
+
+    // 修正方針タブに切り替えて結果を表示
+    activeTab = "suggestion";
+    tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "suggestion"));
+    tabInputEl.classList.add("hidden");
+    tabSummaryEl.classList.add("hidden");
+    tabSuggestionEl.classList.remove("hidden");
+
+    suggestionPlaceholder.classList.add("hidden");
+    suggestionContent.classList.remove("hidden");
+
+    if (selectedSlide) renderSuggestionTab(selectedSlide);
+  } catch (err) {
+    showMessage(suggestMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    suggestBtn.disabled = false;
+    suggestBtn.textContent = "修正方針を提示する";
   }
 });
 
@@ -397,13 +594,40 @@ function markdownTableEscape(value) {
   return str.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
 }
 
+// Markdownの箇条書き（- / * / + / 1. など）を1項目ずつのテキスト配列に分解する
+// 箇条書きが見つからない場合は、テキスト全体を1項目として扱う
+function extractMarkdownItems(text) {
+  const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
+  const items = [];
+
+  lines.forEach((rawLine) => {
+    const bulletMatch = rawLine.match(/^\s*[-*+]\s+(.*)$/);
+    const orderedMatch = rawLine.match(/^\s*\d+[.)]\s+(.*)$/);
+    const match = bulletMatch || orderedMatch;
+    const content = match ? match[1].trim() : rawLine.trim();
+    if (content) items.push(content);
+  });
+
+  if (items.length === 0) {
+    const whole = String(text || "").trim();
+    if (whole) items.push(whole);
+  }
+
+  return items;
+}
+
 downloadCsvBtn.addEventListener("click", () => {
   const perspectives = reviewData?.presentation_summary?.perspectives || [];
   if (perspectives.length === 0) return;
 
   const lines = ["| No | 観点 | 指摘事項 |", "| --- | --- | --- |"];
-  perspectives.forEach((p, i) => {
-    lines.push(`| ${i + 1} | ${markdownTableEscape(p.label || p.type || "")} | ${markdownTableEscape(p.summary || "")} |`);
+  let no = 1;
+  perspectives.forEach((p) => {
+    const label = p.label || p.type || "";
+    extractMarkdownItems(p.summary || "").forEach((item) => {
+      lines.push(`| ${no} | ${markdownTableEscape(label)} | ${markdownTableEscape(item)} |`);
+      no += 1;
+    });
   });
 
   const markdownContent = lines.join("\n") + "\n";
@@ -413,6 +637,52 @@ downloadCsvBtn.addEventListener("click", () => {
   const a = document.createElement("a");
   a.href = url;
   a.download = "review_result.md";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// ============================================================
+// 修正方針のMarkdownダウンロード
+// ============================================================
+
+downloadSuggestionBtn.addEventListener("click", () => {
+  const slideNumbers = Object.keys(suggestionBySlide).map(Number).sort((a, b) => a - b);
+  if (slideNumbers.length === 0) return;
+
+  const lines = ["# 修正方針", ""];
+  slideNumbers.forEach((num) => {
+    const data = suggestionBySlide[num] || {};
+    const example = data.example_text || {};
+
+    lines.push(`## スライド ${num}`, "");
+    lines.push(`**要約:** ${data.summary || ""}`, "");
+
+    lines.push("### 問題点");
+    (data.issues || []).forEach((i) => lines.push(`- ${i}`));
+    lines.push("");
+
+    lines.push("### 修正アクション");
+    (data.actions || []).forEach((a) => lines.push(`- [${actionTypeLabel(a.type)}] ${a.instruction || ""}`));
+    lines.push("");
+
+    lines.push("### 差し替え文案");
+    lines.push(`**タイトル案:** ${example.title || ""}`);
+    lines.push(`**リード文案:** ${example.lead || ""}`);
+    (example.body || []).forEach((b) => lines.push(`- ${b}`));
+    lines.push("");
+
+    lines.push(`**期待される状態:** ${data.expected_outcome || ""}`, "");
+  });
+
+  const markdownContent = lines.join("\n") + "\n";
+  const blob = new Blob([markdownContent], { type: "text/markdown;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "revision_suggestion.md";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
