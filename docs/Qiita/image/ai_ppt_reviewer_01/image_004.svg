@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" font-family="'Hiragino Sans', 'Yu Gothic', 'Segoe UI', sans-serif">
+  <rect x="1" y="1" width="998" height="648" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+
+  <text x="500" y="38" text-anchor="middle" font-size="22" font-weight="700" fill="#1f2933">観点別レビューの処理時間比較</text>
+  <text x="500" y="60" text-anchor="middle" font-size="14" fill="#52606d">直列実行（Before） vs asyncio.gather + asyncio.to_thread による並列実行（After）</text>
+
+  <!-- ===================== Section A: Before (Sequential) ===================== -->
+  <text x="50" y="102" font-size="16" font-weight="700" fill="#1f2933">Before: 観点ごとに直列でAIへ問い合わせ</text>
+
+  <!-- sequential blocks (single lane, back-to-back) -->
+  <g font-size="13" font-weight="600" fill="#ffffff">
+    <rect x="50" y="118" width="120" height="36" fill="#4C72B0"/>
+    <text x="110" y="141" text-anchor="middle">全体</text>
+    <rect x="170" y="118" width="120" height="36" fill="#DD8452"/>
+    <text x="230" y="141" text-anchor="middle">構成</text>
+    <rect x="290" y="118" width="120" height="36" fill="#55A868"/>
+    <text x="350" y="141" text-anchor="middle">計画</text>
+    <rect x="410" y="118" width="120" height="36" fill="#C44E52"/>
+    <text x="470" y="141" text-anchor="middle">課題</text>
+    <rect x="530" y="118" width="120" height="36" fill="#8172B2"/>
+    <text x="590" y="141" text-anchor="middle">優先</text>
+    <rect x="650" y="118" width="120" height="36" fill="#937860"/>
+    <text x="710" y="141" text-anchor="middle">実現</text>
+    <rect x="770" y="118" width="120" height="36" fill="#64B5CD"/>
+    <text x="830" y="141" text-anchor="middle">評価</text>
+  </g>
+
+  <!-- total time bracket for Before -->
+  <line x1="50" y1="168" x2="890" y2="168" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="50" y1="162" x2="50" y2="174" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="890" y1="162" x2="890" y2="174" stroke="#94a3b8" stroke-width="2"/>
+  <text x="470" y="192" text-anchor="middle" font-size="13" fill="#52606d">合計時間 ≈ 観点数(7) × 1回のAI呼び出し時間 → 観点が増えるほど応答が線形に遅くなる</text>
+
+  <!-- code annotation Before -->
+  <rect x="650" y="210" width="300" height="76" rx="8" fill="#0f172a"/>
+  <text x="666" y="232" font-size="11.5" font-family="'Consolas','Menlo',monospace" fill="#e2e8f0">for ptype, pkg in packages:</text>
+  <text x="666" y="250" font-size="11.5" font-family="'Consolas','Menlo',monospace" fill="#e2e8f0">    call_review(pkg)</text>
+  <text x="666" y="268" font-size="11.5" font-family="'Consolas','Menlo',monospace" fill="#f59e0b"># 1件ずつ順番に待つ</text>
+
+  <!-- divider -->
+  <line x1="30" y1="300" x2="970" y2="300" stroke="#e2e8f0" stroke-width="1.5"/>
+
+  <!-- ===================== Section B: After (Parallel) ===================== -->
+  <text x="50" y="330" font-size="16" font-weight="700" fill="#1f2933">After: asyncio.gather + asyncio.to_thread で並列実行</text>
+
+  <!-- dashed line marking "all start / finish together" -->
+  <line x1="170" y1="350" x2="170" y2="620" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4"/>
+
+  <g font-size="13" font-weight="600" fill="#ffffff">
+    <rect x="50" y="350" width="120" height="30" fill="#4C72B0"/>
+    <text x="110" y="370" text-anchor="middle">全体</text>
+    <rect x="50" y="390" width="120" height="30" fill="#DD8452"/>
+    <text x="110" y="410" text-anchor="middle">構成</text>
+    <rect x="50" y="430" width="120" height="30" fill="#55A868"/>
+    <text x="110" y="450" text-anchor="middle">計画</text>
+    <rect x="50" y="470" width="120" height="30" fill="#C44E52"/>
+    <text x="110" y="490" text-anchor="middle">課題</text>
+    <rect x="50" y="510" width="120" height="30" fill="#8172B2"/>
+    <text x="110" y="530" text-anchor="middle">優先</text>
+    <rect x="50" y="550" width="120" height="30" fill="#937860"/>
+    <text x="110" y="570" text-anchor="middle">実現</text>
+    <rect x="50" y="590" width="120" height="30" fill="#64B5CD"/>
+    <text x="110" y="610" text-anchor="middle">評価</text>
+  </g>
+
+  <g font-size="14" font-weight="500">
+    <text x="190" y="370" fill="#4C72B0">全体</text>
+    <text x="190" y="410" fill="#DD8452">構成・表現</text>
+    <text x="190" y="450" fill="#55A868">計画・戦略</text>
+    <text x="190" y="490" fill="#C44E52">課題設定</text>
+    <text x="190" y="530" fill="#8172B2">優先度・差別化</text>
+    <text x="190" y="570" fill="#937860">実現可能性</text>
+    <text x="190" y="610" fill="#64B5CD">評価・検証</text>
+  </g>
+  <text x="190" y="342" font-size="11.5" fill="#94a3b8">← 同時にリクエスト開始（asyncio.to_thread）</text>
+
+  <!-- total time bracket for After (only width of one block) -->
+  <line x1="50" y1="628" x2="170" y2="628" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="50" y1="622" x2="50" y2="634" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="170" y1="622" x2="170" y2="634" stroke="#94a3b8" stroke-width="2"/>
+
+  <!-- code annotation After -->
+  <rect x="650" y="350" width="300" height="112" rx="8" fill="#0f172a"/>
+  <text x="666" y="372" font-size="11.5" font-family="'Consolas','Menlo',monospace" fill="#e2e8f0">await asyncio.gather(</text>
+  <text x="666" y="390" font-size="11.5" font-family="'Consolas','Menlo',monospace" fill="#e2e8f0">  *(asyncio.to_thread(</text>
+  <text x="666" y="408" font-size="11.5" font-family="'Consolas','Menlo',monospace" fill="#e2e8f0">      _review_perspective,</text>
+  <text x="666" y="426" font-size="11.5" font-family="'Consolas','Menlo',monospace" fill="#e2e8f0">      ptype, pkg)</text>
+  <text x="666" y="444" font-size="11.5" font-family="'Consolas','Menlo',monospace" fill="#f59e0b">   for ptype, pkg in packages)</text>
+  <text x="666" y="460" font-size="11.5" font-family="'Consolas','Menlo',monospace" fill="#e2e8f0">)</text>
+
+  <text x="800" y="490" text-anchor="middle" font-size="13" fill="#52606d" font-weight="600">合計時間 ≈ 1回分</text>
+  <text x="800" y="508" text-anchor="middle" font-size="12" fill="#52606d">（最も遅い観点の処理時間）</text>
+</svg>
