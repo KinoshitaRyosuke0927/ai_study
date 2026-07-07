@@ -18,7 +18,7 @@ pip install -r requirements.txt
 ### 2. LibreOffice のインストール（スライド画像化に必要）
 
 **Windows**
-[LibreOffice 公式サイト](https://www.libreoffice.org/download/) からインストーラーをダウンロードして実行します。
+[LibreOffice 公式サイト](https://www.libreoffice.org/download/)あるいは[サイト](https://forest.watch.impress.co.jp/library/software/libreoffice/) からインストーラーをダウンロードして実行します。
 インストール後、`C:\Program Files\LibreOffice\program\soffice.exe` が自動的に検出されます。
 
 ### 3. Poppler のインストール（PDF→画像変換に必要）
