@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import csv
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 
-_CSV_PATH = Path(__file__).parent.parent / "review_point.csv"
+if getattr(sys, "frozen", False):
+    _CSV_PATH = Path(sys.executable).resolve().parent / "review_point.csv"
+else:
+    _CSV_PATH = Path(__file__).parent.parent / "review_point.csv"
 
 
 def _load_review_points() -> dict[str, list[str]]:

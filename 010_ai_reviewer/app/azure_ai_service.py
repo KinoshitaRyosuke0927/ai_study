@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import json
 from typing import Any
 from pathlib import Path
@@ -10,7 +11,11 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI
 
 # 環境変数(.env)を読み込む
-load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+if getattr(sys, "frozen", False):
+    _env_path = Path(sys.executable).resolve().parent / ".env"
+else:
+    _env_path = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(_env_path)
 
 ## Azure OpenAI の接続情報を環境変数から取得
 _raw_endpoint = os.environ["AZURE_OPENAI_ENDPOINT"]

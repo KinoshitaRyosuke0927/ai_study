@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import uvicorn
 import tempfile
 from pathlib import Path
 
@@ -237,3 +238,7 @@ async def suggest_revision(request: SuggestionRequest) -> dict:
     return {
         "slide_suggestions": list(slide_suggestions),
     }
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8000)
