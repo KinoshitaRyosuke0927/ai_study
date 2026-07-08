@@ -1,0 +1,4 @@
+user_id,user_name,mail_address,password,owner_flag
+1,さくらみこ,sakuramiko3535@hol.co.jp,$2b$12$hkm9glUpV5NPIVbgMajYMO5Qn2zEXlZQdOoSiJ7xPqrW5CwrPM5SG,TRUE
+2,白上フブキ,fbkfoxxxxxx@hol.co.jp,$2b$12$5h8YmHsmRiLqciqXOLX04OaVoK14wwCL4DU3/TNGZt4i/sgrAAhna,FALSE
+3,AZKi,azki_vdiva@hol.co.jp,$2b$12$ZAP8C6oPUherwSTFsdzJRuyNKJS4aYjr1MUxlH0UHNNwDPdp94mYm,FALSE

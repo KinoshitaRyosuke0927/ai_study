@@ -1,0 +1,4 @@
+hotel_id,plan_id,area,plan_name,price,room_size,has_breakfast,has_lunch,has_dinner,introduction
+1,1,31,部屋指定なし 格安プラン,4500,1,FALSE,FALSE,FALSE,木のぬくもりを感じる館内で過ごす贅沢な時間。素泊まりプランのためお食事は付きません。
+1,2,31,1泊2日 朝食ビュッフェ付きプラン,12000,2,TRUE,FALSE,FALSE,お部屋タイプは大きな窓が印象的な開放感溢れるスイートルーム。
+1,3,31,絶景！露天風呂&豪華ディナー付きご宿泊プラン,31200,2,TRUE,FALSE,TRUE,和・洋・中の多彩なレストランから選べる夕食と朝食がセットになったホテルの美食を満喫できるプランです。

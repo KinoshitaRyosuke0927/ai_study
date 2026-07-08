@@ -1,4 +1,9 @@
+import os
+
 import pandas as pd
+
+# このファイルの場所を基準にdb_dataディレクトリの絶対パスを組み立てる
+DB_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "db_data")
 
 
 # クラス変数定義
@@ -11,22 +16,22 @@ class TR_DB():
         self.t_reservation: pd.DataFrame = pd.DataFrame()
 
 # クラス変数用意
-db_data = TR_DB()
+db_local = TR_DB()
 
 
 def read_db_data():
     """
     DBのデータに相当するcsvファイルを読み込む
     """
-
     ## m_accommodation_plan
     # csvファイル読み込み
     try:
         df = pd.read_csv(
-            "./db_data/m_accommodation_plan.csv",
+            os.path.join(DB_DATA_DIR, "m_accommodation_plan.csv"),
             dtype={
                 "hotel_id": int,
                 "plan_id": int,
+                "area": str,
                 "plan_name": str,
                 "price": int,
                 "room_size": int,
@@ -45,13 +50,13 @@ def read_db_data():
     if df.empty:
         print("m_accommodation_planのデータが1件も登録されていません")
     else:
-        db_data.m_accommodation_plan = df
+        db_local.m_accommodation_plan = df
 
     ## m_hotel
     # csvファイル読み込み
     try:
         df = pd.read_csv(
-            "./db_data/m_hotel.csv",
+            os.path.join(DB_DATA_DIR, "m_hotel.csv"),
             dtype={
                 "hotel_id": int,
                 "hotel_name": str,
@@ -68,13 +73,13 @@ def read_db_data():
     if df.empty:
         print("m_hotelのデータが1件も登録されていません")
     else:
-        db_data.m_hotel = df
+        db_local.m_hotel = df
 
     ## m_room_capacity
     # csvファイル読み込み
     try:
         df = pd.read_csv(
-            "./db_data/m_room_capacity.csv",
+            os.path.join(DB_DATA_DIR, "m_room_capacity.csv"),
             dtype={
                 "plan_id": int,
                 "capacity": int,
@@ -92,13 +97,13 @@ def read_db_data():
     if df.empty:
         print("m_room_capacityのデータが1件も登録されていません")
     else:
-        db_data.m_room_capacity = df
+        db_local.m_room_capacity = df
 
     ## m_user
     # csvファイル読み込み
     try:
         df = pd.read_csv(
-            "./db_data/m_user.csv",
+            os.path.join(DB_DATA_DIR, "m_user.csv"),
             dtype={
                 "user_id": int,
                 "user_name": str,
@@ -116,13 +121,13 @@ def read_db_data():
     if df.empty:
         print("m_userのデータが1件も登録されていません")
     else:
-        db_data.m_user = df
+        db_local.m_user = df
 
     ## t_reservation
     # csvファイル読み込み
     try:
         df = pd.read_csv(
-            "./db_data/t_reservation.csv",
+            os.path.join(DB_DATA_DIR, "t_reservation.csv"),
             dtype={
                 "user_id": int,
                 "plan_id": str,
@@ -141,16 +146,14 @@ def read_db_data():
     if df.empty:
         print("t_reservationのデータが1件も登録されていません")
     else:
-        db_data.t_reservation = df
+        db_local.t_reservation = df
 
-    ## 読み込んだデータを確認
-    print("m_accommodation_plan :" + str(len(db_data.m_accommodation_plan)) + "件")
-    print("m_hotel :" + str(len(db_data.m_hotel)) + "件")
-    print("m_room_capacity :" + str(len(db_data.m_room_capacity)) + "件")
-    print("m_user :" + str(len(db_data.m_user)) + "件")
-    print("t_reservation :" + str(len(db_data.t_reservation)) + "件")
-
-
-if __name__ == "__main__":
-
-    read_db_data()
+    ## 読み込んだデータを表示
+    print("===========================================================")
+    print("★ 以下のデータが読み込まれました★")
+    print("m_accommodation_plan :" + str(len(db_local.m_accommodation_plan)) + "件")
+    print("m_hotel              :" + str(len(db_local.m_hotel)) + "件")
+    print("m_room_capacity      :" + str(len(db_local.m_room_capacity)) + "件")
+    print("m_user               :" + str(len(db_local.m_user)) + "件")
+    print("t_reservation        :" + str(len(db_local.t_reservation)) + "件")
+    print("===========================================================")
