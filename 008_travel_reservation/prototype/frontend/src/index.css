@@ -30,15 +30,3 @@ body{
 button, input{
   font-family:inherit;
 }
-
-/* ヘッダを固定し、メインコンテンツ部分のみスクロールさせるレイアウト */
-.screen-shell{
-  height:100vh;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-}
-.screen-shell > main{
-  flex:1 1 auto;
-  overflow-y:auto;
-}

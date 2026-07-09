@@ -1,0 +1,21 @@
+/* ヘッダを固定し、メインコンテンツ部分のみスクロールさせるレイアウト */
+.screen-shell{
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.screen-shell > main{
+  flex:1 1 auto;
+  overflow-y:auto;
+}
+.home-body{
+  display:flex;
+  flex-direction:column;
+  background:var(--bg);
+  padding-top:46px;
+  padding-bottom:40px;
+}
+@media (max-width: 980px){
+  .home-body{padding:28px 16px 40px}
+}

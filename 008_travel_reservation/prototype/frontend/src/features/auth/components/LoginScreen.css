@@ -91,16 +91,6 @@ input:focus{border-color:#9ac6e5; box-shadow:0 0 0 4px rgba(154,198,229,.18)}
   transition:.18s ease;
 }
 .button:hover{background:var(--accent-hover)}
-.error-message{
-  margin-bottom:16px;
-  padding:10px 12px;
-  border-radius:8px;
-  background:#fdeeea;
-  border:1px solid #f3c5b8;
-  color:#c9432b;
-  font-size:13px;
-  line-height:1.5;
-}
 
 @media (max-width: 980px){
   .login-layout{grid-template-columns:1fr}

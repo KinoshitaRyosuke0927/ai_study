@@ -45,7 +45,7 @@ def get_detail(plan_id: int) -> GetPlanDetailResponse:
     if df.empty:
         return GetPlanDetailResponse(
             messages=[{
-                "message_id": "E001",
+                "message_id": "msg-E-0002",
                 "message_type": "error",
                 "message": "該当する宿泊プランが見つかりませんでした。",
             }]

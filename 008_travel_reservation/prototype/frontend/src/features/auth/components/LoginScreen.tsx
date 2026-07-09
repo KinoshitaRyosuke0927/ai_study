@@ -1,16 +1,22 @@
 import { useState } from 'react'
 import { login } from '../api/loginApi'
+import ErrorMessage from '../../../common/components/ErrorMessage'
 import './LoginScreen.css'
 
 type LoginScreenProps = {
+  // ログイン成功時に呼び出し元(App)へユーザー名を渡すコールバック。
+  // ログイン後の画面遷移や状態更新はApp側の責務のため、ここでは通知するだけに留めている。
   onLogin: (userName: string) => void
 }
 
+// ログイン画面。左側にキャッチコピー、右側にログインフォームを表示する2カラムレイアウト。
 function LoginScreen({ onLogin }: LoginScreenProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
+  // ログインボタン押下時の処理。
+  // messagesが空でない場合は認証エラーとみなし、先頭のメッセージを画面に表示する。
   async function handleLogin() {
     setErrorMessage('')
     const response = await login(email, password)
@@ -18,6 +24,7 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
       setErrorMessage(response.messages[0].message)
       return
     }
+    // user_nameが未設定になることは想定していないが、型上optionalなため空文字にフォールバックしている。
     onLogin(response.user_name ?? '')
   }
 
@@ -66,7 +73,7 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          {errorMessage && <div className="error-message">{errorMessage}</div>}
+          <ErrorMessage message={errorMessage} />
           <button className="button" onClick={handleLogin}>
             ログイン
           </button>
