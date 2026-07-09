@@ -48,11 +48,47 @@ def select_plan(key_word: str) -> pd.DataFrame:
     # テーブルデータ取得
     df_hotel = db_local.m_hotel.copy()
     df_plan = db_local.m_accommodation_plan.copy()
-    # ホテル名で絞り込み
-    df_hotel = df_hotel[df_hotel["hotel_name"].str.contains(key_word, na=False)]
+    # key_wordが空文字の場合は空のDataFrameを返す
+    if not key_word:
+        return pd.DataFrame(columns=["hotel_id", "hotel_name", "plan_id", "plan_name", "price"])
+
+    # ホテル名で絞り込み(英字の大文字・小文字は区別しない)
+    df_hotel = df_hotel[df_hotel["hotel_name"].str.contains(key_word, case=False, na=False)]
     # 宿泊プランと結合して必要な列のみ抽出
     df = pd.merge(df_hotel, df_plan, on="hotel_id", how="left")[
         ["hotel_id", "hotel_name", "plan_id", "plan_name", "price"]
+    ]
+
+    return df
+
+
+def select_plan_detail(plan_id: int) -> pd.DataFrame:
+    """
+    m_accommodation_planテーブルとm_hotelテーブルからplan_idに一致する宿泊プランの詳細情報を取得する
+
+    Args
+    -----------------
+    - plan_id: int,                 宿泊プランID
+
+    Returns
+    -----------------
+    - df: pd.DataFrame,             取得した宿泊プラン詳細情報(該当なしの場合は空)
+
+    """
+    # テーブルデータ取得
+    df_hotel = db_local.m_hotel.copy()
+    df_plan = db_local.m_accommodation_plan.copy()
+    # plan_idで絞り込み
+    df_plan = df_plan[df_plan["plan_id"] == plan_id]
+    # ホテル情報と結合し、必要な列のみ抽出
+    df = pd.merge(df_plan, df_hotel, on="hotel_id", how="left", suffixes=("", "_hotel")).rename(
+        columns={"address": "hotel_address", "introduction_hotel": "hotel_introduction"}
+    )[
+        [
+            "hotel_id", "hotel_name", "hotel_address", "hotel_introduction",
+            "plan_id", "plan_name", "price", "area", "room_size",
+            "has_breakfast", "has_lunch", "has_dinner", "introduction",
+        ]
     ]
 
     return df

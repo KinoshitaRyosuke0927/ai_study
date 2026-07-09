@@ -1,0 +1,77 @@
+.plan-detail-box{
+  width:600px;
+  margin:0 auto;
+  background:#fff;
+  border-radius:14px;
+  padding:20px 24px 28px;
+  box-shadow:0 8px 20px rgba(120,160,190,.07);
+}
+.back-link{
+  border:none;
+  background:none;
+  padding:0;
+  margin-bottom:14px;
+  color:var(--brand);
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+.back-link:hover{
+  text-decoration:underline;
+}
+.plan-detail-top{
+  padding-bottom:16px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:16px;
+}
+.plan-detail-hotel-name{
+  font-size:18px;
+  font-weight:700;
+  color:var(--text);
+}
+.plan-detail-plan-name{
+  font-size:13px;
+  color:var(--muted);
+  margin-top:6px;
+}
+.plan-detail-price{
+  margin-top:10px;
+  font-size:20px;
+  font-weight:800;
+  color:var(--brand);
+}
+.plan-detail-price span{
+  font-size:12px;
+  font-weight:600;
+  color:var(--muted);
+}
+.plan-detail-section{
+  margin-top:18px;
+}
+.plan-detail-section h4{
+  margin:0 0 10px;
+  color:var(--brand);
+  font-size:14px;
+}
+.plan-detail-row{
+  display:flex;
+  gap:12px;
+  font-size:13px;
+  color:var(--text);
+  padding:6px 0;
+}
+.plan-detail-row .label{
+  width:88px;
+  flex-shrink:0;
+  color:var(--muted);
+  font-weight:600;
+}
+.plan-detail-text{
+  margin:10px 0 0;
+  font-size:13px;
+  line-height:1.7;
+  color:var(--text);
+}
+@media (max-width: 980px){
+  .plan-detail-box{width:100%;max-width:600px}
+}

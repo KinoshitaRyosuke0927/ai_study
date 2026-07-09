@@ -1,85 +1,46 @@
-import { useEffect, useRef, useState } from 'react'
-import { searchPlan, type AccommodationPlan } from '../api/searchPlanApi'
+import type { KeyboardEvent } from 'react'
+import type { AccommodationPlan } from '../api/searchPlanApi'
+import Header, { type Tab } from './Header'
 import './HomeScreen.css'
 
 type HomeScreenProps = {
   userName: string
+  activeTab: Tab
+  onTabChange: (tab: Tab) => void
   onLogout: () => void
+  onSelectPlan: (planId: number) => void
+  keyword: string
+  onKeywordChange: (keyword: string) => void
+  plans: AccommodationPlan[]
+  errorMessage: string
+  hasSearched: boolean
+  onSearch: () => void
 }
 
-type Tab = 'plan' | 'comingSoon'
+function HomeScreen({
+  userName,
+  activeTab,
+  onTabChange,
+  onLogout,
+  onSelectPlan,
+  keyword,
+  onKeywordChange,
+  plans,
+  errorMessage,
+  hasSearched,
+  onSearch,
+}: HomeScreenProps) {
+  const canSearch = keyword.trim() !== ''
 
-function HomeScreen({ userName, onLogout }: HomeScreenProps) {
-  const [keyword, setKeyword] = useState('')
-  const [activeTab, setActiveTab] = useState<Tab>('plan')
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-  const userMenuRef = useRef<HTMLDivElement>(null)
-  const [plans, setPlans] = useState<AccommodationPlan[]>([])
-  const [errorMessage, setErrorMessage] = useState('')
-  const [hasSearched, setHasSearched] = useState(false)
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setIsUserMenuOpen(false)
-      }
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' && canSearch) {
+      onSearch()
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  async function handleSearch() {
-    setErrorMessage('')
-    const response = await searchPlan(keyword)
-    if (response.messages.length > 0) {
-      setErrorMessage(response.messages[0].message)
-      setPlans([])
-      setHasSearched(true)
-      return
-    }
-    setPlans(response.plans)
-    setHasSearched(true)
   }
 
   return (
-    <div>
-      <header className="site-header">
-        <div className="header-top">
-          <div className="brand">AIS Travel</div>
-          <div className="header-right" ref={userMenuRef}>
-            <div className="header-user" onClick={() => setIsUserMenuOpen((open) => !open)}>
-              こんにちは {userName} さん
-            </div>
-            {isUserMenuOpen && (
-              <div className="user-menu">
-                <span
-                  className="user-menu-item"
-                  onClick={() => {
-                    setIsUserMenuOpen(false)
-                    onLogout()
-                  }}
-                >
-                  ログアウト
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="header-nav">
-          <span
-            className={`nav-tab${activeTab === 'plan' ? ' active' : ''}`}
-            onClick={() => setActiveTab('plan')}
-          >
-            宿泊プラン
-          </span>
-          <span
-            className={`nav-tab${activeTab === 'comingSoon' ? ' active' : ''}`}
-            onClick={() => setActiveTab('comingSoon')}
-          >
-            Coming soon...
-          </span>
-        </div>
-      </header>
+    <div className="screen-shell">
+      <Header userName={userName} activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} />
       <main className="home-body">
         {activeTab === 'plan' ? (
           <div className="search-box">
@@ -90,9 +51,10 @@ function HomeScreen({ userName, onLogout }: HomeScreenProps) {
                 type="text"
                 placeholder="ホテル名を入力"
                 value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
+                onChange={(e) => onKeywordChange(e.target.value)}
+                onKeyDown={handleKeyDown}
               />
-              <button className="search-btn" onClick={handleSearch}>
+              <button className="search-btn" onClick={onSearch} disabled={!canSearch}>
                 検索
               </button>
             </div>
@@ -105,7 +67,11 @@ function HomeScreen({ userName, onLogout }: HomeScreenProps) {
               <div className="plan-list-empty">該当する宿泊プランが見つかりませんでした。</div>
             ) : (
               plans.map((plan) => (
-                <div className="plan-card" key={`${plan.hotel_id}-${plan.plan_id}`}>
+                <div
+                  className="plan-card"
+                  key={`${plan.hotel_id}-${plan.plan_id}`}
+                  onClick={() => onSelectPlan(plan.plan_id)}
+                >
                   <div className="plan-card-main">
                     <div className="plan-hotel-name">{plan.hotel_name}</div>
                     <div className="plan-name">{plan.plan_name}</div>

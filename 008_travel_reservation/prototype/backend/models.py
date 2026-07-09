@@ -31,3 +31,25 @@ class SearchPlanRequest(BaseModel):
 class SearchPlanResponse(BaseModel):
     messages: list[dict[str, str]]
     plans: list[AccommodationPlan]
+
+# 宿泊プラン詳細
+class AccommodationPlanDetail(BaseModel):
+    hotel_id: int
+    hotel_name: str
+    hotel_address: str
+    hotel_introduction: str
+    plan_id: int
+    plan_name: str
+    price: int
+    area: str
+    room_size: int
+    has_breakfast: bool
+    has_lunch: bool
+    has_dinner: bool
+    introduction: str
+
+# プラン詳細取得レスポンス
+# ※該当プランが存在しない場合にも返却するためplanは指定せずに返却できるようにしている
+class GetPlanDetailResponse(BaseModel):
+    messages: list[dict[str, str]]
+    plan: Optional[AccommodationPlanDetail]=None

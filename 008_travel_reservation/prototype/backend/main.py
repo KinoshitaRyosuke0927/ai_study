@@ -54,3 +54,12 @@ def search_plan(request: SearchPlanRequest):
     """
     # 宿泊プランの検索結果を返却
     return accommodation_plan_service.search(request.key_word)
+
+
+@app.get("/plan-detail/{plan_id}", response_model=GetPlanDetailResponse)
+def get_plan_detail(plan_id: int):
+    """
+    宿泊プラン詳細情報の取得処理を行う
+    """
+    # 宿泊プランの詳細情報を返却
+    return accommodation_plan_service.get_detail(plan_id)
