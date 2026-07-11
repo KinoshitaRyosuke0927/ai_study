@@ -1,4 +1,5 @@
 from common.constants import AREA_CODE
+from common.error_messages import ErrorMessages
 from models import AccommodationPlan, AccommodationPlanDetail, SearchPlanResponse, GetPlanDetailResponse
 from database import db_access_service
 
@@ -43,13 +44,7 @@ def get_detail(plan_id: int) -> GetPlanDetailResponse:
 
     # 該当するプランが存在しない場合はエラーメッセージを返却
     if df.empty:
-        return GetPlanDetailResponse(
-            messages=[{
-                "message_id": "msg-E-0002",
-                "message_type": "error",
-                "message": "該当する宿泊プランが見つかりませんでした。",
-            }]
-        )
+        return GetPlanDetailResponse(messages=[ErrorMessages.E_0002])
 
     # 取得したデータのエリアコードを実際の地域名称に変換
     record = df.to_dict(orient="records")[0]

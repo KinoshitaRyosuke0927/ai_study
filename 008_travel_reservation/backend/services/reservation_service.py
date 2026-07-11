@@ -3,6 +3,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from common.constants import RESERVATION_STATUS
+from common.error_messages import ErrorMessages
 from models import (
     Reservation, GetReservationsResponse,
     AvailabilityDay, GetPlanAvailabilityResponse,
@@ -60,13 +61,7 @@ def get_plan_availability(plan_id: int) -> GetPlanAvailabilityResponse:
 
     # 該当するプランが存在しない場合はエラーメッセージを返却
     if capacity is None:
-        return GetPlanAvailabilityResponse(
-            messages=[{
-                "message_id": "msg-E-0002",
-                "message_type": "error",
-                "message": "該当する宿泊プランが見つかりませんでした。",
-            }]
-        )
+        return GetPlanAvailabilityResponse(messages=[ErrorMessages.E_0002])
 
     # 日付ごとの有効な予約件数(キャンセルを除く)を取得
     reserved_counts = db_access_service.select_reservation_counts(plan_id)
@@ -103,26 +98,14 @@ def create_reservation(request: CreateReservationRequest) -> CreateReservationRe
 
     # 該当するプランが存在しない場合はエラーメッセージを返却
     if capacity is None:
-        return CreateReservationResponse(
-            messages=[{
-                "message_id": "msg-E-0002",
-                "message_type": "error",
-                "message": "該当する宿泊プランが見つかりませんでした。",
-            }]
-        )
+        return CreateReservationResponse(messages=[ErrorMessages.E_0002])
 
     # 指定日の予約件数が最大部屋数に達している場合はエラーメッセージを返却
     reserved_counts = db_access_service.select_reservation_counts(request.plan_id)
     target_date = pd.Timestamp(request.date_of_stay)
     reserved_count = int(reserved_counts.get(target_date, 0))
     if reserved_count >= capacity:
-        return CreateReservationResponse(
-            messages=[{
-                "message_id": "msg-E-0003",
-                "message_type": "error",
-                "message": "指定された日付は満室のため予約できません。",
-            }]
-        )
+        return CreateReservationResponse(messages=[ErrorMessages.E_0003])
 
     # 予約を登録
     db_access_service.insert_reservation(request.user_id, request.plan_id, target_date)

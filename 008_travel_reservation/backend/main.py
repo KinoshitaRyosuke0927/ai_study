@@ -1,21 +1,11 @@
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from models import *
 from services import accommodation_plan_service, login_service, reservation_service
-from database import db_local_service
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # サーバ起動時にDBデータ(csv)を読み込む
-    db_local_service.read_db_data()
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 # サーバへのアクセスを許可するオリジンを設定
 app.add_middleware(
