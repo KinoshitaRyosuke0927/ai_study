@@ -1,0 +1,41 @@
+/* アプリ全体で使い回す配色・影・角丸をCSS変数として定義。
+   各画面のCSSではこの変数(例: var(--brand))を参照することで、
+   色を変えたいときにここ1箇所を直せば全画面に反映される。 */
+:root{
+  --bg:#f5f5f5;          /* 画面全体の背景色 */
+  --surface:#ffffff;     /* カードやパネルなど前面要素の背景色 */
+  --header:#d9eefb;      /* ヘッダー周りで使う淡い青 */
+  --panel:#eef8ff;       /* タブやサイドメニューなどの淡いパネル背景 */
+  --panel-strong:#e3f2fc;/* 選択中の項目など、少し濃いパネル背景 */
+  --border:#c7dfef;      /* 枠線の色 */
+  --text:#25313c;        /* 基本の文字色 */
+  --muted:#6f8291;       /* 補足文言など目立たせたくない文字色 */
+  --brand:#40c4ff;       /* ブランドカラー(見出し・リンク・アクティブ状態) */
+  --accent:#ffa000;      /* ボタンなど強調したい要素の色 */
+  --accent-hover:#ff8f00;/* accentのホバー時の色 */
+  --shadow:0 10px 28px rgba(76,114,143,.10); /* カードに付ける共通の影 */
+  --radius:16px;         /* カードなどの角丸の基準値 */
+}
+
+/* すべての要素でpadding/borderをwidth/heightに含めるようにし、
+   サイズ計算を直感的にするための設定 */
+*{box-sizing:border-box}
+
+/* 画面全体に高さいっぱいのレイアウトを組めるよう、
+   html/body/Reactのマウント先(#root)すべてに高さ100%を指定 */
+html,body,#root{
+  height:100%;
+}
+
+/* ページ全体の基本スタイル(フォント・背景色・文字色) */
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP",sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
+
+/* ボタン・入力欄がブラウザ標準フォントにならないよう、bodyのフォントを継承させる */
+button, input{
+  font-family:inherit;
+}

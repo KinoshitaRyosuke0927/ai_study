@@ -1,3 +1,4 @@
+/* 全画面共通のヘッダー(Header.tsx)全体の外枠 */
 .site-header{
   background:#fff;
   border-bottom:1px solid var(--border);
@@ -5,18 +6,22 @@
   flex-direction:column;
   padding:14px 18px 0;
 }
+/* ヘッダー左上の「AIS Travel」ロゴ文字 */
 .site-header .brand{font-size:18px}
+/* ロゴ行とユーザーメニュー行を横並びにするコンテナ(.brandと.header-rightの親) */
 .header-top{
   display:flex;
   align-items:flex-start;
   justify-content:space-between;
   margin-bottom:12px;
 }
+/* 「宿泊プラン」「Coming Soon...」タブを並べるナビゲーション行 */
 .header-nav{
   display:flex;
   font-size:13px;
   color:var(--text);
 }
+/* タブ1つ分のスタイル(通常状態) */
 .header-nav .nav-tab{
   padding:10px 20px;
   cursor:pointer;
@@ -27,10 +32,12 @@
 .header-nav .nav-tab:hover{
   background:var(--panel);
 }
+/* 選択中のタブに付く強調スタイル(Header.tsxでactiveTabと一致する場合のみactiveクラスが付与される) */
 .header-nav .nav-tab.active{
   color:var(--brand);
   border-bottom:3px solid var(--brand);
 }
+/* ユーザー名表示とログアウトメニューをまとめる、ヘッダー右側のコンテナ */
 .header-right{
   position:relative;
   display:flex;
@@ -38,6 +45,7 @@
   align-items:flex-end;
   gap:6px;
 }
+/* クリックするとログアウトメニューが開閉する「こんにちは○○さん」表示 */
 .header-user{
   font-size:11px;
   font-weight:700;
@@ -46,6 +54,7 @@
 .header-user:hover{
   color:var(--brand);
 }
+/* ユーザー名クリックで表示されるドロップダウンメニュー(マイページ・ログアウト)の枠 */
 .user-menu{
   position:absolute;
   top:calc(100% + 8px);
@@ -58,6 +67,7 @@
   overflow:hidden;
   z-index:10;
 }
+/* ドロップダウンメニュー内の項目(「マイページ」「ログアウト」)1つ分のスタイル */
 .user-menu-item{
   display:block;
   padding:10px 16px;
@@ -68,6 +78,7 @@
 .user-menu-item:hover{
   background:var(--panel);
 }
+/* スマホなど狭い画面でヘッダーが崩れないようにするレスポンシブ対応 */
 @media (max-width: 980px){
   .header-top{flex-wrap:wrap;gap:10px}
   .header-right{align-items:flex-start}

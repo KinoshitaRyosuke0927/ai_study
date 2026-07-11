@@ -1,17 +1,21 @@
+/* AvailabilityCalendarコンポーネントのルート要素 */
 .availability-calendar{
   width:100%;
 }
+/* 「＜ 2026年7月 ＞」のような、月移動ボタンと月見出しを並べる行 */
 .calendar-header{
   display:flex;
   align-items:center;
   justify-content:space-between;
   margin-bottom:10px;
 }
+/* 「○年○月」の月見出し文字 */
 .calendar-title{
   font-size:13px;
   font-weight:700;
   color:var(--text);
 }
+/* 前月/翌月に移動する「＜」「＞」ボタン */
 .calendar-nav{
   width:26px;
   height:26px;
@@ -25,15 +29,18 @@
 .calendar-nav:hover:not(:disabled){
   background:var(--panel);
 }
+/* 空室状況データの範囲外(移動できない方向)のときに無効化されたボタンの見た目 */
 .calendar-nav:disabled{
   color:#cdd6db;
   cursor:not-allowed;
 }
+/* 曜日ラベル行+日付セルを7列(日〜土)で並べるグリッド */
 .calendar-grid{
   display:grid;
   grid-template-columns:repeat(7, 1fr);
   gap:4px;
 }
+/* 「日」「月」...の曜日ラベル */
 .calendar-weekday{
   text-align:center;
   font-size:11px;
@@ -41,6 +48,7 @@
   font-weight:600;
   padding-bottom:4px;
 }
+/* 日付1マス分のボタンの基本スタイル。空室状況に応じて下記の各状態クラスが付加される */
 .calendar-cell{
   height:32px;
   border:none;
@@ -48,12 +56,15 @@
   font-size:12px;
   background:transparent;
 }
+/* 月初の曜日合わせ用の空セル(日付を表示しない) */
 .calendar-cell.empty{
   visibility:hidden;
 }
+/* 空室状況データの範囲外の日付(取得期間より先・過去など判定不能な日) */
 .calendar-cell.unknown{
   color:#cdd6db;
 }
+/* 予約可能な日付のスタイル */
 .calendar-cell.available{
   background:var(--panel-strong);
   color:var(--brand);
@@ -64,15 +75,18 @@
   background:var(--brand);
   color:#fff;
 }
+/* 満室で予約できない日付のスタイル(打ち消し線付き) */
 .calendar-cell.unavailable{
   color:#cdd6db;
   text-decoration:line-through;
   cursor:not-allowed;
 }
+/* ユーザーが選択中の日付のスタイル */
 .calendar-cell.selected{
   background:var(--brand);
   color:#fff;
 }
+/* カレンダー下部の「予約可」「満室」の凡例を並べる行 */
 .calendar-legend{
   display:flex;
   gap:14px;
@@ -80,21 +94,25 @@
   font-size:11px;
   color:var(--muted);
 }
+/* 凡例1項目分(色見本+ラベル文字)のまとまり */
 .legend-item{
   display:flex;
   align-items:center;
   gap:6px;
 }
+/* 凡例の色見本(小さい四角) */
 .legend-swatch{
   width:10px;
   height:10px;
   border-radius:3px;
   display:inline-block;
 }
+/* 「予約可」の色見本 */
 .legend-swatch.available{
   background:var(--panel-strong);
   border:1px solid var(--brand);
 }
+/* 「満室」の色見本 */
 .legend-swatch.unavailable{
   background:#f1f3f4;
   border:1px solid #cdd6db;

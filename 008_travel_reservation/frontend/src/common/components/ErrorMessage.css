@@ -1,3 +1,4 @@
+/* ErrorMessageコンポーネントが表示する赤系のエラーメッセージ枠のスタイル */
 .error-message{
   margin:12px 0;
   padding:10px 12px;

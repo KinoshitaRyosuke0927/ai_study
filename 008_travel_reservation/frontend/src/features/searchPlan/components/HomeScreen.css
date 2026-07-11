@@ -1,3 +1,4 @@
+/* キーワード検索フォーム全体を囲むカード */
 .search-box{
   width:470px;
   margin:0 auto;
@@ -6,6 +7,7 @@
   padding:16px;
   box-shadow:0 8px 20px rgba(120,160,190,.07);
 }
+/* 「キーワードから探す」の見出し */
 .search-box h3{
   margin:0 0 6px;
   color:var(--brand);
@@ -16,12 +18,14 @@
   color:var(--muted);
   margin-bottom:12px;
 }
+/* 検索入力欄と検索ボタンを横並びにする行 */
 .search-row{
   display:grid;
   grid-template-columns:1fr auto;
   gap:16px;
   align-items:center;
 }
+/* ホテル名を入力するテキストボックス */
 .search-input{
   height:38px;
   border:1px solid #b8d3e7;
@@ -34,6 +38,7 @@
 .search-input::placeholder{
   color:#8a99a6;
 }
+/* 「検索」ボタン */
 .search-btn{
   height:38px;
   padding:0 24px;
@@ -46,11 +51,13 @@
   cursor:pointer;
 }
 .search-btn:hover{background:var(--accent-hover)}
+/* キーワード未入力時など、検索ボタンを押せない状態のスタイル */
 .search-btn:disabled{
   background:#cdd6db;
   cursor:not-allowed;
 }
 .search-btn:disabled:hover{background:#cdd6db}
+/* 検索結果のプランカードを縦に並べるコンテナ */
 .plan-list{
   width:470px;
   margin:20px auto 0;
@@ -58,12 +65,14 @@
   flex-direction:column;
   gap:12px;
 }
+/* 検索結果が0件のときに表示するメッセージ */
 .plan-list-empty{
   text-align:center;
   color:var(--muted);
   font-size:13px;
   padding:20px 0;
 }
+/* 宿泊プラン1件分のカード。クリックするとプラン詳細画面へ遷移する */
 .plan-card{
   display:flex;
   align-items:center;
@@ -79,22 +88,26 @@
   box-shadow:0 10px 24px rgba(120,160,190,.14);
   transform:translateY(-1px);
 }
+/* プランカード内のホテル名 */
 .plan-hotel-name{
   font-size:14px;
   font-weight:700;
   color:var(--text);
 }
+/* プランカード内のプラン名 */
 .plan-name{
   font-size:12px;
   color:var(--muted);
   margin-top:4px;
 }
+/* プランカード右端の価格表示 */
 .plan-price{
   font-size:15px;
   font-weight:800;
   color:var(--brand);
   white-space:nowrap;
 }
+/* 「Coming Soon...」タブ選択時に表示するプレースホルダー */
 .under-construction{
   flex:1 1 auto;
   display:flex;
@@ -104,6 +117,7 @@
   font-size:18px;
   font-weight:700;
 }
+/* スマホなど狭い画面での幅・レイアウト調整 */
 @media (max-width: 980px){
   .search-box{width:100%;max-width:470px}
   .plan-list{width:100%;max-width:470px}
