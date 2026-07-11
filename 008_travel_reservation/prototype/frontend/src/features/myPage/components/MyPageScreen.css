@@ -1,0 +1,111 @@
+.mypage-layout{
+  display:flex;
+  width:100%;
+  /* サイドメニュー幅は据え置きのまま、コンテンツ側の横幅を20%広げるため全体のmax-widthを拡大している */
+  max-width:1040px;
+  margin:0 auto;
+  gap:24px;
+}
+.mypage-sidebar{
+  width:180px;
+  flex:0 0 auto;
+  display:flex;
+  flex-direction:column;
+  background:#fff;
+  border-radius:14px;
+  padding:10px;
+  box-shadow:0 8px 20px rgba(120,160,190,.07);
+  height:fit-content;
+}
+.mypage-sidebar-item{
+  padding:12px 14px;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:600;
+  color:var(--text);
+  cursor:pointer;
+}
+.mypage-sidebar-item:hover{
+  background:var(--panel);
+}
+.mypage-sidebar-item.active{
+  background:var(--panel-strong);
+  color:var(--brand);
+}
+.mypage-content{
+  flex:1 1 auto;
+  min-width:0;
+}
+.mypage-panel{
+  background:#fff;
+  border-radius:14px;
+  padding:16px;
+  box-shadow:0 8px 20px rgba(120,160,190,.07);
+  min-height:200px;
+}
+.mypage-panel h3{
+  margin:0 0 6px;
+  color:var(--brand);
+  font-size:16px;
+}
+.reservation-list-empty{
+  text-align:center;
+  color:var(--muted);
+  font-size:13px;
+  padding:20px 0;
+}
+.reservation-cards{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  margin-top:12px;
+}
+.reservation-card{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:var(--panel);
+  border-radius:12px;
+  padding:14px 18px;
+}
+.reservation-hotel-name{
+  font-size:14px;
+  font-weight:700;
+  color:var(--text);
+}
+.reservation-plan-name{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:4px;
+}
+.reservation-date{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:4px;
+}
+.reservation-card-side{
+  text-align:right;
+}
+.reservation-price{
+  font-size:15px;
+  font-weight:800;
+  color:var(--brand);
+  white-space:nowrap;
+}
+.reservation-status{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:4px;
+}
+.mypage-coming-soon{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--muted);
+  font-size:18px;
+  font-weight:700;
+}
+@media (max-width: 980px){
+  .mypage-layout{flex-direction:column}
+  .mypage-sidebar{width:100%;flex-direction:row;overflow-x:auto}
+}

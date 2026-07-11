@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from models import *
-from services import accommodation_plan_service, login_service
+from services import accommodation_plan_service, login_service, reservation_service
 from database import db_local_service
 
 
@@ -63,3 +63,30 @@ def get_plan_detail(plan_id: int):
     """
     # 宿泊プランの詳細情報を返却
     return accommodation_plan_service.get_detail(plan_id)
+
+
+@app.get("/reservations/{user_id}", response_model=GetReservationsResponse)
+def get_reservations(user_id: int):
+    """
+    ユーザの予約一覧情報の取得処理を行う
+    """
+    # 該当ユーザの予約一覧情報を返却
+    return reservation_service.get_reservations(user_id)
+
+
+@app.get("/plan-availability/{plan_id}", response_model=GetPlanAvailabilityResponse)
+def get_plan_availability(plan_id: int):
+    """
+    宿泊プランの空室状況の取得処理を行う
+    """
+    # 宿泊プランの空室状況を返却
+    return reservation_service.get_plan_availability(plan_id)
+
+
+@app.post("/reservations", response_model=CreateReservationResponse)
+def create_reservation(request: CreateReservationRequest):
+    """
+    宿泊プランの予約登録処理を行う
+    """
+    # 予約登録結果を返却
+    return reservation_service.create_reservation(request)

@@ -7,13 +7,15 @@ export type Tab = 'plan' | 'comingSoon'
 
 type HeaderProps = {
   userName: string
-  activeTab: Tab
+  // マイページ表示中など、どのタブも選択されていない状態を表すためnullを許容する。
+  activeTab: Tab | null
   onTabChange: (tab: Tab) => void
   onLogout: () => void
+  onOpenMyPage: () => void
 }
 
 // 全画面共通で表示するヘッダー。ユーザー名表示・ログアウトメニュー・タブ切り替えを担当する。
-function Header({ userName, activeTab, onTabChange, onLogout }: HeaderProps) {
+function Header({ userName, activeTab, onTabChange, onLogout, onOpenMyPage }: HeaderProps) {
   // ユーザー名クリックで開くログアウトメニューの開閉状態。
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   // メニュー外側のクリックを検知するために、メニュー領域のDOMを参照しておく。
@@ -45,6 +47,16 @@ function Header({ userName, activeTab, onTabChange, onLogout }: HeaderProps) {
               <span
                 className="user-menu-item"
                 onClick={() => {
+                  // メニューを閉じてからマイページへ遷移する。
+                  setIsUserMenuOpen(false)
+                  onOpenMyPage()
+                }}
+              >
+                マイページ
+              </span>
+              <span
+                className="user-menu-item"
+                onClick={() => {
                   // メニューを閉じてからログアウト処理を呼ぶ。
                   // 先にonLogoutで画面が切り替わるとこのDOMごと消えるため、開閉状態のリセットを先に行う。
                   setIsUserMenuOpen(false)
@@ -69,7 +81,7 @@ function Header({ userName, activeTab, onTabChange, onLogout }: HeaderProps) {
           className={`nav-tab${activeTab === 'comingSoon' ? ' active' : ''}`}
           onClick={() => onTabChange('comingSoon')}
         >
-          Coming soon...
+          Coming Soon...
         </span>
       </div>
     </header>

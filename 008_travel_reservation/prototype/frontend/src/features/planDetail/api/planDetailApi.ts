@@ -1,4 +1,4 @@
-import { getJson } from '../../../common/api/client'
+import { getJson, postJson } from '../../../common/api/client'
 import type { ApiMessage } from '../../../common/api/types'
 
 // プラン詳細画面で表示する宿泊プランの詳細情報。
@@ -28,4 +28,34 @@ export type GetPlanDetailResponse = {
 // プランIDを指定して詳細情報を取得するAPIを呼び出す。
 export function getPlanDetail(planId: number): Promise<GetPlanDetailResponse> {
   return getJson(`/plan-detail/${planId}`)
+}
+
+// 1日分の空室状況(その日に予約可能かどうか)。
+export type AvailabilityDay = {
+  date_of_stay: string
+  is_available: boolean
+}
+
+export type GetPlanAvailabilityResponse = {
+  messages: ApiMessage[]
+  capacity: number
+  availability: AvailabilityDay[]
+}
+
+// プランIDを指定して、当日以降の空室状況を取得するAPIを呼び出す。
+export function getPlanAvailability(planId: number): Promise<GetPlanAvailabilityResponse> {
+  return getJson(`/plan-availability/${planId}`)
+}
+
+export type CreateReservationResponse = {
+  messages: ApiMessage[]
+}
+
+// ユーザID・プランID・宿泊日を指定して予約を登録するAPIを呼び出す。
+export function createReservation(
+  userId: number,
+  planId: number,
+  dateOfStay: string
+): Promise<CreateReservationResponse> {
+  return postJson('/reservations', { user_id: userId, plan_id: planId, date_of_stay: dateOfStay })
 }

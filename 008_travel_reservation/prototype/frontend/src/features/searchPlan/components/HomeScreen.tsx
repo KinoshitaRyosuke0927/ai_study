@@ -88,7 +88,7 @@ function HomeScreen({
         </div>
       )}
       {/* 未実装機能用のタブ。プレースホルダーとして固定メッセージのみ表示する */}
-      {activeTab === 'comingSoon' && <div className="under-construction">Coming soon...</div>}
+      {activeTab === 'comingSoon' && <div className="under-construction">Coming Soon...</div>}
     </ScreenLayout>
   )
 }

@@ -5,7 +5,8 @@ import type { Tab } from '../components/Header'
 // 画面ごとにこの4つを個別に定義すると変更時に修正漏れが起きやすいため、型として共通化している。
 export type HeaderNavProps = {
   userName: string
-  activeTab: Tab
+  activeTab: Tab | null
   onTabChange: (tab: Tab) => void
   onLogout: () => void
+  onOpenMyPage: () => void
 }

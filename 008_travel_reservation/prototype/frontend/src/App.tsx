@@ -2,16 +2,18 @@ import { useState } from 'react'
 import LoginScreen from './features/auth/components/LoginScreen'
 import HomeScreen from './features/searchPlan/components/HomeScreen'
 import PlanDetailScreen from './features/planDetail/components/PlanDetailScreen'
+import MyPageScreen from './features/myPage/components/MyPageScreen'
 import type { Tab } from './common/components/Header'
 import { searchPlan, type AccommodationPlan } from './features/searchPlan/api/searchPlanApi'
 
 // このアプリはReact Routerなどのルーティングライブラリを使わず、
 // 「今どの画面を表示しているか」をstateで管理する簡易的なSPA構成になっている。
-type Screen = 'login' | 'home' | 'planDetail'
+type Screen = 'login' | 'home' | 'planDetail' | 'myPage'
 
 function App() {
   // 画面遷移用のstate。ログイン→ホーム→プラン詳細という遷移をこのstateの切り替えで表現する。
   const [screen, setScreen] = useState<Screen>('login')
+  const [userId, setUserId] = useState<number | null>(null)
   const [userName, setUserName] = useState('')
   const [activeTab, setActiveTab] = useState<Tab>('plan')
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null)
@@ -40,6 +42,11 @@ function App() {
     setScreen('home')
   }
 
+  // ヘッダーのユーザーメニューから呼ばれる、マイページへの遷移処理。
+  function handleOpenMyPage() {
+    setScreen('myPage')
+  }
+
   // 宿泊プラン検索APIを呼び出す処理。
   // バックエンドはエラー時も200 OKでmessagesにエラー内容を返す設計のため、
   // messagesが空かどうかで成功/失敗を判定している(HTTPステータスでは判定できない)。
@@ -58,13 +65,28 @@ function App() {
 
   // 以下は画面のstateに応じて表示するコンポーネントを切り替える単純な条件分岐。
   // プラン詳細画面はselectedPlanIdが確定していないと表示できないため、両方の条件を確認する。
-  if (screen === 'planDetail' && selectedPlanId !== null) {
+  if (screen === 'myPage' && userId !== null) {
+    return (
+      <MyPageScreen
+        userName={userName}
+        activeTab={null}
+        onTabChange={handleTabChange}
+        onLogout={handleLogout}
+        onOpenMyPage={handleOpenMyPage}
+        userId={userId}
+      />
+    )
+  }
+
+  if (screen === 'planDetail' && selectedPlanId !== null && userId !== null) {
     return (
       <PlanDetailScreen
         userName={userName}
         activeTab={activeTab}
         onTabChange={handleTabChange}
         onLogout={handleLogout}
+        onOpenMyPage={handleOpenMyPage}
+        userId={userId}
         planId={selectedPlanId}
         onBack={() => setScreen('home')}
       />
@@ -78,6 +100,7 @@ function App() {
         activeTab={activeTab}
         onTabChange={handleTabChange}
         onLogout={handleLogout}
+        onOpenMyPage={handleOpenMyPage}
         onSelectPlan={(planId) => {
           // 一覧でプランが選択されたら、そのIDを覚えつつ詳細画面へ遷移する。
           setSelectedPlanId(planId)
@@ -95,8 +118,9 @@ function App() {
   // 上記いずれの条件にも当てはまらない場合(初期状態)はログイン画面を表示する。
   return (
     <LoginScreen
-      onLogin={(name) => {
-        // ログイン成功時はユーザー名を保持し、必ず「宿泊プラン」タブのホーム画面から開始させる。
+      onLogin={(id, name) => {
+        // ログイン成功時はユーザーID・ユーザー名を保持し、必ず「宿泊プラン」タブのホーム画面から開始させる。
+        setUserId(id)
         setUserName(name)
         setActiveTab('plan')
         setScreen('home')

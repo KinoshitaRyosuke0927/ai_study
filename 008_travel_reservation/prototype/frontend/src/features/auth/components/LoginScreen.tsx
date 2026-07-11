@@ -4,9 +4,9 @@ import ErrorMessage from '../../../common/components/ErrorMessage'
 import './LoginScreen.css'
 
 type LoginScreenProps = {
-  // ログイン成功時に呼び出し元(App)へユーザー名を渡すコールバック。
+  // ログイン成功時に呼び出し元(App)へユーザーID・ユーザー名を渡すコールバック。
   // ログイン後の画面遷移や状態更新はApp側の責務のため、ここでは通知するだけに留めている。
-  onLogin: (userName: string) => void
+  onLogin: (userId: number, userName: string) => void
 }
 
 // ログイン画面。左側にキャッチコピー、右側にログインフォームを表示する2カラムレイアウト。
@@ -14,6 +14,8 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  // パスワードを平文表示するかどうかの切り替え状態。
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
 
   // ログインボタン押下時の処理。
   // messagesが空でない場合は認証エラーとみなし、先頭のメッセージを画面に表示する。
@@ -24,8 +26,8 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
       setErrorMessage(response.messages[0].message)
       return
     }
-    // user_nameが未設定になることは想定していないが、型上optionalなため空文字にフォールバックしている。
-    onLogin(response.user_name ?? '')
+    // user_id/user_nameが未設定になることは想定していないが、型上optionalなためフォールバックしている。
+    onLogin(response.user_id ?? 0, response.user_name ?? '')
   }
 
   return (
@@ -65,13 +67,34 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
             <label className="label" htmlFor="password">
               パスワード
             </label>
-            <input
-              id="password"
-              type="password"
-              placeholder="パスワードを入力"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <div className="password-field-wrap">
+              <input
+                id="password"
+                className="password-input"
+                type={isPasswordVisible ? 'text' : 'password'}
+                placeholder="パスワードを入力"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setIsPasswordVisible((visible) => !visible)}
+                aria-label={isPasswordVisible ? 'パスワードを隠す' : 'パスワードを表示'}
+              >
+                {isPasswordVisible ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a20.3 20.3 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
           <ErrorMessage message={errorMessage} />
           <button className="button" onClick={handleLogin}>

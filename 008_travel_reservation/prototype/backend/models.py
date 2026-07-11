@@ -53,3 +53,40 @@ class AccommodationPlanDetail(BaseModel):
 class GetPlanDetailResponse(BaseModel):
     messages: list[dict[str, str]]
     plan: Optional[AccommodationPlanDetail]=None
+
+# 予約情報(宿泊プラン詳細に予約日・予約状況を加えたもの)
+class Reservation(BaseModel):
+    hotel_id: int
+    hotel_name: str
+    plan_id: int
+    plan_name: str
+    price: int
+    date_of_stay: str
+    status: str
+
+# 予約一覧取得レスポンス
+class GetReservationsResponse(BaseModel):
+    messages: list[dict[str, str]]
+    reservations: list[Reservation]
+
+# 空室状況(1日分)
+class AvailabilityDay(BaseModel):
+    date_of_stay: str
+    is_available: bool
+
+# プランの空室状況取得レスポンス
+# ※該当プランが存在しない場合にも返却するためcapacity・availabilityは空で返却できるようにしている
+class GetPlanAvailabilityResponse(BaseModel):
+    messages: list[dict[str, str]]
+    capacity: int=0
+    availability: list[AvailabilityDay]=[]
+
+# 予約登録リクエスト
+class CreateReservationRequest(BaseModel):
+    user_id: int
+    plan_id: int
+    date_of_stay: str
+
+# 予約登録レスポンス
+class CreateReservationResponse(BaseModel):
+    messages: list[dict[str, str]]
