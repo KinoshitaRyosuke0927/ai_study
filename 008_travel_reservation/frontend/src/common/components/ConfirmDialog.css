@@ -1,0 +1,56 @@
+/* 画面全体を覆う半透明のオーバーレイ */
+.confirm-dialog-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(37,49,60,.4);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:200;
+}
+/* ダイアログ本体 */
+.confirm-dialog{
+  width:100%;
+  max-width:340px;
+  background:#fff;
+  border-radius:14px;
+  padding:24px;
+  box-shadow:0 16px 40px rgba(0,0,0,.25);
+}
+.confirm-dialog-message{
+  margin:0 0 20px;
+  color:var(--text, #25313c);
+  font-size:14px;
+  line-height:1.7;
+}
+/* 「キャンセル」「OK」ボタンを右寄せで横並びにする */
+.confirm-dialog-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+}
+.confirm-dialog-cancel,
+.confirm-dialog-ok{
+  height:38px;
+  padding:0 22px;
+  border-radius:8px;
+  font-weight:700;
+  font-size:13px;
+  cursor:pointer;
+}
+.confirm-dialog-cancel{
+  border:1px solid var(--border, #c7dfef);
+  background:#fff;
+  color:var(--muted, #6f8291);
+}
+.confirm-dialog-cancel:hover{
+  background:var(--panel, #eef8ff);
+}
+.confirm-dialog-ok{
+  border:none;
+  background:#c9432b;
+  color:#fff;
+}
+.confirm-dialog-ok:hover{
+  background:#b53a24;
+}

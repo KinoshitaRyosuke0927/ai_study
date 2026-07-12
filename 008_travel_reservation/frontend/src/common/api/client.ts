@@ -23,3 +23,17 @@ export function postJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   })
 }
+
+// PUTリクエスト用のヘルパー。
+export function putJson<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+// DELETEリクエスト用のヘルパー。
+export function deleteJson<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' })
+}

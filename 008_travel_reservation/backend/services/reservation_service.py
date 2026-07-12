@@ -3,7 +3,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from common.constants import RESERVATION_STATUS
-from common.error_messages import ErrorMessages
+from common.messages import ErrorMessages
 from models import (
     Reservation, GetReservationsResponse,
     AvailabilityDay, GetPlanAvailabilityResponse,

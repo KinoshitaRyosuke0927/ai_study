@@ -1,5 +1,5 @@
-import { getJson, postJson } from '../../../common/api/client'
-import type { ApiMessage } from '../../../common/api/types'
+import { getJson, postJson } from '../../../../common/api/client'
+import type { ApiMessage } from '../../../../common/api/types'
 
 // プラン詳細画面で表示する宿泊プランの詳細情報。
 // 検索結果一覧(AccommodationPlan)より項目が多く、ホテルの住所・紹介文や食事条件などを含む。

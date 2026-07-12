@@ -1,6 +1,6 @@
 /* プラン詳細画面全体を囲むカード */
 .plan-detail-box{
-  width:720px;
+  width:60%;
   margin:0 auto;
   background:#fff;
   border-radius:14px;
@@ -99,11 +99,12 @@
 }
 /* カレンダー右側の「選択中の日付」表示と予約ボタンをまとめるエリア */
 .reservation-action{
-  width:160px;
+  width:220px;
   flex:0 0 auto;
   display:flex;
   flex-direction:column;
   align-items:center;
+  justify-content:flex-start;
   gap:10px;
   padding-top:6px;
 }
@@ -139,7 +140,7 @@
 }
 /* スマホなど狭い画面では、カレンダーと予約操作パネルを縦に並べる */
 @media (max-width: 980px){
-  .plan-detail-box{width:100%;max-width:720px}
+  .plan-detail-box{width:100%}
   .availability-box{flex-direction:column}
   .reservation-action{width:100%}
 }

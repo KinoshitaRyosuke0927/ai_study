@@ -1,6 +1,6 @@
 /* キーワード検索フォーム全体を囲むカード */
 .search-box{
-  width:470px;
+  width:30%;
   margin:0 auto;
   background:#fff;
   border-radius:14px;
@@ -59,7 +59,7 @@
 .search-btn:disabled:hover{background:#cdd6db}
 /* 検索結果のプランカードを縦に並べるコンテナ */
 .plan-list{
-  width:470px;
+  width:30%;
   margin:20px auto 0;
   display:flex;
   flex-direction:column;
@@ -119,7 +119,7 @@
 }
 /* スマホなど狭い画面での幅・レイアウト調整 */
 @media (max-width: 980px){
-  .search-box{width:100%;max-width:470px}
-  .plan-list{width:100%;max-width:470px}
+  .search-box{width:100%}
+  .plan-list{width:100%}
   .search-row{grid-template-columns:1fr}
 }

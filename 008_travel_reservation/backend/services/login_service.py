@@ -1,6 +1,6 @@
 import bcrypt
 
-from common.error_messages import ErrorMessages
+from common.messages import ErrorMessages
 from models import LoginResponse
 from database import db_access_service
 

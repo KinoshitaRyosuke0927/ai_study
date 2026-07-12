@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import ScreenLayout from '../../../common/components/ScreenLayout'
-import ErrorMessage from '../../../common/components/ErrorMessage'
-import type { HeaderNavProps } from '../../../common/types/navigation'
+import ScreenLayout from '../../../../common/components/ScreenLayout'
+import ErrorMessage from '../../../../common/components/ErrorMessage'
+import type { HeaderNavProps } from '../../../../common/types/navigation'
 import { getReservations, type Reservation } from '../api/reservationApi'
 import './MyPageScreen.css'
 

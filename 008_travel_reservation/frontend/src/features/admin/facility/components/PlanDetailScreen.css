@@ -1,0 +1,6 @@
+/* 宿泊プラン詳細画面全体を囲むエリア */
+.plan-detail-screen{
+  width:75%;
+  margin:0 auto;
+  padding:24px 0 40px;
+}

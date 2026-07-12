@@ -6,10 +6,11 @@ import {
   type AccommodationPlanDetail,
   type AvailabilityDay,
 } from '../api/planDetailApi'
-import ScreenLayout from '../../../common/components/ScreenLayout'
-import ErrorMessage from '../../../common/components/ErrorMessage'
+import ScreenLayout from '../../../../common/components/ScreenLayout'
+import ErrorMessage from '../../../../common/components/ErrorMessage'
+import ConfirmDialog from '../../../../common/components/ConfirmDialog'
 import AvailabilityCalendar from './AvailabilityCalendar'
-import type { HeaderNavProps } from '../../../common/types/navigation'
+import type { HeaderNavProps } from '../../../../common/types/navigation'
 import './PlanDetailScreen.css'
 
 type PlanDetailScreenProps = HeaderNavProps & {
@@ -30,6 +31,8 @@ function PlanDetailScreen({ userId, planId, onBack, ...headerProps }: PlanDetail
   const [reservationMessage, setReservationMessage] = useState('')
   // 予約完了のたびにこの値を更新し、空室状況の再取得をトリガーする。
   const [availabilityVersion, setAvailabilityVersion] = useState(0)
+  // 予約確認ダイアログの表示状態。
+  const [isConfirmingReservation, setIsConfirmingReservation] = useState(false)
 
   // planIdが変わるたびに詳細情報を再取得する。
   // cancelledフラグは、取得中にplanIdが変わって古いリクエストの結果が後から返ってきた場合に、
@@ -79,9 +82,16 @@ function PlanDetailScreen({ userId, planId, onBack, ...headerProps }: PlanDetail
     setReservationMessage('')
   }
 
-  // 予約ボタン押下時の処理。
-  async function handleReserve() {
+  // 予約ボタン押下時の処理。確認ダイアログを表示し、実際の予約登録は確認後に行う。
+  function handleReserve() {
     if (!selectedDate) return
+    setIsConfirmingReservation(true)
+  }
+
+  // 確認ダイアログでOKが押されたときの処理。
+  async function handleConfirmReserve() {
+    if (!selectedDate) return
+    setIsConfirmingReservation(false)
     setIsReserving(true)
     setReservationError('')
     setReservationMessage('')
@@ -135,8 +145,8 @@ function PlanDetailScreen({ userId, planId, onBack, ...headerProps }: PlanDetail
                 <span>{plan.area}</span>
               </div>
               <div className="plan-detail-row">
-                <span className="label">部屋数</span>
-                <span>{plan.room_size}室</span>
+                <span className="label">部屋の広さ</span>
+                <span>{plan.room_size}㎡</span>
               </div>
               <div className="plan-detail-row">
                 <span className="label">食事</span>
@@ -172,6 +182,13 @@ function PlanDetailScreen({ userId, planId, onBack, ...headerProps }: PlanDetail
           </>
         )}
       </div>
+      {isConfirmingReservation && selectedDate && (
+        <ConfirmDialog
+          message={`${selectedDate} で予約します。よろしいですか?`}
+          onCancel={() => setIsConfirmingReservation(false)}
+          onConfirm={handleConfirmReserve}
+        />
+      )}
     </ScreenLayout>
   )
 }

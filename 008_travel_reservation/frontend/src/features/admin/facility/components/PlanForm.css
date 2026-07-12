@@ -1,0 +1,99 @@
+/* プラン新規登録・編集フォーム全体を囲むカード */
+.plan-form{
+  background:#fbfbfb;
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:16px 20px;
+  margin-top:12px;
+}
+/* ラベル+入力欄の1行分 */
+.plan-form-row{
+  display:flex;
+  align-items:flex-start;
+  gap:16px;
+  margin-bottom:12px;
+}
+.plan-form-row:last-of-type{
+  margin-bottom:0;
+}
+.plan-form-label{
+  width:140px;
+  flex-shrink:0;
+  padding-top:8px;
+  font-size:13px;
+  font-weight:600;
+  color:var(--muted);
+}
+/* 必須項目を示す赤い* */
+.required-mark{
+  color:#c9432b;
+  margin-left:2px;
+}
+.plan-form-row input[type="text"],
+.plan-form-row input[type="number"],
+.plan-form-row select,
+.plan-form-row textarea{
+  flex:1 1 auto;
+  min-width:0;
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:8px 12px;
+  font-size:13px;
+  color:var(--text);
+  background:#fff;
+}
+.plan-form-row textarea{
+  resize:vertical;
+}
+/* 朝食・昼食・夕食のチェックボックスを横並びにする */
+.plan-form-checkboxes{
+  display:flex;
+  gap:16px;
+  padding-top:8px;
+  font-size:13px;
+  color:var(--text);
+}
+/* テキスト部分をクリックしても反応しないよう、labelではなくspanで組んでいる。
+   クリック判定はinput(チェックボックス本体)のみに限定する。 */
+.plan-form-checkbox-item{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.plan-form-checkboxes input{
+  width:auto;
+  cursor:pointer;
+}
+/* 「キャンセル」「保存」ボタンを右寄せにするエリア */
+.plan-form-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:16px;
+}
+.plan-form-cancel,
+.plan-form-submit{
+  height:36px;
+  padding:0 20px;
+  border-radius:8px;
+  font-weight:700;
+  font-size:13px;
+  cursor:pointer;
+}
+.plan-form-cancel{
+  border:1px solid var(--border);
+  background:#fff;
+  color:var(--muted);
+}
+.plan-form-cancel:hover:not(:disabled){
+  background:var(--panel);
+}
+.plan-form-submit{
+  border:none;
+  background:var(--admin-main, #111111);
+  color:#fff;
+}
+.plan-form-submit:disabled{
+  background:#cdd6db;
+  cursor:not-allowed;
+}

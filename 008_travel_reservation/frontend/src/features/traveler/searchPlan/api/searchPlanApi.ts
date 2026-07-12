@@ -1,5 +1,5 @@
-import { postJson } from '../../../common/api/client'
-import type { ApiMessage } from '../../../common/api/types'
+import { postJson } from '../../../../common/api/client'
+import type { ApiMessage } from '../../../../common/api/types'
 
 // 検索結果として表示する宿泊プランの情報。
 // 一覧表示に必要な最小限の項目のみを持ち、詳細情報はplanDetailApi側で別途取得する。

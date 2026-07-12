@@ -35,7 +35,7 @@ def select_user(mail_address: str) -> pd.DataFrame:
 
 
 ############################################################
-## 宿泊プラン検索
+## 旅行者向け:宿泊プラン検索
 ############################################################
 def select_plan(key_word: str) -> pd.DataFrame:
     """
@@ -164,7 +164,7 @@ def insert_reservation(user_id: int, plan_id: int, date_of_stay: pd.Timestamp) -
 
 
 ############################################################
-## マイページ
+## 旅行者向け:マイページ
 ############################################################
 def select_reservations(user_id: int) -> pd.DataFrame:
     """
@@ -190,3 +190,252 @@ def select_reservations(user_id: int) -> pd.DataFrame:
     df = pd.read_sql(sql, get_engine(), params={"user_id": user_id}, parse_dates=["date_of_stay"])
 
     return df
+
+
+############################################################
+## 管理者向け:ホテル管理
+############################################################
+def select_hotels_by_owner(owner_user_id: int) -> pd.DataFrame:
+    """
+    m_hotelテーブルから、指定オーナーが所有する施設の一覧を取得する
+
+    Args
+    -----------------
+    - owner_user_id: int,           施設オーナーのユーザID
+
+    Returns
+    -----------------
+    - df: pd.DataFrame,             取得した施設一覧(該当なしの場合は空)
+
+    """
+    sql = text(
+        "SELECT hotel_id, hotel_name, address "
+        "FROM m_hotel WHERE owner_user_id = :owner_user_id"
+    )
+    df = pd.read_sql(sql, get_engine(), params={"owner_user_id": owner_user_id})
+
+    return df
+
+
+def select_hotel(hotel_id: int) -> pd.DataFrame:
+    """
+    m_hotelテーブルからhotel_idに一致する施設の基本情報を取得する
+
+    Args
+    -----------------
+    - hotel_id: int,                施設ID
+
+    Returns
+    -----------------
+    - df: pd.DataFrame,             取得した施設情報(該当なしの場合は空)
+
+    """
+    sql = text(
+        "SELECT hotel_id, hotel_name, address, introduction "
+        "FROM m_hotel WHERE hotel_id = :hotel_id"
+    )
+    df = pd.read_sql(sql, get_engine(), params={"hotel_id": hotel_id})
+
+    return df
+
+
+def select_plans_by_hotel(hotel_id: int) -> pd.DataFrame:
+    """
+    m_accommodation_planテーブルからhotel_idに一致する宿泊プランの一覧を取得する
+
+    Args
+    -----------------
+    - hotel_id: int,                施設ID
+
+    Returns
+    -----------------
+    - df: pd.DataFrame,             取得した宿泊プラン一覧(該当なしの場合は空)
+
+    """
+    sql = text(
+        "SELECT plan_id, plan_name, price, area, room_size, capacity, "
+        "       has_breakfast, has_lunch, has_dinner, introduction "
+        "FROM m_accommodation_plan WHERE hotel_id = :hotel_id"
+    )
+    df = pd.read_sql(sql, get_engine(), params={"hotel_id": hotel_id})
+    if not df.empty:
+        df = df.astype({"has_breakfast": bool, "has_lunch": bool, "has_dinner": bool})
+
+    return df
+
+
+def insert_hotel(owner_user_id: int, hotel_name: str, address: str, introduction: str) -> int:
+    """
+    m_hotelテーブルに新しい施設を1件追加する
+
+    Args
+    -----------------
+    - owner_user_id: int,           施設オーナーのユーザID
+    - hotel_name: str,              施設名称
+    - address: str,                 住所
+    - introduction: str,            紹介文
+
+    Returns
+    -----------------
+    - hotel_id: int,                採番された施設ID
+
+    """
+    sql = text(
+        "INSERT INTO m_hotel (owner_user_id, hotel_name, address, introduction) "
+        "VALUES (:owner_user_id, :hotel_name, :address, :introduction)"
+    )
+    with get_engine().begin() as conn:
+        result = conn.execute(
+            sql,
+            {"owner_user_id": owner_user_id, "hotel_name": hotel_name, "address": address, "introduction": introduction},
+        )
+        return result.lastrowid
+
+
+def update_hotel(hotel_id: int, hotel_name: str, address: str, introduction: str) -> None:
+    """
+    m_hotelテーブルの施設の基本情報(名称・住所・紹介文)を更新する
+
+    Args
+    -----------------
+    - hotel_id: int,                更新対象の施設ID
+    - hotel_name: str,              施設名称
+    - address: str,                 住所
+    - introduction: str,            紹介文
+
+    """
+    sql = text(
+        "UPDATE m_hotel SET hotel_name = :hotel_name, address = :address, introduction = :introduction "
+        "WHERE hotel_id = :hotel_id"
+    )
+    with get_engine().begin() as conn:
+        conn.execute(
+            sql,
+            {"hotel_id": hotel_id, "hotel_name": hotel_name, "address": address, "introduction": introduction},
+        )
+
+
+def insert_plan(
+    hotel_id: int,
+    plan_name: str,
+    price: int,
+    area: str,
+    room_size: int,
+    capacity: int,
+    has_breakfast: bool,
+    has_lunch: bool,
+    has_dinner: bool,
+    introduction: str,
+) -> int:
+    """
+    m_accommodation_planテーブルに新しい宿泊プランを1件追加する
+
+    Args
+    -----------------
+    - hotel_id: int,                プランを追加する施設ID
+    - plan_name: str,               プラン名
+    - price: int,                   価格
+    - area: str,                    エリアコード
+    - room_size: int,               部屋の広さ
+    - capacity: int,                1日あたりの最大予約可能室数
+    - has_breakfast: bool,          朝食有無
+    - has_lunch: bool,              昼食有無
+    - has_dinner: bool,             夕食有無
+    - introduction: str,            プラン紹介文
+
+    Returns
+    -----------------
+    - plan_id: int,                 採番された宿泊プランID
+
+    """
+    sql = text(
+        "INSERT INTO m_accommodation_plan "
+        "(hotel_id, plan_name, price, area, room_size, capacity, has_breakfast, has_lunch, has_dinner, introduction) "
+        "VALUES (:hotel_id, :plan_name, :price, :area, :room_size, :capacity, :has_breakfast, :has_lunch, :has_dinner, :introduction)"
+    )
+    with get_engine().begin() as conn:
+        result = conn.execute(
+            sql,
+            {
+                "hotel_id": hotel_id,
+                "plan_name": plan_name,
+                "price": price,
+                "area": area,
+                "room_size": room_size,
+                "capacity": capacity,
+                "has_breakfast": has_breakfast,
+                "has_lunch": has_lunch,
+                "has_dinner": has_dinner,
+                "introduction": introduction,
+            },
+        )
+        return result.lastrowid
+
+
+def update_plan(
+    plan_id: int,
+    plan_name: str,
+    price: int,
+    area: str,
+    room_size: int,
+    capacity: int,
+    has_breakfast: bool,
+    has_lunch: bool,
+    has_dinner: bool,
+    introduction: str,
+) -> None:
+    """
+    m_accommodation_planテーブルの既存の宿泊プランを更新する
+
+    Args
+    -----------------
+    - plan_id: int,                 更新対象の宿泊プランID
+    - plan_name: str,               プラン名
+    - price: int,                   価格
+    - area: str,                    エリアコード
+    - room_size: int,               部屋の広さ
+    - capacity: int,                1日あたりの最大予約可能室数
+    - has_breakfast: bool,          朝食有無
+    - has_lunch: bool,              昼食有無
+    - has_dinner: bool,             夕食有無
+    - introduction: str,            プラン紹介文
+
+    """
+    sql = text(
+        "UPDATE m_accommodation_plan SET "
+        "plan_name = :plan_name, price = :price, area = :area, room_size = :room_size, capacity = :capacity, "
+        "has_breakfast = :has_breakfast, has_lunch = :has_lunch, has_dinner = :has_dinner, introduction = :introduction "
+        "WHERE plan_id = :plan_id"
+    )
+    with get_engine().begin() as conn:
+        conn.execute(
+            sql,
+            {
+                "plan_id": plan_id,
+                "plan_name": plan_name,
+                "price": price,
+                "area": area,
+                "room_size": room_size,
+                "capacity": capacity,
+                "has_breakfast": has_breakfast,
+                "has_lunch": has_lunch,
+                "has_dinner": has_dinner,
+                "introduction": introduction,
+            },
+        )
+
+
+def delete_plan(plan_id: int) -> None:
+    """
+    m_accommodation_planテーブルから宿泊プランを1件削除する
+
+    予約(t_reservation)が紐づいている場合は外部キー制約によりIntegrityErrorが送出される。
+
+    Args
+    -----------------
+    - plan_id: int,                 削除対象の宿泊プランID
+
+    """
+    sql = text("DELETE FROM m_accommodation_plan WHERE plan_id = :plan_id")
+    with get_engine().begin() as conn:
+        conn.execute(sql, {"plan_id": plan_id})

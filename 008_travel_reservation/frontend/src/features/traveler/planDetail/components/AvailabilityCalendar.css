@@ -1,6 +1,9 @@
-/* AvailabilityCalendarコンポーネントのルート要素 */
+/* AvailabilityCalendarコンポーネントのルート要素。
+   親要素の横幅に合わせて際限なく広がると、日付セルが間延びしたり
+   右側の予約ボタンが改行されてしまうため、最大幅を設けている。 */
 .availability-calendar{
   width:100%;
+  max-width:320px;
 }
 /* 「＜ 2026年7月 ＞」のような、月移動ボタンと月見出しを並べる行 */
 .calendar-header{

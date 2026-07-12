@@ -1,0 +1,60 @@
+/* 複数のトーストを右上に縦積みで表示するコンテナ */
+.toast-stack{
+  position:fixed;
+  top:24px;
+  right:24px;
+  z-index:100;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+/* 画面右上に表示するポップアップ通知。時間経過では消えず、×ボタン押下でのみ消える */
+.toast{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  width:360px;
+  background:#fff;
+  color:var(--text, #25313c);
+  border-radius:10px;
+  border-left:4px solid transparent;
+  padding:14px 16px;
+  box-shadow:0 12px 28px rgba(0,0,0,.16);
+  animation:toast-in .18s ease;
+}
+/* 正常終了時(info)。左端のラインのみで種別を表す */
+.toast-info{
+  border-left-color:#25313c;
+}
+/* エラー時(error) */
+.toast-error{
+  border-left-color:#c9432b;
+}
+@keyframes toast-in{
+  from{opacity:0; transform:translateY(-8px)}
+  to{opacity:1; transform:translateY(0)}
+}
+.toast-message{
+  flex:1 1 auto;
+  min-width:0;
+  font-size:13px;
+  line-height:1.6;
+}
+/* ×ボタン。トースト本文の長さによらず、常に右端に固定する */
+.toast-close{
+  flex-shrink:0;
+  margin-left:auto;
+  border:none;
+  background:none;
+  padding:0;
+  width:20px;
+  height:20px;
+  color:var(--muted, #6f8291);
+  font-size:18px;
+  line-height:1;
+  cursor:pointer;
+  opacity:.8;
+}
+.toast-close:hover{
+  opacity:1;
+}

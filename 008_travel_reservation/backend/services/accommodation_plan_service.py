@@ -1,5 +1,5 @@
 from common.constants import AREA_CODE
-from common.error_messages import ErrorMessages
+from common.messages import ErrorMessages
 from models import AccommodationPlan, AccommodationPlanDetail, SearchPlanResponse, GetPlanDetailResponse
 from database import db_access_service
 

@@ -1,5 +1,5 @@
-import { getJson } from '../../../common/api/client'
-import type { ApiMessage } from '../../../common/api/types'
+import { getJson } from '../../../../common/api/client'
+import type { ApiMessage } from '../../../../common/api/types'
 
 // マイページの予約確認で表示する、宿泊プラン詳細を含んだ予約情報。
 export type Reservation = {
