@@ -1,0 +1,34 @@
+/* 管理者向け画面共通のサイドメニュー(サブカラー=濃いめのグレー)。
+   普段は画面外にスライドして最小化しておき、親の.admin-side-menu-zoneがhoverされたら表示する */
+.admin-side-menu{
+  position:absolute;
+  top:0;
+  left:0;
+  bottom:0;
+  width:200px;
+  display:flex;
+  flex-direction:column;
+  padding:20px 0;
+  background:var(--admin-sub);
+  box-shadow:2px 0 12px rgba(0,0,0,.25);
+  transform:translateX(-190px);
+  transition:transform .2s ease;
+}
+.admin-side-menu-zone:hover .admin-side-menu{
+  transform:translateX(0);
+}
+/* サイドメニュー項目1つ分のスタイル */
+.admin-side-menu-item{
+  color:#fff;
+  font-weight:600;
+  font-size:14px;
+  padding:12px 24px;
+  cursor:pointer;
+}
+.admin-side-menu-item:hover{
+  background:rgba(255,255,255,.08);
+}
+/* 選択中の項目に付く強調スタイル */
+.admin-side-menu-item.active{
+  background:rgba(255,255,255,.16);
+}

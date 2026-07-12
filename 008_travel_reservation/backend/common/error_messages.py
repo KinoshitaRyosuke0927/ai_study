@@ -18,3 +18,8 @@ class ErrorMessages:
         "message_type": "error",
         "message": "指定された日付は満室のため予約できません。",
     }
+    E_0004 = {
+        "message_id": "msg-E-0004",
+        "message_type": "error",
+        "message": "施設登録の申請をした方のみがログインできます。",
+    }

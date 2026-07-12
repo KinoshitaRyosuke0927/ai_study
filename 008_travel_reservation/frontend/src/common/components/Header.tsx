@@ -12,10 +12,22 @@ type HeaderProps = {
   onTabChange: (tab: Tab) => void
   onLogout: () => void
   onOpenMyPage: () => void
+  onLogoClick: () => void
+  isOwner: boolean
+  onSwitchToAdmin: () => void
 }
 
 // 全画面共通で表示するヘッダー。ユーザー名表示・ログアウトメニュー・タブ切り替えを担当する。
-function Header({ userName, activeTab, onTabChange, onLogout, onOpenMyPage }: HeaderProps) {
+function Header({
+  userName,
+  activeTab,
+  onTabChange,
+  onLogout,
+  onOpenMyPage,
+  onLogoClick,
+  isOwner,
+  onSwitchToAdmin,
+}: HeaderProps) {
   // ユーザー名クリックで開くログアウトメニューの開閉状態。
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   // メニュー外側のクリックを検知するために、メニュー領域のDOMを参照しておく。
@@ -37,7 +49,9 @@ function Header({ userName, activeTab, onTabChange, onLogout, onOpenMyPage }: He
   return (
     <header className="site-header">
       <div className="header-top">
-        <div className="brand">AIS Travel</div>
+        <div className="brand brand-clickable" onClick={onLogoClick}>
+          AIS Travel
+        </div>
         <div className="header-right" ref={userMenuRef}>
           <div className="header-user" onClick={() => setIsUserMenuOpen((open) => !open)}>
             こんにちは {userName} さん
@@ -54,6 +68,18 @@ function Header({ userName, activeTab, onTabChange, onLogout, onOpenMyPage }: He
               >
                 マイページ
               </span>
+              {/* owner_flagを持つユーザのみ、管理者向け画面への切り替えメニューを表示する */}
+              {isOwner && (
+                <span
+                  className="user-menu-item"
+                  onClick={() => {
+                    setIsUserMenuOpen(false)
+                    onSwitchToAdmin()
+                  }}
+                >
+                  管理者サイトに切替
+                </span>
+              )}
               <span
                 className="user-menu-item"
                 onClick={() => {

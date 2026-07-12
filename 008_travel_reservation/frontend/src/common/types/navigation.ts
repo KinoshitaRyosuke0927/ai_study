@@ -9,4 +9,8 @@ export type HeaderNavProps = {
   onTabChange: (tab: Tab) => void
   onLogout: () => void
   onOpenMyPage: () => void
+  onLogoClick: () => void
+  // owner_flagを持つユーザ(施設管理者)かどうか。trueの場合のみ「管理者サイトに切替」メニューを表示する。
+  isOwner: boolean
+  onSwitchToAdmin: () => void
 }

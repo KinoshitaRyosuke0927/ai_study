@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { login } from '../api/loginApi'
 import ErrorMessage from '../../../common/components/ErrorMessage'
 import './LoginScreen.css'
 
 type LoginScreenProps = {
-  // ログイン成功時に呼び出し元(App)へユーザーID・ユーザー名を渡すコールバック。
+  // ログイン成功時に呼び出し元(App)へユーザーID・ユーザー名・管理者向けログインモードだったか・
+  // owner_flagを持つユーザかどうかを渡すコールバック。
   // ログイン後の画面遷移や状態更新はApp側の責務のため、ここでは通知するだけに留めている。
-  onLogin: (userId: number, userName: string) => void
+  onLogin: (userId: number, userName: string, isAdmin: boolean, isOwner: boolean) => void
 }
 
 // ログイン画面。左側にキャッチコピー、右側にログインフォームを表示する2カラムレイアウト。
@@ -16,22 +17,46 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
   const [errorMessage, setErrorMessage] = useState('')
   // パスワードを平文表示するかどうかの切り替え状態。
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
+  // 管理者向けログインモードかどうか。trueのときはメインカラーが黒に変わる。
+  // 管理者モードでのログイン処理自体は未実装で、モード切り替えの表示のみを行う。
+  const [isAdminMode, setIsAdminMode] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
 
   // ログインボタン押下時の処理。
   // messagesが空でない場合は認証エラーとみなし、先頭のメッセージを画面に表示する。
   async function handleLogin() {
     setErrorMessage('')
-    const response = await login(email, password)
+    const response = await login(email, password, isAdminMode)
     if (response.messages.length > 0) {
       setErrorMessage(response.messages[0].message)
       return
     }
     // user_id/user_nameが未設定になることは想定していないが、型上optionalなためフォールバックしている。
-    onLogin(response.user_id ?? 0, response.user_name ?? '')
+    onLogin(response.user_id ?? 0, response.user_name ?? '', isAdminMode, response.is_owner ?? false)
   }
 
+  // フォームのEnterキー送信(submit)でもログインボタン押下と同じ処理を実行する。
+  // preventDefaultをしないとページがリロードされてしまう。
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    handleLogin()
+  }
+
+  // 入力欄にフォーカスが無い状態でEnterを押した場合も、ログインボタン押下と同じ処理を実行する。
+  // フォーム内(入力欄・ボタン)にフォーカスがある場合はform側のsubmitイベントで既に処理されるため、
+  // ここで二重にhandleLoginを呼ばないようフォーカス位置を判定してスキップする。
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Enter') return
+      if (formRef.current?.contains(document.activeElement)) return
+      handleLogin()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  })
+
   return (
-    <div className="login-layout">
+    <div className={`login-layout${isAdminMode ? ' login-layout--admin' : ''}`}>
       <div className="login-visual">
         <div>
           <div className="brand">AIS Travel</div>
@@ -50,7 +75,20 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
 
       <div className="login-panel-wrap">
         <div className="login-panel">
-          <h2>ログイン</h2>
+          <div className="login-panel-header">
+            <h2>ログイン</h2>
+            <a
+              href="#"
+              className="mode-toggle-link"
+              onClick={(e) => {
+                e.preventDefault()
+                setIsAdminMode((admin) => !admin)
+              }}
+            >
+              {isAdminMode ? '旅行者の方はこちら' : '施設管理者の方はこちら'}
+            </a>
+          </div>
+          <form ref={formRef} onSubmit={handleSubmit}>
           <div className="field">
             <label className="label" htmlFor="email">
               メールアドレス
@@ -97,9 +135,10 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
             </div>
           </div>
           <ErrorMessage message={errorMessage} />
-          <button className="button" onClick={handleLogin}>
+          <button className="button" type="submit">
             ログイン
           </button>
+          </form>
         </div>
       </div>
     </div>

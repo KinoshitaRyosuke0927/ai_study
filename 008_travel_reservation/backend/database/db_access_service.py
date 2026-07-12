@@ -24,7 +24,7 @@ def select_user(mail_address: str) -> pd.DataFrame:
 
     """
     sql = text(
-        "SELECT user_id, user_name, mail_address, password "
+        "SELECT user_id, user_name, mail_address, password, owner_flag "
         "FROM m_user WHERE mail_address = :mail_address"
     )
     df = pd.read_sql(sql, get_engine(), params={"mail_address": mail_address})

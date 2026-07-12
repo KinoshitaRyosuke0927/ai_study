@@ -7,6 +7,8 @@ from pydantic import BaseModel
 class LoginRequest(BaseModel):
     mail_address: str
     password: str
+    # 施設管理者向けログインモードからのリクエストかどうか(Trueの場合owner_flagがONのユーザのみログイン可能)
+    is_admin: bool = False
 
 # ログインレスポンス
 # ※ログインに失敗した場合にも返却するためuser_id, user_nameは指定せずに返却できるようにしている
@@ -14,6 +16,8 @@ class LoginResponse(BaseModel):
     messages: list[dict[str, str]]
     user_id: Optional[int]=None
     user_name: Optional[str]=""
+    # 施設管理者権限(owner_flag)を持つユーザかどうか
+    is_owner: bool=False
 
 # 宿泊プラン
 class AccommodationPlan(BaseModel):

@@ -1,0 +1,52 @@
+/* 管理者向け画面共通のヘッダー(メインカラー=黒) */
+.admin-header{
+  background:var(--admin-main);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 24px;
+  height:56px;
+  flex:0 0 auto;
+}
+.admin-brand{
+  font-size:22px;
+  font-weight:800;
+}
+.admin-brand-clickable{
+  cursor:pointer;
+}
+/* ユーザー名表示とログアウトメニューをまとめる、ヘッダー右側のコンテナ */
+.admin-header-right{
+  position:relative;
+}
+/* クリックするとメニューが開閉する「○○ 様」表示 */
+.admin-header-user{
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+}
+/* ユーザー名クリックで表示されるドロップダウンメニューの枠 */
+.admin-user-menu{
+  position:absolute;
+  top:calc(100% + 8px);
+  right:0;
+  min-width:140px;
+  background:#fff;
+  border-radius:8px;
+  box-shadow:0 8px 20px rgba(0,0,0,.25);
+  overflow:hidden;
+  z-index:30;
+}
+/* ドロップダウンメニュー内の項目1つ分のスタイル */
+.admin-user-menu-item{
+  display:block;
+  padding:10px 16px;
+  font-size:12px;
+  color:var(--text);
+  white-space:nowrap;
+  cursor:pointer;
+}
+.admin-user-menu-item:hover{
+  background:var(--panel);
+}

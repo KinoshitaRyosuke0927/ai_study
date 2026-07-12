@@ -1,0 +1,40 @@
+/* 管理者向け画面共通の配色。メインカラー=黒、サブカラー=濃いめのグレー */
+.admin-shell{
+  --admin-main:#000000;
+  --admin-sub:#3f3f3f;
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+/* サイドメニューとメインコンテンツの領域。サイドメニューは画面左端に重ねて表示するため
+   position:relativeにして、絶対配置する.admin-side-menu-zoneの基準にする */
+.admin-body{
+  position:relative;
+  display:flex;
+  flex:1 1 auto;
+  overflow:hidden;
+}
+/* サイドメニューの当たり判定領域。普段はこの幅(=最小化時に見える帯の幅)のみ表示され、
+   ここにマウスが近づく(hoverする)とサイドメニュー本体がスライドして表示される */
+.admin-side-menu-zone{
+  position:absolute;
+  top:0;
+  left:0;
+  bottom:0;
+  width:10px;
+  z-index:20;
+}
+.admin-side-menu-zone:hover{
+  width:200px;
+}
+/* メインコンテンツエリア(背景色は旅行者向け画面と同じ薄いグレー)。
+   サイドメニューは重ねて表示するため、最小化時の帯の幅ぶんだけ左に余白を確保する */
+.admin-content{
+  flex:1 1 auto;
+  display:flex;
+  flex-direction:column;
+  overflow-y:auto;
+  background:var(--bg);
+  margin-left:10px;
+}

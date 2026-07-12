@@ -8,6 +8,7 @@
 }
 /* ヘッダー左上の「AIS Travel」ロゴ文字 */
 .site-header .brand{font-size:18px}
+.site-header .brand-clickable{cursor:pointer}
 /* ロゴ行とユーザーメニュー行を横並びにするコンテナ(.brandと.header-rightの親) */
 .header-top{
   display:flex;
@@ -59,7 +60,7 @@
   position:absolute;
   top:calc(100% + 8px);
   right:0;
-  min-width:120px;
+  min-width:max-content;
   background:#fff;
   border:1px solid var(--border);
   border-radius:8px;
@@ -67,12 +68,13 @@
   overflow:hidden;
   z-index:10;
 }
-/* ドロップダウンメニュー内の項目(「マイページ」「ログアウト」)1つ分のスタイル */
+/* ドロップダウンメニュー内の項目(「マイページ」「管理者サイトに切替」「ログアウト」)1つ分のスタイル */
 .user-menu-item{
   display:block;
   padding:10px 16px;
   font-size:12px;
   color:var(--text);
+  white-space:nowrap;
   cursor:pointer;
 }
 .user-menu-item:hover{

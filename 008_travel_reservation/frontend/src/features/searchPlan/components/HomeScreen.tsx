@@ -47,7 +47,7 @@ function HomeScreen({
       {/* 「宿泊プラン」タブのときだけ検索フォームを表示する */}
       {activeTab === 'plan' ? (
         <div className="search-box">
-          <h3>キーワードから探す</h3>
+          <h3>ホテル名から探す</h3>
           <div className="search-row">
             <input
               className="search-input"

@@ -17,6 +17,10 @@ user_df = pd.DataFrame(
     index=[0],
 ).astype({"user_id": int, "user_name": str, "mail_address": str, "password": bytes, "owner_flag": bool})
 
+# owner_flagがOFFのユーザ(施設管理者権限なし)のテーブルデータ
+non_owner_df = user_df.copy()
+non_owner_df.loc[:, "owner_flag"] = False
+
 
 # 正常系
 # 正常にログインできること
@@ -29,7 +33,7 @@ def test_login_OK_01(mock):
     password = "mikomiko"
 
     ## 期待値
-    expected_res = LoginResponse(messages=[], user_id=1, user_name="さくらみこ")
+    expected_res = LoginResponse(messages=[], user_id=1, user_name="さくらみこ", is_owner=True)
 
     ## テスト処理
     result_res = login_service.login(mail_address, password)
@@ -53,6 +57,45 @@ def test_login_NG_01(mock):
 
     ## テスト処理
     result_res = login_service.login(mail_address, password)
+
+    assert expected_res == result_res
+
+
+# 正常系
+# owner_flagがONのユーザは施設管理者向けログインモードでもログインできること
+@patch("database.db_access_service.select_user", return_value=user_df)
+def test_login_OK_02(mock):
+    ## テストデータ用意
+    # メールアドレス
+    mail_address = "sakuramiko3535@hol.co.jp"
+    # パスワード
+    password = "mikomiko"
+
+    ## 期待値
+    expected_res = LoginResponse(messages=[], user_id=1, user_name="さくらみこ", is_owner=True)
+
+    ## テスト処理
+    result_res = login_service.login(mail_address, password, is_admin=True)
+
+    assert expected_res == result_res
+
+
+# 異常系
+# owner_flagがOFFのユーザは施設管理者向けログインモードではログインできないこと
+@patch("database.db_access_service.select_user", return_value=non_owner_df)
+def test_login_NG_03(mock):
+    ## テストデータ用意
+    # メールアドレス
+    mail_address = "sakuramiko3535@hol.co.jp"
+    # パスワード
+    password = "mikomiko"
+
+    ## 期待値
+    error_dict = {"message_id": "msg-E-0004", "message_type": "error", "message": "このアカウントには施設管理者の権限がありません。"}
+    expected_res = LoginResponse(messages=[error_dict])
+
+    ## テスト処理
+    result_res = login_service.login(mail_address, password, is_admin=True)
 
     assert expected_res == result_res
 

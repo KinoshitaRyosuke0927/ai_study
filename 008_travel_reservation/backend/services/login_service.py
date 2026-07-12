@@ -5,7 +5,7 @@ from models import LoginResponse
 from database import db_access_service
 
 
-def login(mail_address: str, password: str) -> LoginResponse:
+def login(mail_address: str, password: str, is_admin: bool = False) -> LoginResponse:
     """
     メールアドレスとパスワードでログインを行う
 
@@ -13,6 +13,7 @@ def login(mail_address: str, password: str) -> LoginResponse:
     -----------------
     - mail_address: str,        メールアドレス
     - password: str,            パスワード
+    - is_admin: bool,           施設管理者向けログインモードからのリクエストかどうか
 
     Returns
     -----------------
@@ -27,11 +28,18 @@ def login(mail_address: str, password: str) -> LoginResponse:
         return LoginResponse(messages=[ErrorMessages.E_0001])
     # 対象のユーザ情報が存在する場合
     else:
-        # パスワードが正しいか確認
-        if bcrypt.checkpw(password.encode("utf-8"), df["password"].values[0]):
-            # レスポンス返却
-            return LoginResponse(messages=[], user_id=df["user_id"].values[0], user_name=df["user_name"].values[0])
         # パスワードが誤っている場合
-        else:
+        if not bcrypt.checkpw(password.encode("utf-8"), df["password"].values[0]):
             # レスポンス返却
             return LoginResponse(messages=[ErrorMessages.E_0001])
+        # 施設管理者向けログインモードで、かつowner_flagがONでない場合
+        if is_admin and not bool(df["owner_flag"].values[0]):
+            # レスポンス返却
+            return LoginResponse(messages=[ErrorMessages.E_0004])
+        # レスポンス返却
+        return LoginResponse(
+            messages=[],
+            user_id=df["user_id"].values[0],
+            user_name=df["user_name"].values[0],
+            is_owner=bool(df["owner_flag"].values[0]),
+        )

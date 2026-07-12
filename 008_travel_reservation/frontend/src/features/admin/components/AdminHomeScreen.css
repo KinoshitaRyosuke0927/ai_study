@@ -1,0 +1,9 @@
+/* メインコンテンツ未実装のあいだ表示するプレースホルダー */
+.admin-under-construction{
+  flex:1 1 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--muted);
+  font-size:18px;
+}

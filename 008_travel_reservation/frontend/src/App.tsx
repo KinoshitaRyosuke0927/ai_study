@@ -3,18 +3,22 @@ import LoginScreen from './features/auth/components/LoginScreen'
 import HomeScreen from './features/searchPlan/components/HomeScreen'
 import PlanDetailScreen from './features/planDetail/components/PlanDetailScreen'
 import MyPageScreen from './features/myPage/components/MyPageScreen'
+import AdminHomeScreen from './features/admin/components/AdminHomeScreen'
 import type { Tab } from './common/components/Header'
 import { searchPlan, type AccommodationPlan } from './features/searchPlan/api/searchPlanApi'
 
 // このアプリはReact Routerなどのルーティングライブラリを使わず、
 // 「今どの画面を表示しているか」をstateで管理する簡易的なSPA構成になっている。
-type Screen = 'login' | 'home' | 'planDetail' | 'myPage'
+type Screen = 'login' | 'home' | 'planDetail' | 'myPage' | 'adminHome'
 
 function App() {
   // 画面遷移用のstate。ログイン→ホーム→プラン詳細という遷移をこのstateの切り替えで表現する。
   const [screen, setScreen] = useState<Screen>('login')
   const [userId, setUserId] = useState<number | null>(null)
   const [userName, setUserName] = useState('')
+  // owner_flagを持つユーザ(施設管理者)としてログインしているかどうか。
+  // trueの場合のみ旅行者向けヘッダーに「管理者サイトに切替」メニューを表示する。
+  const [isOwner, setIsOwner] = useState(false)
   const [activeTab, setActiveTab] = useState<Tab>('plan')
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null)
 
@@ -47,6 +51,22 @@ function App() {
     setScreen('myPage')
   }
 
+  // ヘッダーのユーザーメニューから呼ばれる、管理者向けホーム画面への遷移処理。
+  function handleSwitchToAdmin() {
+    setScreen('adminHome')
+  }
+
+  // ヘッダー左上のロゴクリック時の処理。ログイン直後と同じ「宿泊プラン」タブのホーム画面に戻し、
+  // 検索キーワード・検索結果などの状態もログイン直後の状態にリセットする。
+  function handleLogoClick() {
+    setActiveTab('plan')
+    setScreen('home')
+    setKeyword('')
+    setPlans([])
+    setErrorMessage('')
+    setHasSearched(false)
+  }
+
   // 宿泊プラン検索APIを呼び出す処理。
   // バックエンドはエラー時も200 OKでmessagesにエラー内容を返す設計のため、
   // messagesが空かどうかで成功/失敗を判定している(HTTPステータスでは判定できない)。
@@ -73,6 +93,9 @@ function App() {
         onTabChange={handleTabChange}
         onLogout={handleLogout}
         onOpenMyPage={handleOpenMyPage}
+        onLogoClick={handleLogoClick}
+        isOwner={isOwner}
+        onSwitchToAdmin={handleSwitchToAdmin}
         userId={userId}
       />
     )
@@ -86,6 +109,9 @@ function App() {
         onTabChange={handleTabChange}
         onLogout={handleLogout}
         onOpenMyPage={handleOpenMyPage}
+        onLogoClick={handleLogoClick}
+        isOwner={isOwner}
+        onSwitchToAdmin={handleSwitchToAdmin}
         userId={userId}
         planId={selectedPlanId}
         onBack={() => setScreen('home')}
@@ -101,6 +127,9 @@ function App() {
         onTabChange={handleTabChange}
         onLogout={handleLogout}
         onOpenMyPage={handleOpenMyPage}
+        onLogoClick={handleLogoClick}
+        isOwner={isOwner}
+        onSwitchToAdmin={handleSwitchToAdmin}
         onSelectPlan={(planId) => {
           // 一覧でプランが選択されたら、そのIDを覚えつつ詳細画面へ遷移する。
           setSelectedPlanId(planId)
@@ -115,13 +144,29 @@ function App() {
       />
     )
   }
+  if (screen === 'adminHome') {
+    return (
+      <AdminHomeScreen
+        userName={userName}
+        onSwitchToTraveler={handleLogoClick}
+        onLogout={handleLogout}
+      />
+    )
+  }
+
   // 上記いずれの条件にも当てはまらない場合(初期状態)はログイン画面を表示する。
   return (
     <LoginScreen
-      onLogin={(id, name) => {
-        // ログイン成功時はユーザーID・ユーザー名を保持し、必ず「宿泊プラン」タブのホーム画面から開始させる。
+      onLogin={(id, name, isAdmin, isOwnerUser) => {
         setUserId(id)
         setUserName(name)
+        setIsOwner(isOwnerUser)
+        if (isAdmin) {
+          // 管理者向けログインモードの場合は管理者向けホーム画面へ遷移する。
+          setScreen('adminHome')
+          return
+        }
+        // ログイン成功時はユーザーID・ユーザー名を保持し、必ず「宿泊プラン」タブのホーム画面から開始させる。
         setActiveTab('plan')
         setScreen('home')
       }}

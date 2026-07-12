@@ -34,7 +34,7 @@ def login(request: LoginRequest):
     ログイン画面の処理を行う
     """
     # ログイン状況を返却
-    return login_service.login(request.mail_address, request.password)
+    return login_service.login(request.mail_address, request.password, request.is_admin)
 
 
 @app.post("/search-plan", response_model=SearchPlanResponse)
