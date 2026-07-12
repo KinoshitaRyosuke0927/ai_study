@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import AdminLayout from './AdminLayout'
-import { type AdminMenuItem } from './AdminSideMenu'
-import FacilityListScreen from '../facility/components/FacilityListScreen'
-import FacilityDetailScreen from '../facility/components/FacilityDetailScreen'
+import AdminLayout from './layout/components/AdminLayout'
+import { type AdminMenuItem } from './layout/components/AdminSideMenu'
+import FacilityListScreen from './facility/components/FacilityListScreen'
+import FacilityDetailScreen from './facility/components/FacilityDetailScreen'
 import './AdminHomeScreen.css'
 
 type AdminHomeScreenProps = {

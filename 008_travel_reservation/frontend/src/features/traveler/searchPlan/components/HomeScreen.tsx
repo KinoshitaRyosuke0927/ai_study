@@ -1,8 +1,8 @@
 import type { KeyboardEvent } from 'react'
 import type { AccommodationPlan } from '../api/searchPlanApi'
-import ScreenLayout from '../../../../common/components/ScreenLayout'
+import ScreenLayout from '../../layout/components/ScreenLayout'
 import ErrorMessage from '../../../../common/components/ErrorMessage'
-import type { HeaderNavProps } from '../../../../common/types/navigation'
+import type { HeaderNavProps } from '../../layout/types/navigation'
 import './HomeScreen.css'
 
 type HomeScreenProps = HeaderNavProps & {

@@ -3,8 +3,8 @@ import LoginScreen from './features/auth/components/LoginScreen'
 import HomeScreen from './features/traveler/searchPlan/components/HomeScreen'
 import PlanDetailScreen from './features/traveler/planDetail/components/PlanDetailScreen'
 import MyPageScreen from './features/traveler/myPage/components/MyPageScreen'
-import AdminHomeScreen from './features/admin/components/AdminHomeScreen'
-import type { Tab } from './common/components/Header'
+import AdminHomeScreen from './features/admin/AdminHomeScreen'
+import type { Tab } from './features/traveler/layout/components/Header'
 import { searchPlan, type AccommodationPlan } from './features/traveler/searchPlan/api/searchPlanApi'
 
 // このアプリはReact Routerなどのルーティングライブラリを使わず、

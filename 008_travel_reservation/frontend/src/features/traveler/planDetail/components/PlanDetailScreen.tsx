@@ -6,11 +6,11 @@ import {
   type AccommodationPlanDetail,
   type AvailabilityDay,
 } from '../api/planDetailApi'
-import ScreenLayout from '../../../../common/components/ScreenLayout'
+import ScreenLayout from '../../layout/components/ScreenLayout'
 import ErrorMessage from '../../../../common/components/ErrorMessage'
 import ConfirmDialog from '../../../../common/components/ConfirmDialog'
 import AvailabilityCalendar from './AvailabilityCalendar'
-import type { HeaderNavProps } from '../../../../common/types/navigation'
+import type { HeaderNavProps } from '../../layout/types/navigation'
 import './PlanDetailScreen.css'
 
 type PlanDetailScreenProps = HeaderNavProps & {
