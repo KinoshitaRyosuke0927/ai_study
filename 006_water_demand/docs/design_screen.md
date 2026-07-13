@@ -2,9 +2,35 @@
 
 ## システム概要
 
-**システム名：** ウォーターサーバー注文量管理システム  
+**システム説明：** ブラウザから注文量実績・出社カレンダーを登録・編集し、気象データを最新化した上で翌月の推奨注文量（20L単位）を予測・確認できるWebアプリ
 **フレームワーク：** FastAPI + Jinja2テンプレート  
 **画面数：** 4画面
+
+---
+
+## アプリケーション名称
+
+1. CON-AQUA ー Consumption Order Navigator Aqua ー
+
+    【日本語】
+    消費量をもとに、適切な注文量へ導く
+
+    【英語】
+    Consumption：消費量
+    Order：注文
+    Navigator：導く, 判断を支援する
+    Aqua：水(ラテン語)
+
+2. KON-AQUA ー Konsumo Ordo Necessarius Aqua ー
+
+    【日本語】
+    必要な注文量をあつらえる
+
+    【ラテン語】
+    Konsumo：消費を表す造語
+    Ordo：秩序, 注文
+    Necessarius：必要な
+    Aqua：水 
 
 ---
 
@@ -23,7 +49,7 @@
 
 ### 画面キャプチャ
 
-<!-- 画面キャプチャ画像をここに添付 -->
+![alt text](/006_water_demand/docs/images/image_001.png)
 
 ---
 
@@ -56,7 +82,7 @@ SCR-001（メニュー）
 
 ### 画面キャプチャ
 
-<!-- 画面キャプチャ画像をここに添付 -->
+![alt text](/006_water_demand/docs/images/image_002.png)
 
 ---
 
@@ -113,7 +139,7 @@ SCR-001（メニュー）
 
 ### 画面キャプチャ
 
-<!-- 画面キャプチャ画像をここに添付 -->
+![alt text](/006_water_demand/docs/images/image_003.png)
 
 ---
 
@@ -173,7 +199,7 @@ SCR-001（メニュー）
 
 ### 画面キャプチャ
 
-<!-- 画面キャプチャ画像をここに添付 -->
+![alt text](/006_water_demand/docs/images/image_004.png)
 
 ---
 

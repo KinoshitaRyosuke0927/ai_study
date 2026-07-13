@@ -1,28 +1,29 @@
 import sys
 from pathlib import Path
 from datetime import datetime
+
+import numpy as np
+import pandas as pd
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-import pandas as pd
-import numpy as np
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import LeaveOneOut, cross_val_score
 
 ## 定数
-# ベースディレクトリ（exe実行時はexe本体のディレクトリ、通常実行時はスクリプトのディレクトリ）
+# ベースディレクトリ(exe実行時はexe本体のディレクトリ、通常実行時はスクリプトのディレクトリ)
 if getattr(sys, "frozen", False):
     BASE_DIR = Path(sys.executable).parent
 else:
     BASE_DIR = Path(__file__).parent
 # 水の注文量実績CSVパス
-DATA_PATH        = BASE_DIR / "train_data" / "water_demand.csv"
+DATA_PATH = BASE_DIR/"train_data"/"water_demand.csv"
 # AIC出社カレンダーCSVパス
-WORK_DAY_PATH    = BASE_DIR / "train_data" / "work_day.csv"
+WORK_DAY_PATH = BASE_DIR/"train_data"/"work_day.csv"
 # JBD営業日カレンダーCSVパス
-JBD_CALENDAR_PATH = BASE_DIR / "train_data" / "jbd_calendar.csv"
+JBD_CALENDAR_PATH = BASE_DIR/"train_data"/"jbd_calendar.csv"
 # 気候情報CSVパス
-WEATHER_DATA_PATH = BASE_DIR / "train_data" / "weather_data.csv"
+WEATHER_DATA_PATH = BASE_DIR/"train_data"/"weather_data.csv"
 
 ## アプリケーション初期化
 # FastAPIインスタンス生成
@@ -142,7 +143,9 @@ async def work_day_save(request: Request):
 # ── 注文量予測 ────────────────────────────────────────────
 
 def _data_source_info() -> dict:
-    """使用データの参照期間・更新日時を返す"""
+    """
+    使用データの参照期間・更新日時を返す
+    """
     ## 日付フォーマット定数
     fmt_dt  = "%Y/%m/%d %H:%M:%S"
     fmt_day = "%Y/%m/%d"
@@ -195,37 +198,39 @@ def _data_source_info() -> dict:
 
     # 各データソースの情報を返却
     return [
-        {"name": "水の注文量実績",       "period": water_period,   "mtime": mtime(DATA_PATH)},
-        {"name": "JBD営業日カレンダー",  "period": jbd_period,     "mtime": mtime(JBD_CALENDAR_PATH)},
-        {"name": "AIC出社カレンダー",    "period": work_period,    "mtime": mtime(WORK_DAY_PATH)},
-        {"name": "気候情報",            "period": weather_period,  "mtime": mtime(WEATHER_DATA_PATH)},
+        {"name": "水の注文量実績", "period": water_period, "mtime": mtime(DATA_PATH)},
+        {"name": "JBD営業日カレンダー", "period": jbd_period, "mtime": mtime(JBD_CALENDAR_PATH)},
+        {"name": "AIC出社カレンダー", "period": work_period, "mtime": mtime(WORK_DAY_PATH)},
+        {"name": "気候情報", "period": weather_period, "mtime": mtime(WEATHER_DATA_PATH)},
     ]
 
 
 def _run_prediction() -> dict:
-    """翌月の注文量をRidge回帰で予測して結果を返す"""
+    """
+    翌月の注文量をRidge回帰で予測して結果を返す
+    """
     ## データ読み込み
     # 水の注文量実績
     water_demand = pd.read_csv(DATA_PATH)
     # JBD営業日カレンダー
     jbd_calendar = pd.read_csv(JBD_CALENDAR_PATH)
     # AIC出社カレンダー
-    work_day_df  = pd.read_csv(WORK_DAY_PATH)
+    work_day_df = pd.read_csv(WORK_DAY_PATH)
     # 気候情報
     weather_data = pd.read_csv(WEATHER_DATA_PATH)
 
     ## 前処理
     # 年月列の作成
-    water_demand["date_ym"]    = pd.to_datetime(water_demand["date_ym"])
+    water_demand["date_ym"] = pd.to_datetime(water_demand["date_ym"])
     water_demand["year_month"] = water_demand["date_ym"].dt.to_period("M")
     # 年月列の作成
-    jbd_calendar["date"]       = pd.to_datetime(jbd_calendar["date"])
+    jbd_calendar["date"] = pd.to_datetime(jbd_calendar["date"])
     jbd_calendar["year_month"] = jbd_calendar["date"].dt.to_period("M")
     # 年月列の作成
-    work_day_df["date"]        = pd.to_datetime(work_day_df["date"])
-    work_day_df["year_month"]  = work_day_df["date"].dt.to_period("M")
+    work_day_df["date"] = pd.to_datetime(work_day_df["date"])
+    work_day_df["year_month"] = work_day_df["date"].dt.to_period("M")
     # 年月列の作成
-    weather_data["date"]       = pd.to_datetime(weather_data["date"])
+    weather_data["date"] = pd.to_datetime(weather_data["date"])
     weather_data["year_month"] = weather_data["date"].dt.to_period("M")
 
     ## 月次特徴量作成
@@ -241,9 +246,7 @@ def _run_prediction() -> dict:
     # 日ごとの出社人数を集計
     work_day_df["daily_attendance"] = work_day_df[emp_cols].sum(axis=1)
     # JBDカレンダーの営業日フラグを付与して営業日のみ出社にカウント
-    work_day_df = work_day_df.merge(
-        jbd_calendar[["date", "business_day_flag"]], on="date", how="left"
-    )
+    work_day_df = work_day_df.merge(jbd_calendar[["date", "business_day_flag"]], on="date", how="left")
     # カレンダーにない日付は休日とする
     work_day_df["daily_attendance"] *= work_day_df["business_day_flag"].fillna(0)
     # 月ごとの延べ出社人数を合計
@@ -282,6 +285,7 @@ def _run_prediction() -> dict:
     # Ridge回帰 + 正則化強度alphaをLOO-CVで比較して最適値を選択
     best_alpha, best_mae = None, float("inf")
     for alpha in [0.01, 0.1, 1.0, 10.0, 50.0, 100.0]:
+        # 負の平均絶対誤差により評価
         scores = cross_val_score(
             Ridge(alpha=alpha), X, y, cv=LeaveOneOut(),
             scoring="neg_mean_absolute_error"
@@ -297,11 +301,11 @@ def _run_prediction() -> dict:
 
     ## 予測月の決定
     # 最新の実績月を取得
-    latest_month  = water_demand["date_ym"].max()
+    latest_month = water_demand["date_ym"].max()
     # 翌月を予測対象月とする
     next_month_dt = latest_month + pd.DateOffset(months=1)
     # Period型に変換
-    next_period   = pd.Period(next_month_dt, "M")
+    next_period = pd.Period(next_month_dt, "M")
 
     # 予測月の営業日数を抽出
     next_biz = monthly_biz_days.loc[monthly_biz_days["year_month"] == next_period, "business_days"]
@@ -313,7 +317,7 @@ def _run_prediction() -> dict:
         return {"error": f"予測月 {next_period} のカレンダーデータが不足しています"}
 
     # Seriesから営業日数・出社比率を抽出
-    next_biz_val  = float(next_biz.values[0])
+    next_biz_val = float(next_biz.values[0])
     next_att_rate = float(next_att.values[0]) / next_biz_val
     # 気温は前年同月実績値を使用
     prev_year_period = pd.Period(next_month_dt - pd.DateOffset(years=1), "M")
@@ -324,26 +328,26 @@ def _run_prediction() -> dict:
         return {"error": f"前年同月（{prev_year_period}）の気温データがありません"}
 
     # Seriesから平均気温を抽出
-    tavg_val   = float(tavg_row.values[0])
+    tavg_val = float(tavg_row.values[0])
     # 予測に必要な特徴量を用意
-    X_pred     = pd.DataFrame([{
-        "business_days":  next_biz_val,
+    X_pred = pd.DataFrame([{
+        "business_days": next_biz_val,
         "attendance_rate": next_att_rate,
-        "tavg_mean":       tavg_val,
+        "tavg_mean": tavg_val,
     }])
     # 予測実行
-    prediction         = float(model.predict(X_pred)[0])
+    prediction = float(model.predict(X_pred)[0])
     # 20L単位に切り上げて推奨注文量を計算
     prediction_rounded = int(np.ceil(prediction / 20) * 20)
 
     # 予測結果を返却
     return {
-        "target_month":       next_month_dt.strftime("%Y年%m月"),
-        "date_ym_csv":        next_month_dt.strftime("%Y/%m/%d"),
-        "business_days":      int(next_biz_val),
-        "attendance_rate":    round(next_att_rate, 1),
-        "tavg_prev_year":     round(tavg_val, 1),
-        "prediction":         round(prediction, 1),
+        "target_month": next_month_dt.strftime("%Y年%m月"),
+        "date_ym_csv": next_month_dt.strftime("%Y/%m/%d"),
+        "business_days": int(next_biz_val),
+        "attendance_rate": round(next_att_rate, 1),
+        "tavg_prev_year": round(tavg_val, 1),
+        "prediction": round(prediction, 1),
         "prediction_rounded": prediction_rounded,
     }
 

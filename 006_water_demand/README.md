@@ -14,8 +14,6 @@ AICで毎月購入しているウォーターサーバーの水の注文量を�
 ```bash
 cd water_demand
 python -m venv .venv
-
-# Windows
 .venv\Scripts\activate
 ```
 
