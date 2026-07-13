@@ -32,6 +32,55 @@ Start-Service MySQL80
 mysql -u root -p
 ```
 
+### rootパスワードを忘れた場合の初期化手順
+
+管理者権限のPowerShellで以下の手順を実行する。
+
+**1. MySQLサービスを停止する**
+
+```powershell
+net stop MySQL80
+```
+
+**2. 初期化ファイルを作成する**
+
+任意の場所にSQLファイルを作成し、以下を記述する。
+
+```sql
+ALTER USER 'root'@'localhost' IDENTIFIED BY '新しいパスワード';
+```
+
+**3. `--init-file`と`--defaults-file`を指定してMySQLを起動する**
+
+`my.ini`はデフォルトで `C:\ProgramData\MySQL\MySQL Server 8.0\my.ini` にある。
+
+```powershell
+& "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqld.exe" `
+  --defaults-file="C:\ProgramData\MySQL\MySQL Server 8.0\my.ini" `
+  --init-file="C:\mysql-init.sql" `
+  --console
+```
+
+ログに `ready for connections` と表示されたら **Ctrl+C** で停止する。
+
+**4. MySQLサービスを通常起動する**
+
+```powershell
+net start MySQL80
+```
+
+**5. 初期化ファイルを削除する（セキュリティのため）**
+
+```powershell
+Remove-Item C:\mysql-init.sql
+```
+
+**6. 新しいパスワードでログインを確認する**
+
+```powershell
+mysql -u root -p
+```
+
 以降、`mysql>`プロンプト内での操作になる。
 
 ## 2. アプリケーション用ユーザー作成
