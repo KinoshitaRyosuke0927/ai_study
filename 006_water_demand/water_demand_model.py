@@ -16,6 +16,8 @@ jbd_calendar = pd.read_csv(f"{BASE_DIR}/jbd_calendar.csv")
 work_day = pd.read_csv(f"{BASE_DIR}/work_day.csv")
 # 気象データ
 weather_data = pd.read_csv(f"{BASE_DIR}/weather_data.csv")
+# 社員ごとの日次消費量
+water_demand_per_emp = pd.read_csv(f"{BASE_DIR}/water_demand_per_emp.csv")
 
 ## 前処理
 # 年月列の作成
@@ -30,6 +32,9 @@ work_day["year_month"] = work_day["date"].dt.to_period("M")
 # 年月列の作成
 weather_data["date"] = pd.to_datetime(weather_data["date"])
 weather_data["year_month"] = weather_data["date"].dt.to_period("M")
+# 年月列の作成
+water_demand_per_emp["date_ym"] = pd.to_datetime(water_demand_per_emp["date_ym"])
+water_demand_per_emp["year_month"] = water_demand_per_emp["date_ym"].dt.to_period("M")
 
 ## 月次特徴量作成
 # 月ごとの営業日数を集計
@@ -61,6 +66,12 @@ monthly_weather = (
     .reset_index()
     .rename(columns={"tavg": "tavg_mean"})
 )
+# 社員ごとの出社1日あたり平均消費量を算出（0Lの日は欠勤とみなして除外）
+emp_cols_consumption = [c for c in water_demand_per_emp.columns if c.startswith("emp_")]
+per_emp_rate = {
+    col: (lambda s: s[s > 0].mean() if (s > 0).any() else 0.0)(water_demand_per_emp[col])
+    for col in emp_cols_consumption
+}
 
 ## 学習データ構築
 # 水の注文量に月ごとの営業日を連結
@@ -191,3 +202,31 @@ else:
         print(f"  予測注文量        : {prediction:.1f} L")
         print(f"  推奨注文量        : {prediction_rounded:.0f} L  (20L単位に切り上げ)")
         print("=" * 40)
+
+## ボトムアップ予測（社員別消費量ベース）
+# 予測月の社員別出社予定日数を抽出
+next_work = work_day[work_day["year_month"] == next_period]
+# 予測月の出社予定データが不足している場合
+if next_work.empty:
+    print(f"\n予測月 {next_period} の出社予定データが不足しています。")
+else:
+    # 社員ごとに「出社1日あたり平均消費量 × 予測月の出社予定日数」を積み上げ
+    bottom_up_detail = {
+        col: per_emp_rate[col] * next_work[col].sum()
+        for col in emp_cols_consumption
+        if col in next_work.columns
+    }
+    # 合計消費量を算出
+    bottom_up_total = sum(bottom_up_detail.values())
+    # 注文数を計算
+    bottom_up_rounded = np.ceil(bottom_up_total / 20) * 20
+    # 結果出力
+    print()
+    print("=" * 40)
+    print("【翌月の注文量予測（ボトムアップ：社員別消費量ベース）】")
+    for col, val in bottom_up_detail.items():
+        print(f"  {col}: 出社1日あたり{per_emp_rate[col]:.2f}L × 出社予定{next_work[col].sum():.0f}日 = {val:.1f}L")
+    print(f"  予測注文量        : {bottom_up_total:.1f} L")
+    print(f"  推奨注文量        : {bottom_up_rounded:.0f} L  (20L単位に切り上げ)")
+    print("  ※社員別消費量データは1か月分の実績のため、参考値・トップダウン予測との比較用です。")
+    print("=" * 40)
