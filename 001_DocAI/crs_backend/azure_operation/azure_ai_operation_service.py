@@ -1,6 +1,6 @@
 import copy
 
-from openai import AzureOpenAI
+from openai import OpenAI
 
 from azure_operation.azure_constant import (
     AZURE_OPENAI_ENDPOINT,
@@ -15,16 +15,13 @@ from azure_operation.azure_constant import (
 )
 
 ## 接続に必要なモデルの情報
-# デプロイしたモデルのAPIバージョン
-API_VERSION = "2024-12-01-preview"
 # デプロイしたモデルの名称
-MODEL_NAME = "gpt-5-chat"
+MODEL_NAME = "gpt-5.4-mini"
 
 # Azure OpenAI クライアント用意
-client = AzureOpenAI(
-    azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    api_key=AZURE_OPENAI_KEY,
-    api_version=API_VERSION
+client = OpenAI(
+    base_url=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_KEY
 )
 # チャット履歴を保持するリスト
 CHAT_TEMPLATE = [

@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from openai import AzureOpenAI
+from openai import OpenAI
 
 # 環境変数(.env)を読み込む
 if getattr(sys, "frozen", False):
@@ -18,21 +18,17 @@ else:
 load_dotenv(_env_path)
 
 ## Azure OpenAI の接続情報を環境変数から取得
-_raw_endpoint = os.environ["AZURE_OPENAI_ENDPOINT"]
-# .envのエンドポイントが完全URLの場合はベースURLだけを取り出す
-_parsed = urlparse(_raw_endpoint)
-# エンドポイントURL設定
-AZURE_OPENAI_ENDPOINT = f"{_parsed.scheme}://{_parsed.netloc}/"
-# 環境変数
-AZURE_OPENAI_KEY = os.environ["AZURE_OPENAI_KEY"]
-API_VERSION = os.environ.get("AZURE_API_VERSION", "2024-12-01-preview")
-MODEL_NAME = os.environ.get("AZURE_MODEL_NAME", "gpt-4o")
+# Azure OpenAIのエンドポイント
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+# Azure OpenAIのAPIキー
+AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY", "")
+# デプロイしたモデルの名称
+MODEL_NAME = "gpt-5.4-mini"
 
-## Azure OpenAI クライアントを初期化
-client = AzureOpenAI(
-    azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    api_key=AZURE_OPENAI_KEY,
-    api_version=API_VERSION,
+# Azure OpenAI クライアント用意
+client = OpenAI(
+    base_url=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_KEY
 )
 
 

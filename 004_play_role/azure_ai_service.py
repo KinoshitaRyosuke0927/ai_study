@@ -1,6 +1,6 @@
 import json
 import os
-from openai import AzureOpenAI
+from openai import OpenAI
 
 from prompt import PROMPT_TEXT, ROLE_DICT
 from history_store import build_profile_context
@@ -12,16 +12,13 @@ from history_store import build_profile_context
 AZURE_OPENAI_ENDPOINT = os.environ["AZURE_OPENAI_ENDPOINT"]
 # Azure OpenAIのAPIキー
 AZURE_OPENAI_KEY = os.environ["AZURE_OPENAI_KEY"]
-# デプロイしたモデルのAPIバージョン
-API_VERSION = os.environ.get("AZURE_API_VERSION", "2024-12-01-preview")
 # デプロイしたモデルの名称
-MODEL_NAME = os.environ.get("AZURE_MODEL_NAME", "gpt-5-chat")
+MODEL_NAME = "gpt-5.4-mini"
 
 # Azure OpenAI クライアント用意
-client = AzureOpenAI(
-    azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    api_key=AZURE_OPENAI_KEY,
-    api_version=API_VERSION
+client = OpenAI(
+    base_url=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_KEY
 )
 
 
