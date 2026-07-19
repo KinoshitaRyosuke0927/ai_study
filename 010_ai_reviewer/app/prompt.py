@@ -163,123 +163,102 @@ def build_overall_per_type_summarize_prompt_package(
     }
 
 
-_REVISION_SUGGESTION_SYSTEM_PROMPT = """
-あなたは、PowerPointスライドのレビュー結果をもとに、「元のスライドをどう直すべきか」を具体的に整理して返すアシスタントです。
+_IMAGE_EDIT_INSTRUCTION_SYSTEM_PROMPT = """
+あなたは、プレゼンテーションスライドのレビュー指摘を、画像編集AI（元のスライド画像1枚を書き換えるimage-to-image編集モデル）向けの指示文に変換するアシスタントです。
 
-目的は、レビュー指摘を単に言い換えることではなく、スライド作成者がそのまま修正作業に着手できるように、修正方針を構造化して返すことです。
-
-以下のルールに厳密に従って出力してください。
-
-【目的】
-入力として与えられる
-- スライドの内容
-- スライドに対するレビュー指摘
-をもとに、
-- 何が問題か
-- どう直すべきか
-- どのような文言に差し替えるとよいか
-- 修正後にどういう状態になるべきか
-を、具体的で実務的な修正方針として返してください。
+画像編集AIは、元のスライド画像とテキストの指示だけを受け取り、画像そのものを直接書き換えます。レビュー指摘の文章をそのまま渡しても意図通りに編集されないため、画像編集に適した具体的な指示文を作成してください。
 
 【出力ルール】
-1. 出力は必ずJSON形式のみとしてください
-2. JSONの外側に説明文、前置き、補足、Markdown記法、コードブロックを付けないでください
-3. 必ず以下のキーをすべて含めてください
-   - summary
-   - issues
-   - actions
-   - example_text
-   - expected_outcome
-4. 情報が不足していても、キーは省略せず、空文字または空配列ではなく、推定可能な範囲で具体化してください
-5. レビュー指摘の要約ではなく、「修正作業の指示」として記述してください
-6. actions には、作業者がそのまま修正できるレベルで具体的に記載してください
-7. example_text には、可能な限りスライドへそのまま流用できる文案を入れてください
-8. expected_outcome には、「修正後にスライドがどう見えるべきか」を1文で明確に記載してください
-9. 曖昧な表現を避けてください
-   - 悪い例: わかりやすくする
-   - 良い例: PoC対象と将来対応を表で分離し、優先順位が一目で分かる構成にする
-10. 同じ内容を重複して書かないでください
-
-【JSONスキーマ】
-以下の構造・型に厳密に従ってください。
-
-{
-  "summary": "このスライドをどう修正すべきかを1〜2文で要約した文章",
-  "issues": [
-    "現状の問題点1",
-    "現状の問題点2",
-    "現状の問題点3"
-  ],
-  "actions": [
-    {
-      "type": "structure",
-      "instruction": "構成変更に関する具体的な修正指示"
-    },
-    {
-      "type": "content",
-      "instruction": "内容追加・削除・整理に関する具体的な修正指示"
-    },
-    {
-      "type": "expression",
-      "instruction": "見出しや文言表現に関する具体的な修正指示"
-    }
-  ],
-  "example_text": {
-    "title": "修正後のスライドタイトル案",
-    "lead": "修正後のスライド冒頭説明文案",
-    "body": [
-      "本文や箇条書きの差し替え文案1",
-      "本文や箇条書きの差し替え文案2"
-    ]
-  },
-  "expected_outcome": "修正後にどのようなスライドになっているべきか"
-}
-
-【各項目の記載ルール】
-- summary:
-  スライド全体として何を直すべきかを簡潔に要約する
-- issues:
-  現状の問題を、閲覧者視点で整理して列挙する
-- actions:
-  修正指示を記載する
-  type は必ず次のいずれかを使う
-  - structure: レイアウト、情報の並び、章立て、表の分割統合など
-  - content: 情報の追加、削除、整理、優先順位付けなど
-  - expression: 見出し、説明文、ラベル、表現の言い換えなど
-- example_text:
-  実際にスライドへ貼れる文案を入れる
-  title は必須
-  lead は必須
-  body は2件以上入れる
-- expected_outcome:
-  閲覧者が見たときに、何が一目で伝わる状態になるかを書く
-
-【判断基準】
-修正方針は、次の観点で具体化してください。
-- 何を残すべきか
-- 何を分けるべきか
-- 何を追加すべきか
-- どこを簡潔にすべきか
-- どの情報を先に見せるべきか
-- 修正後に意思決定しやすくなるか
-
-【禁止事項】
-- 単なるレビュー指摘の焼き直し
-- 抽象的で作業に落ちない助言
-- 「適宜追加してください」「必要に応じて見直してください」だけで終わる記述
-- JSON以外の形式での出力
-- キー名の変更
-
-以下に対象データを与えます。
-この内容をもとに、上記ルールに従ってJSONのみを出力してください。
-
-【スライド内容】
-{{SLIDE_CONTENT}}
-
-【レビュー指摘】
-{{REVIEW_COMMENTS}}
-
+1. 出力は必ずJSON形式のみとしてください。前置き・説明・コードブロックは禁止です。
+2. 以下のスキーマに厳密に従ってください:
+   {"image_edit_instruction": "string"}
+3. image_edit_instruction には、画像編集AIがそのまま実行できるレベルで、視覚的に何をどう変えるかを具体的に記述してください。
+   - どのテキスト・見出し・数値・図表・レイアウトを、どう変更するかを明確に書く
+   - 差し替えるべきテキストがある場合は、実際の日本語の文言をそのまま指示文中に含める
+   - 元のスライドのデザイン・配色・フォント・レイアウトの雰囲気はできる限り維持し、指摘のあった箇所のみを変更するよう指示する
+   - 「わかりやすくして」のような抽象的な表現は禁止し、誰が実行しても同じ結果になるよう具体化する
+   - スライドの端から端まで要素を詰め込まず、上下左右に十分な余白を確保した、企画資料として読みやすいレイアウトを維持するよう明記する
+4. 複数の指摘事項がある場合は、すべてを1つの指示文にまとめて記載してください
 """
+
+# 画像編集AIへの指示文に、AIの出力内容によらず必ず付加する余白確保のガイダンス
+LAYOUT_GUIDANCE_SUFFIX = (
+    "スライド全体に要素を詰め込みすぎないこと。上下左右に十分な余白（マージン）を確保し、"
+    "文字や図表をスライドの端ギリギリまで配置しないこと。情報量を減らさず、"
+    "余白を活かした読みやすいレイアウトに整えること。"
+)
+
+
+def build_image_edit_instruction_prompt_package(
+    slide_number: int,
+    findings_text: str,
+) -> dict[str, Any]:
+    """
+    1枚のスライドについて、レビュー指摘を画像編集AI向けの指示文に変換するプロンプトパッケージを構築する
+
+    Args
+    -----------------
+    - slide_number: int,        対象スライド番号
+    - findings_text: str,       観点別レビュー結果（指摘事項）のテキスト
+
+    Returns
+    -----------------
+    - package: dict[str, Any],  system_prompt と user_prompt を含むプロンプトパッケージ
+
+    """
+    prompt = (
+        f"スライド {slide_number} に対する指摘事項は以下の通りです。\n\n"
+        f"{findings_text}\n"
+        "\nこの指摘事項をもとに、画像編集AIへ渡す指示文をJSONのみで返してください。"
+    )
+    return {
+        "system_prompt": _IMAGE_EDIT_INSTRUCTION_SYSTEM_PROMPT,
+        "user_prompt": [{"type": "text", "text": prompt}],
+    }
+
+
+_CHANGE_DESCRIPTION_SYSTEM_PROMPT = """
+あなたは、修正前と修正後のプレゼンテーションスライド画像を見比べて、実際にどのような修正が施されたかを説明するアシスタントです。
+
+【出力ルール】
+1. 出力は必ずJSON形式のみとしてください。前置き・説明・コードブロックは禁止です。
+2. 以下のスキーマに厳密に従ってください:
+   {"description": "string"}
+3. description には、修正前の画像と修正後の画像を実際に見比べて確認できた変更点（テキスト、レイアウト、強調箇所など）のみを、Markdown形式の箇条書きで具体的に日本語で記載してください。
+4. 変更されていない箇所については触れないでください。
+5. 推測ではなく、画像上で実際に確認できる変化のみを記載してください。
+6. 文末表現は、あなた自身がその修正を行ったかのような能動的な言い切りの形（例:「〜に差し替えました。」「〜を変更しました。」「〜を追加しました」）で統一してください。「〜されている」「〜になっている」「〜が変更された」のような受け身・他人事の表現は使用しないでください。
+"""
+
+
+def build_change_description_prompt_package(
+    slide_number: int,
+    before_image_b64: str,
+    after_image_b64: str,
+) -> dict[str, Any]:
+    """
+    1枚のスライドについて、修正前後の画像を比較し実際の修正内容を説明するプロンプトパッケージを構築する
+
+    Args
+    -----------------
+    - slide_number: int,            対象スライド番号
+    - before_image_b64: str,        修正前スライド画像（PNG）のBase64文字列
+    - after_image_b64: str,         修正後スライド画像（PNG）のBase64文字列
+
+    Returns
+    -----------------
+    - package: dict[str, Any],      system_prompt と user_prompt を含むプロンプトパッケージ
+
+    """
+    content: list[dict[str, Any]] = [
+        {"type": "text", "text": f"スライド {slide_number} の修正前後の画像を比較してください。"},
+        {"type": "text", "text": "【修正前】"},
+        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{before_image_b64}"}},
+        {"type": "text", "text": "【修正後】"},
+        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{after_image_b64}"}},
+        {"type": "text", "text": "実際に施された修正内容をJSONのみで返してください。"},
+    ]
+    return {"system_prompt": _CHANGE_DESCRIPTION_SYSTEM_PROMPT, "user_prompt": content}
 
 
 def build_revision_findings_text(perspectives: list[dict[str, Any]]) -> str:
@@ -299,43 +278,6 @@ def build_revision_findings_text(perspectives: list[dict[str, Any]]) -> str:
         f"- {p.get('label') or p.get('type', '')}: {p.get('summary', '')}\n"
         for p in perspectives
     )
-
-
-def build_revision_suggestion_prompt_package(
-    slide: dict[str, Any],
-    findings_text: str,
-) -> dict[str, Any]:
-    """
-    1枚のスライドについて、レビュー指摘をもとに修正方針を提案するプロンプトパッケージを構築する
-
-    Args
-    -----------------
-    - slide: dict[str, Any],            slide_number と image_jpeg_b64 を含むスライドデータ
-    - findings_text: str,               観点別レビュー結果（指摘事項）のテキスト
-
-    Returns
-    -----------------
-    - package: dict[str, Any],          system_prompt と user_prompt を含むプロンプトパッケージ
-
-    """
-    slide_content = f"スライド {slide['slide_number']}"
-
-    # システムプロンプト内のプレースホルダーを実データで置換
-    system_prompt = (
-        _REVISION_SUGGESTION_SYSTEM_PROMPT
-        .replace("{{SLIDE_CONTENT}}", slide_content)
-        .replace("{{REVIEW_COMMENTS}}", findings_text)
-    )
-
-    ## コンテンツブロックを組み立て（対象スライドの画像を添付）
-    content: list[dict[str, Any]] = [{"type": "text", "text": slide_content}]
-    content.append({
-        "type": "image_url",
-        "image_url": {"url": f"data:image/jpeg;base64,{slide['image_jpeg_b64']}"},
-    })
-    content.append({"type": "text", "text": "上記スライドについて、修正方針をJSONのみで返してください。"})
-
-    return {"system_prompt": system_prompt, "user_prompt": content}
 
 
 def build_overall_per_type_prompt_packages_by_type(

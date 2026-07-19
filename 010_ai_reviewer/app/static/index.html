@@ -12,7 +12,7 @@
       <h1>AI PowerPoint レビュアー</h1>
       <div class="header-actions">
         <button id="download-csv-btn" class="btn-download" disabled>指摘事項をダウンロード</button>
-        <button id="download-suggestion-btn" class="btn-download" disabled>修正方針をダウンロード</button>
+        <button id="download-suggestion-btn" class="btn-download" disabled>修正後スライドをダウンロード</button>
       </div>
     </div>
 
@@ -110,8 +110,19 @@
             </div>
             <div id="suggestion-content" class="hidden">
               <div class="slide-panel-label" id="suggestion-slide-label">スライド 1</div>
-              <div class="slide-image-wrap">
-                <img id="suggestion-slide-img" src="" alt="">
+              <div class="suggestion-compare">
+                <div class="suggestion-compare-col">
+                  <div class="suggestion-compare-title">修正前</div>
+                  <div class="slide-image-wrap">
+                    <img id="suggestion-before-img" src="" alt="修正前">
+                  </div>
+                </div>
+                <div class="suggestion-compare-col">
+                  <div class="suggestion-compare-title">修正後</div>
+                  <div class="slide-image-wrap">
+                    <img id="suggestion-after-img" src="" alt="修正後">
+                  </div>
+                </div>
               </div>
               <div id="suggestion-body"></div>
             </div>

@@ -441,6 +441,27 @@ button:disabled {
   object-fit: contain;
 }
 
+/* ========== 修正方針タブ（修正前後の画像比較） ========== */
+
+.suggestion-compare {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.suggestion-compare-col {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.suggestion-compare-title {
+  font-size: 0.78rem;
+  font-weight: bold;
+  color: #718096;
+  margin-bottom: 6px;
+}
+
 /* ========== 伝えたいことタブ ========== */
 
 .slide-input-area h3 {

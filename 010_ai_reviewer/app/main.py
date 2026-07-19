@@ -1,24 +1,30 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import uvicorn
 import tempfile
+from io import BytesIO
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
+from PIL import Image
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.prompt import (
+    LAYOUT_GUIDANCE_SUFFIX,
+    build_change_description_prompt_package,
+    build_image_edit_instruction_prompt_package,
     build_overall_per_type_prompt_packages_by_type,
     build_overall_per_type_summarize_prompt_package,
     build_revision_findings_text,
-    build_revision_suggestion_prompt_package,
 )
 from app.renderer import render_pptx_to_images, images_to_base64_dict
-from app.azure_ai_service import call_review
+from app.azure_ai_service import call_image_edit, call_review
 
 
 class SlideInput(BaseModel):
@@ -34,7 +40,7 @@ class ReviewRequest(BaseModel):
 
 class SuggestionSlideInput(BaseModel):
     slide_number: int
-    image_jpeg_b64: str
+    image_png_b64: str
 
 
 class PerspectiveResult(BaseModel):
@@ -46,6 +52,15 @@ class PerspectiveResult(BaseModel):
 class SuggestionRequest(BaseModel):
     slides: list[SuggestionSlideInput]
     perspectives: list[PerspectiveResult]
+
+
+class ExportSlideInput(BaseModel):
+    slide_number: int
+    edited_image_b64: str
+
+
+class ExportPdfRequest(BaseModel):
+    slides: list[ExportSlideInput]
 
 # フロントエンドのHTMLパス
 BASE_DIR = Path(__file__).resolve().parent
@@ -198,21 +213,39 @@ async def review_pptx(request: ReviewRequest) -> dict:
 
 def _suggest_revision_for_slide(slide: dict, findings_text: str) -> dict:
     """
-    1枚のスライドについて、修正方針提案をAIに問い合わせる（同期処理）
+    1枚のスライドについて、指摘事項をもとに画像編集AIで修正後スライド画像と修正内容説明を生成する（同期処理）
     """
-    package = build_revision_suggestion_prompt_package(slide, findings_text)
+    slide_number = slide["slide_number"]
+    original_image_b64 = slide["image_png_b64"]
+
+    # Step1: 指摘事項を画像編集AI向けの指示文に変換
+    instruction_package = build_image_edit_instruction_prompt_package(slide_number, findings_text)
     try:
-        result = call_review(package)
+        instruction_result = call_review(instruction_package)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"AIレビュー（修正方針提案）に失敗しました: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"AIレビュー（修正指示文生成）に失敗しました: {exc}") from exc
+    edit_instruction = instruction_result.get("image_edit_instruction", "")
+    # AIの出力内容によらず、余白確保のガイダンスを必ず付加する
+    edit_instruction = f"{edit_instruction}\n{LAYOUT_GUIDANCE_SUFFIX}"
+
+    # Step2: 画像編集AIで元スライド画像を修正
+    try:
+        edited_image_bytes = call_image_edit(edit_instruction, base64.b64decode(original_image_b64))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AI画像修正に失敗しました: {exc}") from exc
+    edited_image_b64 = base64.b64encode(edited_image_bytes).decode()
+
+    # Step3: 修正前後の画像を比較し、実際に施した修正内容の説明を生成
+    description_package = build_change_description_prompt_package(slide_number, original_image_b64, edited_image_b64)
+    try:
+        description_result = call_review(description_package)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AIレビュー（修正内容説明生成）に失敗しました: {exc}") from exc
 
     return {
-        "slide_number": slide["slide_number"],
-        "summary": result.get("summary", ""),
-        "issues": result.get("issues", []),
-        "actions": result.get("actions", []),
-        "example_text": result.get("example_text", {}),
-        "expected_outcome": result.get("expected_outcome", ""),
+        "slide_number": slide_number,
+        "edited_image_b64": edited_image_b64,
+        "description": description_result.get("description", ""),
     }
 
 
@@ -231,14 +264,60 @@ async def suggest_revision(request: SuggestionRequest) -> dict:
     data = request.model_dump()
     findings_text = build_revision_findings_text(data["perspectives"])
 
-    slide_suggestions = await asyncio.gather(
-        *(asyncio.to_thread(_suggest_revision_for_slide, slide, findings_text) for slide in data["slides"])
-    )
+    # スライド枚数がPythonのデフォルトスレッドプール上限を超えても待機が発生しないよう、
+    # スライド枚数分のワーカーを持つ専用スレッドプールで並列実行する
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor(max_workers=len(data["slides"])) as executor:
+        slide_suggestions = await asyncio.gather(
+            *(
+                loop.run_in_executor(executor, _suggest_revision_for_slide, slide, findings_text)
+                for slide in data["slides"]
+            )
+        )
 
     return {
         "slide_suggestions": list(slide_suggestions),
     }
 
 
+def _build_pdf_from_slides(slides: list[dict]) -> bytes:
+    """
+    修正後スライド画像一覧をまとめて1つのPDFファイルに変換する（同期処理）
+    """
+    images = [
+        Image.open(BytesIO(base64.b64decode(slide["edited_image_b64"]))).convert("RGB")
+        for slide in slides
+    ]
+    buffer = BytesIO()
+    images[0].save(buffer, format="PDF", save_all=True, append_images=images[1:])
+    return buffer.getvalue()
+
+
+@app.post("/api/suggest/export-pdf")
+async def export_suggestion_pdf(request: ExportPdfRequest) -> Response:
+    """
+    修正後スライド画像一覧をまとめたPDFファイルを生成して返す
+    """
+    # スライド情報が読み取れなかった場合
+    if not request.slides:
+        raise HTTPException(status_code=400, detail="スライドデータがありません。")
+
+    data = request.model_dump()
+    # スライドを番号順に並べる
+    slides = sorted(data["slides"], key=lambda s: s["slide_number"])
+
+    try:
+        pdf_bytes = await asyncio.to_thread(_build_pdf_from_slides, slides)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"PDFファイルの生成に失敗しました: {exc}") from exc
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="revision_suggestion.pdf"'},
+    )
+
+
+# exe起動用
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

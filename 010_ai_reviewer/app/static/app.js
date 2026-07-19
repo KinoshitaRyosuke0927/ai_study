@@ -11,6 +11,19 @@ function hideMessage(el) {
   el.className = "message hidden";
 }
 
+function formatErrorDetail(detail) {
+  if (Array.isArray(detail)) {
+    // FastAPI の 422 バリデーションエラー（{loc, msg, type} の配列）を整形
+    return detail
+      .map((d) => (d && typeof d === "object" ? `${(d.loc || []).join(".")}: ${d.msg || JSON.stringify(d)}` : String(d)))
+      .join(" / ");
+  }
+  if (detail && typeof detail === "object") {
+    return JSON.stringify(detail);
+  }
+  return String(detail);
+}
+
 function escHtml(str) {
   return String(str || "")
     .replace(/&/g, "&amp;")
@@ -112,7 +125,8 @@ const summaryPerspectiveBody = document.getElementById("summary-perspective-body
 const suggestionPlaceholder = document.getElementById("suggestion-placeholder");
 const suggestionContent     = document.getElementById("suggestion-content");
 const suggestionSlideLabel  = document.getElementById("suggestion-slide-label");
-const suggestionSlideImg    = document.getElementById("suggestion-slide-img");
+const suggestionBeforeImg   = document.getElementById("suggestion-before-img");
+const suggestionAfterImg    = document.getElementById("suggestion-after-img");
 const suggestionBody        = document.getElementById("suggestion-body");
 
 // 伝えたいことタブ
@@ -196,7 +210,7 @@ uploadBtn.addEventListener("click", async () => {
     const data = await res.json();
 
     if (!res.ok) {
-      showMessage(uploadMessage, `エラー: ${data.detail}`, "error");
+      showMessage(uploadMessage, `エラー: ${formatErrorDetail(data.detail)}`, "error");
       return;
     }
 
@@ -363,55 +377,28 @@ function selectPerspective(index) {
   showPerspective(perspectives, index);
 }
 
-const ACTION_TYPE_LABELS = {
-  structure: "構成",
-  content: "内容",
-  expression: "表現",
-};
-
-function actionTypeLabel(type) {
-  return ACTION_TYPE_LABELS[type] || type || "";
-}
-
 function renderSuggestionTab(num) {
-  const src  = slidePngs[num - 1] || thumbnails[num - 1];
-  const mime = slidePngs[num - 1] ? "image/png" : thumbnailMime;
+  const beforeSrc = slidePngs[num - 1] || thumbnails[num - 1];
+  const beforeMime = slidePngs[num - 1] ? "image/png" : thumbnailMime;
   suggestionSlideLabel.textContent = `スライド ${num}`;
-  suggestionSlideImg.src = src ? `data:${mime};base64,${src}` : "";
-  suggestionSlideImg.alt = `スライド ${num}`;
+  suggestionBeforeImg.src = beforeSrc ? `data:${beforeMime};base64,${beforeSrc}` : "";
+  suggestionBeforeImg.alt = `スライド ${num} 修正前`;
 
   const data = suggestionBySlide[num];
   if (!data) {
+    suggestionAfterImg.src = "";
     suggestionBody.innerHTML = "<p class='placeholder-text'>このスライドの修正方針はありません</p>";
     return;
   }
 
-  const example = data.example_text || {};
-  const issuesHtml = (data.issues || []).map((i) => `<li>${escHtml(i)}</li>`).join("") || "<li>特になし</li>";
-  const actionsHtml = (data.actions || [])
-    .map((a) => `<li class="suggestion"><strong>[${escHtml(actionTypeLabel(a.type))}]</strong> ${escHtml(a.instruction || "")}</li>`)
-    .join("") || "<li>特になし</li>";
-  const bodyHtml = (example.body || []).map((b) => `<li>${escHtml(b)}</li>`).join("");
+  suggestionAfterImg.src = data.edited_image_b64 ? `data:image/png;base64,${data.edited_image_b64}` : "";
+  suggestionAfterImg.alt = `スライド ${num} 修正後`;
 
   suggestionBody.innerHTML = `
-    <div class="review-summary-text">${escHtml(data.summary || "")}</div>
     <div class="review-section-block">
-      <div class="review-section-label">問題点</div>
-      <div class="review-item"><ul>${issuesHtml}</ul></div>
+      <div class="review-section-label">実際に施した修正内容</div>
+      <div class="review-item markdown-body">${renderMarkdown(data.description || "")}</div>
     </div>
-    <div class="review-section-block">
-      <div class="review-section-label">修正アクション</div>
-      <div class="review-item"><ul>${actionsHtml}</ul></div>
-    </div>
-    <div class="review-section-block">
-      <div class="review-section-label">差し替え文案</div>
-      <div class="review-item">
-        <p><strong>タイトル案:</strong> ${escHtml(example.title || "")}</p>
-        <p><strong>リード文案:</strong> ${escHtml(example.lead || "")}</p>
-        <ul>${bodyHtml}</ul>
-      </div>
-    </div>
-    <div class="good-point">${escHtml(data.expected_outcome || "")}</div>
   `;
 }
 
@@ -459,7 +446,7 @@ reviewBtn.addEventListener("click", async () => {
     const data = await res.json();
 
     if (!res.ok) {
-      showMessage(reviewMessage, `エラー: ${data.detail}`, "error");
+      showMessage(reviewMessage, `エラー: ${formatErrorDetail(data.detail)}`, "error");
       return;
     }
 
@@ -504,9 +491,9 @@ suggestBtn.addEventListener("click", async () => {
   suggestBtn.innerHTML = '<span class="loading"></span>AIが修正方針を検討中...';
 
   try {
-    const slides = thumbnails.map((thumb, i) => ({
+    const slides = slidePngs.map((png, i) => ({
       slide_number: i + 1,
-      image_jpeg_b64: thumb,
+      image_png_b64: png,
     }));
 
     const res  = await fetch("/api/suggest", {
@@ -524,7 +511,7 @@ suggestBtn.addEventListener("click", async () => {
     const data = await res.json();
 
     if (!res.ok) {
-      showMessage(suggestMessage, `エラー: ${data.detail}`, "error");
+      showMessage(suggestMessage, `エラー: ${formatErrorDetail(data.detail)}`, "error");
       return;
     }
 
@@ -644,48 +631,52 @@ downloadCsvBtn.addEventListener("click", () => {
 });
 
 // ============================================================
-// 修正方針のMarkdownダウンロード
+// 修正後スライドのPDFダウンロード
 // ============================================================
 
-downloadSuggestionBtn.addEventListener("click", () => {
-  const slideNumbers = Object.keys(suggestionBySlide).map(Number).sort((a, b) => a - b);
-  if (slideNumbers.length === 0) return;
+downloadSuggestionBtn.addEventListener("click", async () => {
+  const slides = Object.keys(suggestionBySlide)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .filter((num) => suggestionBySlide[num]?.edited_image_b64)
+    .map((num) => ({
+      slide_number: num,
+      edited_image_b64: suggestionBySlide[num].edited_image_b64,
+    }));
+  if (slides.length === 0) return;
 
-  const lines = ["# 修正方針", ""];
-  slideNumbers.forEach((num) => {
-    const data = suggestionBySlide[num] || {};
-    const example = data.example_text || {};
+  hideMessage(suggestMessage);
+  const originalLabel = downloadSuggestionBtn.textContent;
+  downloadSuggestionBtn.disabled = true;
+  downloadSuggestionBtn.innerHTML = '<span class="loading"></span>PDFを作成中...';
 
-    lines.push(`## スライド ${num}`, "");
-    lines.push(`**要約:** ${data.summary || ""}`, "");
+  try {
+    const res = await fetch("/api/suggest/export-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slides }),
+    });
 
-    lines.push("### 問題点");
-    (data.issues || []).forEach((i) => lines.push(`- ${i}`));
-    lines.push("");
+    if (!res.ok) {
+      const data = await res.json();
+      showMessage(suggestMessage, `エラー: ${formatErrorDetail(data.detail)}`, "error");
+      return;
+    }
 
-    lines.push("### 修正アクション");
-    (data.actions || []).forEach((a) => lines.push(`- [${actionTypeLabel(a.type)}] ${a.instruction || ""}`));
-    lines.push("");
-
-    lines.push("### 差し替え文案");
-    lines.push(`**タイトル案:** ${example.title || ""}`);
-    lines.push(`**リード文案:** ${example.lead || ""}`);
-    (example.body || []).forEach((b) => lines.push(`- ${b}`));
-    lines.push("");
-
-    lines.push(`**期待される状態:** ${data.expected_outcome || ""}`, "");
-  });
-
-  const markdownContent = lines.join("\n") + "\n";
-  const blob = new Blob([markdownContent], { type: "text/markdown;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "revision_suggestion.md";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "revision_suggestion.pdf";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showMessage(suggestMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    downloadSuggestionBtn.disabled = false;
+    downloadSuggestionBtn.textContent = originalLabel;
+  }
 });
 
