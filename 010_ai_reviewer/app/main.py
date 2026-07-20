@@ -210,7 +210,7 @@ async def upload_pptx(file: UploadFile = File(...)) -> dict:
 
     # 一覧用サムネイル画像
     thumbnails = [item["jpg"] for item in images_b64]
-    # スライドごとの表示用画像 
+    # スライドごとの表示用画像
     slide_pngs  = [item["png"] for item in images_b64]
 
     return {
@@ -365,11 +365,15 @@ async def _stream_slide_suggestions(slides: list[dict], findings_text: str):
         return
 
     async def _run(executor: ThreadPoolExecutor, slide: dict) -> dict:
-        # 該当する指摘がないスライドは画像編集自体をスキップする
+        # 該当する指摘がないスライドは画像編集自体をスキップし、修正前の画像をそのまま返す
         slide_number = slide["slide_number"]
         instruction = plans.get(slide_number)
         if not instruction:
-            return {"type": "slide_skipped", "slide_number": slide_number}
+            return {
+                "type": "slide_skipped",
+                "slide_number": slide_number,
+                "image_png_b64": slide["image_png_b64"],
+            }
 
         # 1スライド分の処理を実行し、失敗しても他スライドの処理を止めないようエラーを結果として返す
         try:
@@ -379,9 +383,8 @@ async def _stream_slide_suggestions(slides: list[dict], findings_text: str):
             detail = getattr(exc, "detail", str(exc))
             return {"type": "slide_error", "slide_number": slide_number, "detail": detail}
 
-    # スライド枚数がPythonのデフォルトスレッドプール上限を超えても待機が発生しないよう、
-    # スライド枚数分のワーカーを持つ専用スレッドプールで並列実行する
-    with ThreadPoolExecutor(max_workers=total) as executor:
+    # Azure側の通信上限があるため, 最大同時実行数を2にする
+    with ThreadPoolExecutor(max_workers=2) as executor:
         tasks = [_run(executor, slide) for slide in slides]
         for coro in asyncio.as_completed(tasks):
             payload = await coro

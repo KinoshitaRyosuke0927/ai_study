@@ -297,9 +297,46 @@ function buildSlideList(thumbs, count) {
     label.textContent = `スライド ${i}`;
     item.appendChild(label);
 
+    const status = document.createElement("span");
+    status.className = "slide-list-status hidden";
+    item.appendChild(status);
+
     item.addEventListener("click", () => selectSlide(i));
     slideList.appendChild(item);
   }
+}
+
+// ============================================================
+// スライド一覧の進捗ステータス表示（修正方針の提案処理用）
+// ============================================================
+
+// 提案処理の開始前に、スライド一覧の各アイテムからステータス表示をリセットする
+function resetSlideListSuggestStatus() {
+  document.querySelectorAll(".slide-list-item .slide-list-status").forEach((el) => {
+    el.className = "slide-list-status hidden";
+    el.textContent = "";
+    el.title = "";
+  });
+}
+
+// 指定したスライド番号の一覧アイテムに、処理状況（pending/done/skipped/error）を反映する
+function setSlideListSuggestStatus(num, status) {
+  const item = slideList.querySelector(`.slide-list-item[data-slide="${num}"]`);
+  const statusEl = item && item.querySelector(".slide-list-status");
+  if (!statusEl) return;
+
+  const statusConfig = {
+    pending: { text: "", title: "修正方針を検討中です" },
+    done:    { text: "✓", title: "修正方針の提案が完了しました" },
+    skipped: { text: "―", title: "修正不要と判断されました" },
+    error:   { text: "!", title: "修正方針の生成に失敗しました" },
+  };
+  const config = statusConfig[status];
+  if (!config) return;
+
+  statusEl.className = `slide-list-status slide-list-status-${status}`;
+  statusEl.textContent = config.text;
+  statusEl.title = config.title;
 }
 
 // ============================================================
@@ -424,7 +461,8 @@ function renderSuggestionTab(num) {
   }
 
   if (data.skipped) {
-    suggestionAfterImg.src = "";
+    suggestionAfterImg.src = data.image_png_b64 ? `data:image/png;base64,${data.image_png_b64}` : beforeSrc ? `data:${beforeMime};base64,${beforeSrc}` : "";
+    suggestionAfterImg.alt = `スライド ${num} 修正後（修正なし）`;
     suggestionBody.innerHTML = "<p class='placeholder-text'>このスライドに該当する指摘事項はありませんでした（修正不要と判断されました）。</p>";
     return;
   }
@@ -573,6 +611,10 @@ async function runSuggestionProcess(perspectives) {
   suggestionBySlide = {};
   downloadSuggestionBtn.disabled = true;
 
+  // 左パネルのスライド一覧に進捗ステータスを表示し、どのスライドが処理待ちかを示す
+  resetSlideListSuggestStatus();
+  slides.forEach((s) => setSlideListSuggestStatus(s.slide_number, "pending"));
+
   // 修正方針タブに切り替え、結果が届くたびに反映されるようにする
   activeTab = "suggestion";
   tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "suggestion"));
@@ -613,6 +655,7 @@ async function runSuggestionProcess(perspectives) {
         suggestionBySlide[payload.slide_number] = payload;
         completed += 1;
         updateProgressLabel();
+        setSlideListSuggestStatus(payload.slide_number, "done");
         if (selectedSlide === payload.slide_number && activeTab === "suggestion") {
           renderSuggestionTab(selectedSlide);
         }
@@ -621,13 +664,19 @@ async function runSuggestionProcess(perspectives) {
         suggestionBySlide[payload.slide_number] = { slide_number: payload.slide_number, error: payload.detail };
         completed += 1;
         updateProgressLabel();
+        setSlideListSuggestStatus(payload.slide_number, "error");
         if (selectedSlide === payload.slide_number && activeTab === "suggestion") {
           renderSuggestionTab(selectedSlide);
         }
       } else if (payload.type === "slide_skipped") {
-        suggestionBySlide[payload.slide_number] = { slide_number: payload.slide_number, skipped: true };
+        suggestionBySlide[payload.slide_number] = {
+          slide_number: payload.slide_number,
+          skipped: true,
+          image_png_b64: payload.image_png_b64,
+        };
         completed += 1;
         updateProgressLabel();
+        setSlideListSuggestStatus(payload.slide_number, "skipped");
         if (selectedSlide === payload.slide_number && activeTab === "suggestion") {
           renderSuggestionTab(selectedSlide);
         }

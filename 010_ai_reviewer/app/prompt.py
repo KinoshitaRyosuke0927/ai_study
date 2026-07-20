@@ -233,6 +233,41 @@ def _build_overall_per_type_prompt_package(
     return {"system_prompt": SYSTEM_PROMPT, "user_prompt": content}
 
 
+def _coerce_review_entries(reviews: Any) -> list[dict[str, str]]:
+    """
+    AIから返却されたレビュー結果(reviews)を、question/resultを持つ辞書のリストに正規化する
+    （AIの出力が期待通りの `list[dict]` 形式でなく、文字列や辞書などの別形式で返ってきた場合に備える）
+
+    Args
+    -----------------
+    - reviews: Any,                     AIレスポンスに含まれる reviews の値（形式が不定）
+
+    Returns
+    -----------------
+    - entries: list[dict[str, str]],    question / result を持つ辞書のリスト
+
+    """
+    # 辞書で返ってきた場合（例: {"question1": "result1", ...}）はキーと値をquestion/resultとして扱う
+    if isinstance(reviews, dict):
+        return [{"question": str(k), "result": str(v)} for k, v in reviews.items()]
+    # 文字列で返ってきた場合は、1件のみの結果として扱う
+    if isinstance(reviews, str):
+        return [{"question": "", "result": reviews}]
+    # リストの場合は、要素ごとにdict/それ以外を判定して正規化する
+    if isinstance(reviews, list):
+        entries: list[dict[str, str]] = []
+        for entry in reviews:
+            if isinstance(entry, dict):
+                entries.append({
+                    "question": str(entry.get("question", "")),
+                    "result": str(entry.get("result", "")),
+                })
+            else:
+                entries.append({"question": "", "result": str(entry)})
+        return entries
+    return []
+
+
 def build_overall_per_type_summarize_prompt_package(
     ptype_label: str,
     reviews: list[dict[str, Any]],
@@ -250,10 +285,10 @@ def build_overall_per_type_summarize_prompt_package(
     - package: dict[str, Any],          system_prompt と user_prompt を含むプロンプトパッケージ
 
     """
-    # Q&A形式のレビュー結果をテキストに変換
+    # AIの出力形式のゆらぎに対応するため、reviewsをquestion/result形式のリストに正規化してからテキスト化する
     reviews_text = "".join(
         f"  Q: {r['question']}\n  A: {r['result']}\n"
-        for r in reviews
+        for r in _coerce_review_entries(reviews)
     )
     schema = {"summary": "string"}
 

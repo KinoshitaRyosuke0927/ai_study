@@ -4,9 +4,11 @@
 
 ## できること
 - `.pptx` をアップロードしてスライドを画像として表示（LibreOffice による高品質レンダリング）
-- スライドごとに「伝えたいこと」を入力
-- Azure OpenAI を使って structure / visual / content の3観点で5点満点採点＋改善提案
-- 全体評価・スライド別レビュー結果を画面に表示
+- 資料全体の「伝えたいこと」を入力
+- Azure OpenAI を使って12カテゴリ（全体 / 構成・表現 / 計画・戦略 / 課題設定 / 優先度・差別化 / 実現可能性 / 評価・検証 / レイアウト構成 / 文字表現 / 配色 / 図表・画像 / 文章表現）でレビュー＆指摘事項を表示
+- レビュー観点をCSVファイルまたは画面上の「レビュー観点設定」からON/OFF切り替え
+- AIによる修正提案（スライドごとの修正後画像＋修正内容の説明をSSEで順次表示）
+- 修正提案のPDFダウンロード・指摘事項のCSVダウンロード
 
 ## セットアップ
 
@@ -27,20 +29,20 @@ pip install -r requirements.txt
 [poppler-windows releases](https://github.com/oschwartz10612/poppler-windows/releases/) から最新版の zip をダウンロードし、展開後に `bin` フォルダをシステム PATH に追加してください。
 
 ### 4. 環境変数の設定
-`education/.env` に Azure OpenAI の接続情報を記載してください：
+ワークスペースルート（`010_ai_reviewer` の2つ上の階層）に `.env` を作成し、Azure OpenAI の接続情報を記載してください：
 ```
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/...
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/openai/deployments/your-deployment/
 AZURE_OPENAI_KEY=your-api-key
-AZURE_API_VERSION=2024-12-01-preview
-AZURE_MODEL_NAME=gpt-4o
 ```
+
+> テキストレビューには `gpt-5.4-mini`、AI修正提案の画像生成には `gpt-image-2` を使用します。
 
 ### 5. サーバー起動
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-ブラウザで `http://127.0.0.1:8010` を開いてください。
+ブラウザで `http://127.0.0.1:8000` を開いてください。
 
 ## API エンドポイント
 
@@ -49,14 +51,20 @@ uvicorn app.main:app --reload --port 8000
 | GET | `/` | フロントエンド（index.html） |
 | GET | `/api/health` | ヘルスチェック |
 | POST | `/api/upload` | PPTX アップロード・スライド画像化 |
-| POST | `/api/review` | PPTX 解析 + AI レビュー実行 |
+| GET | `/api/review-points` | レビュー観点設定一覧（apply_flag 状態を含む）を返す |
+| POST | `/api/review-points` | レビュー観点の apply_flag を更新し CSV へ書き戻す |
+| POST | `/api/review` | PPTX 解析 + AI レビュー実行（12カテゴリ）|
+| POST | `/api/suggest` | AIによるスライド修正提案（SSEストリーミング） |
+| POST | `/api/suggest/export-pdf` | 修正後スライド画像をまとめて PDF 出力 |
 
 ## ファイル構成
 - `app/main.py` — FastAPI エントリポイント
 - `app/renderer.py` — LibreOffice + pdf2image によるスライド画像化
-- `app/prompt.py` — AI レビュー用プロンプト定義・レビュー観点・出力スキーマ
-- `app/azure_ai_service.py` — Azure OpenAI 呼び出し
+- `app/prompt.py` — AI レビュー用プロンプト定義・レビュー観点読み込み（`review_point.csv` / `pp_check_points.csv`）・出力スキーマ
+- `app/azure_ai_service.py` — Azure OpenAI 呼び出し（テキスト: `gpt-5.4-mini` / 画像編集: `gpt-image-2`）
 - `app/static/` — フロントエンド（HTML / CSS / JS）
+- `review_point.csv` — レビュー観点（資料内容の観点）
+- `pp_check_points.csv` — レビュー観点（資料デザイン・体裁の観点）
 
 ## exe化（PyInstaller）
 
@@ -102,7 +110,8 @@ pyinstaller --name ai_reviewer `
 `dist/ai_reviewer/` フォルダに、exeと同じ階層で以下を追加してください（PyInstallerには同梱されません）。
 
 - `.env` — Azure OpenAI の接続情報（[manual.md](manual.md) の3-1を参照）
-- `review_point.csv`（`010_ai_reviewer/review_point.csv` をコピー）— レビュー観点。exeの実行者が自由に編集できるよう、exeに同梱せず外部ファイルとして配置する構成にしています
+- `review_point.csv`（`010_ai_reviewer/review_point.csv` をコピー）— レビュー観点（資料内容の観点）
+- `pp_check_points.csv`（`010_ai_reviewer/pp_check_points.csv` をコピー）— レビュー観点（資料デザイン・体裁の観点）
 - `起動.bat`（任意）— ダブルクリックでexe起動とブラウザオープンを行うショートカット
   ```bat
   @echo off
