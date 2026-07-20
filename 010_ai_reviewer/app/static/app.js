@@ -110,6 +110,23 @@ const suggestBtn         = document.getElementById("suggest-btn");
 const suggestMessage     = document.getElementById("suggest-message");
 const downloadCsvBtn     = document.getElementById("download-csv-btn");
 const downloadSuggestionBtn = document.getElementById("download-suggestion-btn");
+// レビュー観点設定モーダル
+const reviewPointSettingsBtn = document.getElementById("review-point-settings-btn");
+const reviewPointModal       = document.getElementById("review-point-modal");
+const reviewPointColumns     = document.getElementById("review-point-columns");
+const reviewPointListLeft    = document.getElementById("review-point-list-left");
+const reviewPointListRight   = document.getElementById("review-point-list-right");
+const reviewPointLoading     = document.getElementById("review-point-loading");
+const reviewPointCancelBtn   = document.getElementById("review-point-cancel-btn");
+const reviewPointSaveBtn     = document.getElementById("review-point-save-btn");
+const reviewPointMessage     = document.getElementById("review-point-message");
+// 修正対象指摘事項選択モーダル
+const suggestSelectionModal      = document.getElementById("suggest-selection-modal");
+const suggestSelectionEmpty      = document.getElementById("suggest-selection-empty");
+const suggestSelectionList       = document.getElementById("suggest-selection-list");
+const suggestSelectionCancelBtn  = document.getElementById("suggest-selection-cancel-btn");
+const suggestSelectionRunBtn     = document.getElementById("suggest-selection-run-btn");
+const suggestSelectionMessage    = document.getElementById("suggest-selection-message");
 // 右パネル
 const rightContent       = document.getElementById("right-content");
 const tabBtns               = document.querySelectorAll(".tab-btn");
@@ -127,6 +144,7 @@ const suggestionContent     = document.getElementById("suggestion-content");
 const suggestionSlideLabel  = document.getElementById("suggestion-slide-label");
 const suggestionBeforeImg   = document.getElementById("suggestion-before-img");
 const suggestionAfterImg    = document.getElementById("suggestion-after-img");
+const suggestionAfterSpinner = document.getElementById("suggestion-after-spinner");
 const suggestionBody        = document.getElementById("suggestion-body");
 
 // 伝えたいことタブ
@@ -147,9 +165,10 @@ let slideCount        = 0;
 let selectedSlide     = null;      // 現在選択中のスライド番号（1始まり）
 let perSlideMessages  = {};        // slideNum -> string
 let reviewData              = null;  // APIから返ってきたレビュー結果
-let suggestionBySlide       = {};    // slide_number -> 修正方針テキスト
+let suggestionBySlide       = {};    // slide_number -> 修正方針テキスト（またはエラー情報）
 let activeTab               = "input"; // "input" | "summary" | "suggestion"
 let activePerspectiveIndex  = 0;
+let suggestInProgress       = false; // 修正方針提案のストリーミング処理中かどうか
 
 // ============================================================
 // ファイル選択
@@ -387,7 +406,26 @@ function renderSuggestionTab(num) {
   const data = suggestionBySlide[num];
   if (!data) {
     suggestionAfterImg.src = "";
-    suggestionBody.innerHTML = "<p class='placeholder-text'>このスライドの修正方針はありません</p>";
+    suggestionAfterImg.classList.toggle("hidden", suggestInProgress);
+    suggestionAfterSpinner.classList.toggle("hidden", !suggestInProgress);
+    suggestionBody.innerHTML = suggestInProgress
+      ? "<p class='placeholder-text'>このスライドの修正方針を検討中です...</p>"
+      : "<p class='placeholder-text'>このスライドの修正方針はありません</p>";
+    return;
+  }
+
+  suggestionAfterSpinner.classList.add("hidden");
+  suggestionAfterImg.classList.remove("hidden");
+
+  if (data.error) {
+    suggestionAfterImg.src = "";
+    suggestionBody.innerHTML = `<p class="placeholder-text">このスライドの修正方針の生成に失敗しました: ${escHtml(data.error)}</p>`;
+    return;
+  }
+
+  if (data.skipped) {
+    suggestionAfterImg.src = "";
+    suggestionBody.innerHTML = "<p class='placeholder-text'>このスライドに該当する指摘事項はありませんでした（修正不要と判断されました）。</p>";
     return;
   }
 
@@ -479,24 +517,79 @@ reviewBtn.addEventListener("click", async () => {
 });
 
 // ============================================================
+// SSEストリームの読み取り
+// ============================================================
+
+// fetch のレスポンスボディを "data: {json}\n\n" 形式のSSEイベントとして逐次読み取り、
+// イベントが届くたびに onEvent(payload) を呼び出す
+async function readSSEStream(response, onEvent) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let sepIndex;
+    while ((sepIndex = buffer.indexOf("\n\n")) >= 0) {
+      const rawEvent = buffer.slice(0, sepIndex);
+      buffer = buffer.slice(sepIndex + 2);
+      const dataLine = rawEvent.split("\n").find((line) => line.startsWith("data:"));
+      if (!dataLine) continue;
+      try {
+        onEvent(JSON.parse(dataLine.slice(5).trim()));
+      } catch (err) {
+        console.error("SSEイベントの解析に失敗しました", err);
+      }
+    }
+  }
+}
+
+// ============================================================
 // 修正方針の提案
 // ============================================================
 
-suggestBtn.addEventListener("click", async () => {
+suggestBtn.addEventListener("click", () => {
   const perspectives = reviewData?.presentation_summary?.perspectives || [];
   if (!currentFile || perspectives.length === 0) return;
+  openSuggestSelectionModal(perspectives);
+});
 
+async function runSuggestionProcess(perspectives) {
   hideMessage(suggestMessage);
   suggestBtn.disabled = true;
-  suggestBtn.innerHTML = '<span class="loading"></span>AIが修正方針を検討中...';
+  suggestInProgress = true;
+
+  const slides = slidePngs.map((png, i) => ({
+    slide_number: i + 1,
+    image_png_b64: png,
+  }));
+  const total = slides.length;
+  let completed = 0;
+  let hasError = false;
+
+  suggestionBySlide = {};
+  downloadSuggestionBtn.disabled = true;
+
+  // 修正方針タブに切り替え、結果が届くたびに反映されるようにする
+  activeTab = "suggestion";
+  tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "suggestion"));
+  tabInputEl.classList.add("hidden");
+  tabSummaryEl.classList.add("hidden");
+  tabSuggestionEl.classList.remove("hidden");
+  suggestionPlaceholder.classList.add("hidden");
+  suggestionContent.classList.remove("hidden");
+  if (selectedSlide) renderSuggestionTab(selectedSlide);
+
+  const updateProgressLabel = () => {
+    suggestBtn.innerHTML = `<span class="loading"></span>AIが修正方針を検討中... (${completed}/${total})`;
+  };
+  updateProgressLabel();
 
   try {
-    const slides = slidePngs.map((png, i) => ({
-      slide_number: i + 1,
-      image_png_b64: png,
-    }));
-
-    const res  = await fetch("/api/suggest", {
+    const res = await fetch("/api/suggest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -508,38 +601,168 @@ suggestBtn.addEventListener("click", async () => {
         })),
       }),
     });
-    const data = await res.json();
 
     if (!res.ok) {
+      const data = await res.json();
       showMessage(suggestMessage, `エラー: ${formatErrorDetail(data.detail)}`, "error");
       return;
     }
 
-    suggestionBySlide = {};
-    (data.slide_suggestions || []).forEach((s) => {
-      suggestionBySlide[s.slide_number] = s;
+    await readSSEStream(res, (payload) => {
+      if (payload.type === "slide_done") {
+        suggestionBySlide[payload.slide_number] = payload;
+        completed += 1;
+        updateProgressLabel();
+        if (selectedSlide === payload.slide_number && activeTab === "suggestion") {
+          renderSuggestionTab(selectedSlide);
+        }
+      } else if (payload.type === "slide_error") {
+        hasError = true;
+        suggestionBySlide[payload.slide_number] = { slide_number: payload.slide_number, error: payload.detail };
+        completed += 1;
+        updateProgressLabel();
+        if (selectedSlide === payload.slide_number && activeTab === "suggestion") {
+          renderSuggestionTab(selectedSlide);
+        }
+      } else if (payload.type === "slide_skipped") {
+        suggestionBySlide[payload.slide_number] = { slide_number: payload.slide_number, skipped: true };
+        completed += 1;
+        updateProgressLabel();
+        if (selectedSlide === payload.slide_number && activeTab === "suggestion") {
+          renderSuggestionTab(selectedSlide);
+        }
+      }
     });
-    downloadSuggestionBtn.disabled = false;
 
-    showMessage(suggestMessage, "修正方針の提案が完了しました", "success");
+    const hasAnySuccess = Object.values(suggestionBySlide).some((s) => s.edited_image_b64);
+    downloadSuggestionBtn.disabled = !hasAnySuccess;
 
-    // 修正方針タブに切り替えて結果を表示
-    activeTab = "suggestion";
-    tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "suggestion"));
-    tabInputEl.classList.add("hidden");
-    tabSummaryEl.classList.add("hidden");
-    tabSuggestionEl.classList.remove("hidden");
-
-    suggestionPlaceholder.classList.add("hidden");
-    suggestionContent.classList.remove("hidden");
-
-    if (selectedSlide) renderSuggestionTab(selectedSlide);
+    if (hasError) {
+      showMessage(suggestMessage, "一部のスライドで修正方針の生成に失敗しました", "error");
+    } else {
+      showMessage(suggestMessage, "修正方針の提案が完了しました", "success");
+    }
   } catch (err) {
     showMessage(suggestMessage, `ネットワークエラー: ${err.message}`, "error");
   } finally {
+    suggestInProgress = false;
     suggestBtn.disabled = false;
     suggestBtn.textContent = "修正方針を提示する";
+    if (selectedSlide && activeTab === "suggestion") renderSuggestionTab(selectedSlide);
   }
+}
+
+// ============================================================
+// 修正対象指摘事項選択モーダル
+// ============================================================
+
+let suggestFindingItems = []; // { id, perspective_type, perspective_label, text, checked }
+
+// レビュー結果の各観点summary（Markdown箇条書き）を、指摘事項単位のリストに分解する
+function buildSuggestFindingItems(perspectives) {
+  const items = [];
+  let id = 0;
+  perspectives.forEach((p) => {
+    const label = p.label || p.type || "";
+    const summary = (p.summary || "").trim();
+    // 指摘事項が存在しない観点は選択対象に含めない
+    if (!summary || summary === "特に指摘事項はありません") return;
+    extractMarkdownItems(summary).forEach((text) => {
+      items.push({
+        id: id++,
+        perspective_type: p.type || label,
+        perspective_label: label,
+        text,
+        checked: true,
+      });
+    });
+  });
+  return items;
+}
+
+function renderSuggestSelectionList() {
+  const groups = groupReviewPointItems(suggestFindingItems);
+
+  suggestSelectionList.innerHTML = groups.map((group) => {
+    const rows = group.items.map((item) => {
+      const checkboxId = `suggest-finding-${item.id}`;
+      return `
+        <div class="review-point-row">
+          <input type="checkbox" id="${checkboxId}" data-id="${item.id}" ${item.checked ? "checked" : ""}>
+          <label for="${checkboxId}">${escHtml(item.text)}</label>
+        </div>
+      `;
+    }).join("");
+    return `
+      <div class="review-point-group">
+        <div class="review-point-group-title">
+          <input type="checkbox" class="review-point-group-toggle">
+          <span>${escHtml(group.label)}</span>
+        </div>
+        ${rows}
+      </div>
+    `;
+  }).join("");
+
+  wireCheckboxGroupToggles(suggestSelectionList, (checkbox) => {
+    const id = Number(checkbox.dataset.id);
+    const item = suggestFindingItems.find((i) => i.id === id);
+    if (item) item.checked = checkbox.checked;
+  });
+}
+
+// チェックが入っている指摘事項のみを観点単位に再構成し、/api/suggest に渡すperspectives配列を作る
+function buildFilteredPerspectivesFromSelection() {
+  const order = [];
+  const grouped = {};
+  suggestFindingItems.forEach((item) => {
+    if (!item.checked) return;
+    if (!grouped[item.perspective_type]) {
+      grouped[item.perspective_type] = { type: item.perspective_type, label: item.perspective_label, lines: [] };
+      order.push(item.perspective_type);
+    }
+    grouped[item.perspective_type].lines.push(item.text);
+  });
+  return order.map((type) => ({
+    type: grouped[type].type,
+    label: grouped[type].label,
+    summary: grouped[type].lines.map((line) => `- ${line}`).join("\n"),
+  }));
+}
+
+function openSuggestSelectionModal(perspectives) {
+  hideMessage(suggestSelectionMessage);
+  suggestFindingItems = buildSuggestFindingItems(perspectives);
+  suggestSelectionModal.classList.remove("hidden");
+
+  if (suggestFindingItems.length === 0) {
+    suggestSelectionList.classList.add("hidden");
+    suggestSelectionEmpty.classList.remove("hidden");
+  } else {
+    suggestSelectionEmpty.classList.add("hidden");
+    suggestSelectionList.classList.remove("hidden");
+    renderSuggestSelectionList();
+  }
+}
+
+function closeSuggestSelectionModal() {
+  suggestSelectionModal.classList.add("hidden");
+}
+
+suggestSelectionCancelBtn.addEventListener("click", closeSuggestSelectionModal);
+
+suggestSelectionModal.addEventListener("click", (e) => {
+  if (e.target === suggestSelectionModal) closeSuggestSelectionModal();
+});
+
+suggestSelectionRunBtn.addEventListener("click", () => {
+  const filteredPerspectives = buildFilteredPerspectivesFromSelection();
+  if (filteredPerspectives.length === 0) {
+    showMessage(suggestSelectionMessage, "少なくとも1つの指摘事項を選択してください", "error");
+    return;
+  }
+  closeSuggestSelectionModal();
+  runSuggestionProcess(filteredPerspectives);
 });
 
 // ============================================================
@@ -677,6 +900,170 @@ downloadSuggestionBtn.addEventListener("click", async () => {
   } finally {
     downloadSuggestionBtn.disabled = false;
     downloadSuggestionBtn.textContent = originalLabel;
+  }
+});
+
+// ============================================================
+// レビュー観点設定モーダル
+// ============================================================
+
+let reviewPointItems = []; // サーバから取得した観点設定一覧（_original に読み込み時点のapply_flagを保持）
+
+function groupReviewPointItems(items) {
+  const groups = [];
+  const indexByType = {};
+  items.forEach((item) => {
+    const key = item.perspective_type;
+    if (!(key in indexByType)) {
+      indexByType[key] = groups.length;
+      groups.push({ type: key, label: item.perspective_label || key, items: [] });
+    }
+    groups[indexByType[key]].items.push(item);
+  });
+  return groups;
+}
+
+// グループ見出しの一括ON/OFFチェックボックスと、個別チェックボックスの状態を同期させる
+// （観点設定モーダル・指摘事項選択モーダルの両方で使う共通処理）
+function wireCheckboxGroupToggles(containerEl, onItemToggle) {
+  containerEl.querySelectorAll(".review-point-group").forEach((groupEl) => {
+    const groupToggle = groupEl.querySelector(".review-point-group-toggle");
+    const getItemCheckboxes = () => groupEl.querySelectorAll('.review-point-row input[type="checkbox"]');
+
+    const syncGroupToggle = () => {
+      const boxes = Array.from(getItemCheckboxes());
+      const checkedCount = boxes.filter((b) => b.checked).length;
+      groupToggle.checked = boxes.length > 0 && checkedCount === boxes.length;
+      groupToggle.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
+    };
+
+    getItemCheckboxes().forEach((checkbox) => {
+      checkbox.addEventListener("change", () => {
+        onItemToggle(checkbox);
+        syncGroupToggle();
+      });
+    });
+
+    groupToggle.addEventListener("change", () => {
+      const checked = groupToggle.checked;
+      groupToggle.indeterminate = false;
+      getItemCheckboxes().forEach((checkbox) => {
+        checkbox.checked = checked;
+        onItemToggle(checkbox);
+      });
+    });
+
+    syncGroupToggle();
+  });
+}
+
+function renderReviewPointColumn(containerEl, items) {
+  const groups = groupReviewPointItems(items);
+
+  containerEl.innerHTML = groups.map((group) => {
+    const rows = group.items.map((item) => {
+      const checkboxId = `review-point-${item.source}-${item.row_index}`;
+      return `
+        <div class="review-point-row">
+          <input type="checkbox" id="${checkboxId}" data-source="${escHtml(item.source)}" data-row-index="${item.row_index}" ${item.apply_flag ? "checked" : ""}>
+          <label for="${checkboxId}">${escHtml(item.detail)}</label>
+        </div>
+      `;
+    }).join("");
+    return `
+      <div class="review-point-group">
+        <div class="review-point-group-title">
+          <input type="checkbox" class="review-point-group-toggle">
+          <span>${escHtml(group.label)}</span>
+        </div>
+        ${rows}
+      </div>
+    `;
+  }).join("");
+
+  wireCheckboxGroupToggles(containerEl, (checkbox) => {
+    const source = checkbox.dataset.source;
+    const rowIndex = Number(checkbox.dataset.rowIndex);
+    const item = reviewPointItems.find((i) => i.source === source && i.row_index === rowIndex);
+    if (item) item.apply_flag = checkbox.checked;
+  });
+}
+
+function renderReviewPointList() {
+  renderReviewPointColumn(reviewPointListLeft, reviewPointItems.filter((i) => i.source === "review_point"));
+  renderReviewPointColumn(reviewPointListRight, reviewPointItems.filter((i) => i.source === "pp_check_points"));
+}
+
+async function openReviewPointModal() {
+  hideMessage(reviewPointMessage);
+  reviewPointModal.classList.remove("hidden");
+  reviewPointColumns.classList.add("hidden");
+  reviewPointLoading.classList.remove("hidden");
+  reviewPointLoading.textContent = "読み込み中...";
+
+  try {
+    const res = await fetch("/api/review-points");
+    const data = await res.json();
+
+    if (!res.ok) {
+      reviewPointLoading.textContent = `エラー: ${formatErrorDetail(data.detail)}`;
+      return;
+    }
+
+    reviewPointItems = (data.items || []).map((item) => ({ ...item, _original: item.apply_flag }));
+    renderReviewPointList();
+    reviewPointLoading.classList.add("hidden");
+    reviewPointColumns.classList.remove("hidden");
+  } catch (err) {
+    reviewPointLoading.textContent = `ネットワークエラー: ${err.message}`;
+  }
+}
+
+function closeReviewPointModal() {
+  reviewPointModal.classList.add("hidden");
+}
+
+reviewPointSettingsBtn.addEventListener("click", openReviewPointModal);
+reviewPointCancelBtn.addEventListener("click", closeReviewPointModal);
+
+reviewPointModal.addEventListener("click", (e) => {
+  if (e.target === reviewPointModal) closeReviewPointModal();
+});
+
+reviewPointSaveBtn.addEventListener("click", async () => {
+  const updates = reviewPointItems
+    .filter((item) => item.apply_flag !== item._original)
+    .map((item) => ({ source: item.source, row_index: item.row_index, apply_flag: item.apply_flag }));
+
+  if (updates.length === 0) {
+    closeReviewPointModal();
+    return;
+  }
+
+  hideMessage(reviewPointMessage);
+  reviewPointSaveBtn.disabled = true;
+  reviewPointSaveBtn.innerHTML = '<span class="loading"></span>保存中...';
+
+  try {
+    const res = await fetch("/api/review-points", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updates }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showMessage(reviewPointMessage, `エラー: ${formatErrorDetail(data.detail)}`, "error");
+      return;
+    }
+
+    reviewPointItems = (data.items || []).map((item) => ({ ...item, _original: item.apply_flag }));
+    closeReviewPointModal();
+  } catch (err) {
+    showMessage(reviewPointMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    reviewPointSaveBtn.disabled = false;
+    reviewPointSaveBtn.textContent = "保存する";
   }
 });
 

@@ -85,89 +85,11 @@ def _pick_edit_size(width: int, height: int) -> str:
     )
 
 
-def _fit_to_size(image_bytes: bytes, target_width: int, target_height: int) -> bytes:
-    """
-    画像を中央基準でクロップ・リサイズし、指定した幅・高さ（縦横比）に合わせる
-
-    Args
-    -----------------
-    - image_bytes: bytes,      対象画像のバイト列
-    - target_width: int,       合わせたい幅
-    - target_height: int,      合わせたい高さ
-
-    Returns
-    -----------------
-    - image_bytes: bytes,      幅・高さを合わせた画像（PNG）のバイト列
-
-    """
-    target_ratio = target_width / target_height
-    with Image.open(BytesIO(image_bytes)) as img:
-        img = img.convert("RGB")
-        width, height = img.size
-        current_ratio = width / height
-        if current_ratio > target_ratio:
-            # 横長すぎる場合は左右をクロップ
-            crop_width = round(height * target_ratio)
-            left = (width - crop_width) // 2
-            img = img.crop((left, 0, left + crop_width, height))
-        elif current_ratio < target_ratio:
-            # 縦長すぎる場合は上下をクロップ
-            crop_height = round(width / target_ratio)
-            top = (height - crop_height) // 2
-            img = img.crop((0, top, width, top + crop_height))
-        img = img.resize((target_width, target_height), Image.LANCZOS)
-
-        buffer = BytesIO()
-        img.save(buffer, format="PNG")
-        return buffer.getvalue()
-
-
-def _build_safe_area_instruction(edit_width: int, edit_height: int, target_width: int, target_height: int) -> str:
-    """
-    生成後に中央クロップされる範囲を踏まえ、要素が見切れないようにする指示文を作成する
-
-    Args
-    -----------------
-    - edit_width: int,      画像編集APIに指定するsizeの幅
-    - edit_height: int,     画像編集APIに指定するsizeの高さ
-    - target_width: int,    最終的に合わせたい幅（元スライド画像の幅）
-    - target_height: int,   最終的に合わせたい高さ（元スライド画像の高さ）
-
-    Returns
-    -----------------
-    - instruction: str,     セーフエリアに関する追加指示文（クロップが発生しない場合は空文字）
-
-    """
-    edit_ratio = edit_width / edit_height
-    target_ratio = target_width / target_height
-    if abs(edit_ratio - target_ratio) < 1e-6:
-        return ""
-
-    if edit_ratio > target_ratio:
-        # 生成画像は横長すぎるため、生成後に左右を中央クロップする
-        visible_ratio = target_ratio / edit_ratio
-        margin_percent = round((1 - visible_ratio) / 2 * 100)
-        side = "左右"
-    else:
-        # 生成画像は縦長すぎるため、生成後に上下を中央クロップする
-        visible_ratio = edit_ratio / target_ratio
-        margin_percent = round((1 - visible_ratio) / 2 * 100)
-        side = "上下"
-
-    return (
-        f"この画像は生成後に中央基準で{side}をそれぞれ約{margin_percent}%トリミングされます。"
-        f"文字・見出し・図表・ロゴなど、見切れて困る要素は画像の{side}端から約{margin_percent}%の範囲には配置せず、"
-        "中央のセーフエリア内に収めてください。"
-    )
-
-
 def call_image_edit(prompt: str, image_bytes: bytes) -> bytes:
     """
     元のスライド画像を指示文に従って編集し、修正後の画像バイト列を返す
 
-    元画像と縦横比が異なるsizeでしか生成できないため、生成後に元画像と同じ幅・高さへ
-    中央クロップ＋リサイズして、縦横比を元画像に合わせる。クロップで要素が見切れないよう、
-    生成前にセーフエリアの指示をプロンプトへ追加する。
+    画像編集APIは元画像と縦横比が異なるsizeでしか生成できないため、最も近いsizeオプションを選ぶ
 
     Args
     -----------------
@@ -184,12 +106,6 @@ def call_image_edit(prompt: str, image_bytes: bytes) -> bytes:
 
     # 元画像の縦横比に最も近いsizeオプションを選んで画像編集APIにリクエストを送信
     edit_size = _pick_edit_size(original_width, original_height)
-    edit_width, edit_height = (int(v) for v in edit_size.split("x"))
-
-    # 生成後のクロップで要素が見切れないよう、セーフエリアの指示を追加
-    safe_area_instruction = _build_safe_area_instruction(edit_width, edit_height, original_width, original_height)
-    if safe_area_instruction:
-        prompt = f"{prompt}\n{safe_area_instruction}"
 
     result = client.images.edit(
         model=MODEL_NAME_IMAGE,
@@ -198,7 +114,4 @@ def call_image_edit(prompt: str, image_bytes: bytes) -> bytes:
         size=edit_size,
         n=1,
     )
-    edited_bytes = base64.b64decode(result.data[0].b64_json)
-
-    # 生成された画像を元画像と同じ縦横比になるよう調整
-    return _fit_to_size(edited_bytes, original_width, original_height)
+    return base64.b64decode(result.data[0].b64_json)

@@ -8,14 +8,55 @@ from typing import Any
 
 
 if getattr(sys, "frozen", False):
-    _CSV_PATH = Path(sys.executable).resolve().parent / "review_point.csv"
+    _APP_ROOT = Path(sys.executable).resolve().parent
 else:
-    _CSV_PATH = Path(__file__).parent.parent / "review_point.csv"
+    _APP_ROOT = Path(__file__).parent.parent
+
+_CSV_PATH = _APP_ROOT / "review_point.csv"
+_PP_CHECK_CSV_PATH = _APP_ROOT / "pp_check_points.csv"
+
+# 観点設定APIで扱うCSVソース名とファイルパスの対応
+CSV_SOURCES: dict[str, Path] = {
+    "review_point": _CSV_PATH,
+    "pp_check_points": _PP_CHECK_CSV_PATH,
+}
 
 
-def _load_review_points() -> dict[str, list[str]]:
+def _read_csv_rows(csv_path: Path) -> tuple[list[str], list[dict[str, str]]]:
     """
-    CSVからレビュー観点を読み込み、perspective_type 別辞書に分けて返す
+    CSVファイルをヘッダーと行データに分けて読み込む（detail列が空の行は除外）
+
+    Args
+    -----------------
+    - csv_path: Path,                       読み込み対象のCSVファイルパス
+
+    Returns
+    -----------------
+    - fieldnames: list[str],                CSVのヘッダー列名リスト
+    - rows: list[dict[str, str]],           行データのリスト
+
+    """
+    with csv_path.open(encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        rows = [row for row in reader if (row.get("detail") or "").strip()]
+    return fieldnames, rows
+
+
+def _parse_apply_flag(value: str | None) -> bool:
+    """
+    CSVのapply_flag列の文字列("TRUE"/"FALSE")を真偽値に変換する
+    """
+    return (value or "").strip().upper() == "TRUE"
+
+
+def _load_review_points_from_csv(csv_path: Path) -> dict[str, list[str]]:
+    """
+    指定したCSVファイルから、apply_flagがTRUEのレビュー観点のみを読み込み、perspective_type 別辞書に分けて返す
+
+    Args
+    -----------------
+    - csv_path: Path,                   読み込み対象のCSVファイルパス
 
     Returns
     -----------------
@@ -23,16 +64,83 @@ def _load_review_points() -> dict[str, list[str]]:
 
     """
     by_type: dict[str, list[str]] = {}
-    with _CSV_PATH.open(encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            detail = row.get("detail", "").strip()
-            # 内容が空の行はスキップ
-            if not detail:
-                continue
-            ptype = row.get("perspective_type", "").strip()
-            by_type.setdefault(ptype, []).append(detail)
+    _, rows = _read_csv_rows(csv_path)
+    for row in rows:
+        # apply_flagがFALSEの観点はレビュー対象から除外
+        if not _parse_apply_flag(row.get("apply_flag")):
+            continue
+        ptype = (row.get("perspective_type") or "").strip()
+        by_type.setdefault(ptype, []).append((row.get("detail") or "").strip())
     return by_type
+
+
+def _load_review_points() -> dict[str, list[str]]:
+    """
+    review_point.csv と pp_check_points.csv からレビュー観点を読み込み、perspective_type 別辞書にまとめて返す
+
+    Returns
+    -----------------
+    - by_type: dict[str, list[str]],    perspective_type をキーとするレビュー観点辞書
+
+    """
+    by_type: dict[str, list[str]] = {}
+    for csv_path in (_CSV_PATH, _PP_CHECK_CSV_PATH):
+        for ptype, details in _load_review_points_from_csv(csv_path).items():
+            by_type.setdefault(ptype, []).extend(details)
+    return by_type
+
+
+def list_review_point_settings() -> list[dict[str, Any]]:
+    """
+    観点設定画面向けに、両方のCSVファイルの観点一覧（apply_flagの状態を含む）をまとめて返す
+
+    Returns
+    -----------------
+    - settings: list[dict[str, Any]],   source / row_index / perspective_type / role / apply_flag / detail を持つ辞書のリスト
+
+    """
+    settings: list[dict[str, Any]] = []
+    for source, csv_path in CSV_SOURCES.items():
+        _, rows = _read_csv_rows(csv_path)
+        for index, row in enumerate(rows):
+            settings.append({
+                "source": source,
+                "row_index": index,
+                "perspective_type": (row.get("perspective_type") or "").strip(),
+                "role": (row.get("role") or "").strip() or None,
+                "apply_flag": _parse_apply_flag(row.get("apply_flag")),
+                "detail": (row.get("detail") or "").strip(),
+            })
+    return settings
+
+
+def update_review_point_settings(updates: list[dict[str, Any]]) -> None:
+    """
+    観点設定のapply_flagをまとめて更新し、対象のCSVファイルへ書き戻す
+
+    Args
+    -----------------
+    - updates: list[dict[str, Any]],   source / row_index / apply_flag を持つ更新内容のリスト
+
+    """
+    # source（CSVファイル）ごとに更新内容をまとめる
+    updates_by_source: dict[str, dict[int, bool]] = {}
+    for u in updates:
+        source = u["source"]
+        if source not in CSV_SOURCES:
+            continue
+        updates_by_source.setdefault(source, {})[u["row_index"]] = bool(u["apply_flag"])
+
+    for source, index_map in updates_by_source.items():
+        csv_path = CSV_SOURCES[source]
+        fieldnames, rows = _read_csv_rows(csv_path)
+        for index, apply_flag in index_map.items():
+            if 0 <= index < len(rows):
+                rows[index]["apply_flag"] = "TRUE" if apply_flag else "FALSE"
+        with csv_path.open("w", encoding="utf-8-sig", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
 
 
 SYSTEM_PROMPT = """
@@ -163,22 +271,26 @@ def build_overall_per_type_summarize_prompt_package(
     }
 
 
-_IMAGE_EDIT_INSTRUCTION_SYSTEM_PROMPT = """
-あなたは、プレゼンテーションスライドのレビュー指摘を、画像編集AI（元のスライド画像1枚を書き換えるimage-to-image編集モデル）向けの指示文に変換するアシスタントです。
+_SLIDE_EDIT_PLAN_SYSTEM_PROMPT = """
+あなたは、プレゼンテーション資料全体のレビュー指摘を確認し、指摘事項がどのスライドに関係するかを判断した上で、
+画像編集AI（元のスライド画像1枚を書き換えるimage-to-image編集モデル）向けの指示文をスライドごとに振り分けるアシスタントです。
 
 画像編集AIは、元のスライド画像とテキストの指示だけを受け取り、画像そのものを直接書き換えます。レビュー指摘の文章をそのまま渡しても意図通りに編集されないため、画像編集に適した具体的な指示文を作成してください。
 
 【出力ルール】
 1. 出力は必ずJSON形式のみとしてください。前置き・説明・コードブロックは禁止です。
 2. 以下のスキーマに厳密に従ってください:
-   {"image_edit_instruction": "string"}
-3. image_edit_instruction には、画像編集AIがそのまま実行できるレベルで、視覚的に何をどう変えるかを具体的に記述してください。
+   {"slide_plans": [{"slide_number": number, "instruction": "string または null"}]}
+3. 提示されたすべてのスライド画像の内容を確認し、各指摘事項が実際にどのスライドの内容に関係するかを判断してください。指摘事項の文章に記載がなくても、画像の内容から判断して構いません。
+4. 該当する指摘があるスライドについて、instruction には画像編集AIがそのまま実行できるレベルで、視覚的に何をどう変えるかを具体的に記述してください。
    - どのテキスト・見出し・数値・図表・レイアウトを、どう変更するかを明確に書く
    - 差し替えるべきテキストがある場合は、実際の日本語の文言をそのまま指示文中に含める
    - 元のスライドのデザイン・配色・フォント・レイアウトの雰囲気はできる限り維持し、指摘のあった箇所のみを変更するよう指示する
    - 「わかりやすくして」のような抽象的な表現は禁止し、誰が実行しても同じ結果になるよう具体化する
    - スライドの端から端まで要素を詰め込まず、上下左右に十分な余白を確保した、企画資料として読みやすいレイアウトを維持するよう明記する
-4. 複数の指摘事項がある場合は、すべてを1つの指示文にまとめて記載してください
+   - 1枚のスライドに複数の指摘が該当する場合は、すべてを1つの指示文にまとめて記載してください
+5. どの指摘事項にも該当しないスライドについては、instruction に null を設定してください（そのスライドは編集しません）。
+6. 提示されたスライド番号すべてについて、1件ずつ必ず slide_plans に含めてください（該当なしの場合もnullで含める）。
 """
 
 # 画像編集AIへの指示文に、AIの出力内容によらず必ず付加する余白確保のガイダンス
@@ -189,32 +301,42 @@ LAYOUT_GUIDANCE_SUFFIX = (
 )
 
 
-def build_image_edit_instruction_prompt_package(
-    slide_number: int,
+def build_slide_edit_plan_prompt_package(
+    slides: list[dict[str, Any]],
     findings_text: str,
 ) -> dict[str, Any]:
     """
-    1枚のスライドについて、レビュー指摘を画像編集AI向けの指示文に変換するプロンプトパッケージを構築する
+    全スライド画像と指摘事項から、資料全体を見渡してスライドごとの画像編集AI向け指示を一括で決定するプロンプトパッケージを構築する
 
     Args
     -----------------
-    - slide_number: int,        対象スライド番号
-    - findings_text: str,       観点別レビュー結果（指摘事項）のテキスト
+    - slides: list[dict[str, Any]],   スライドデータ（slide_number, image_png_b64）のリスト
+    - findings_text: str,             観点別レビュー結果（指摘事項）のテキスト
 
     Returns
     -----------------
-    - package: dict[str, Any],  system_prompt と user_prompt を含むプロンプトパッケージ
+    - package: dict[str, Any],        system_prompt と user_prompt を含むプロンプトパッケージ
 
     """
-    prompt = (
-        f"スライド {slide_number} に対する指摘事項は以下の通りです。\n\n"
+    slide_numbers = [slide["slide_number"] for slide in slides]
+    intro = (
+        f"{len(slides)}枚のスライドからなるプレゼンテーション資料全体に対する指摘事項は以下の通りです。\n\n"
         f"{findings_text}\n"
-        "\nこの指摘事項をもとに、画像編集AIへ渡す指示文をJSONのみで返してください。"
+        "\n各スライドの画像を確認し、指摘事項がどのスライドに該当するかを判断した上で、"
+        "スライドごとの画像編集AI向け指示をJSONのみで返してください。"
+        f"\n対象スライド番号: {slide_numbers}"
     )
-    return {
-        "system_prompt": _IMAGE_EDIT_INSTRUCTION_SYSTEM_PROMPT,
-        "user_prompt": [{"type": "text", "text": prompt}],
-    }
+
+    content: list[dict[str, Any]] = [{"type": "text", "text": intro}]
+    for slide in slides:
+        content.append({"type": "text", "text": f"スライド {slide['slide_number']}"})
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{slide['image_png_b64']}"},
+        })
+    content.append({"type": "text", "text": "スライドごとの編集指示をJSONのみで返してください。"})
+
+    return {"system_prompt": _SLIDE_EDIT_PLAN_SYSTEM_PROMPT, "user_prompt": content}
 
 
 _CHANGE_DESCRIPTION_SYSTEM_PROMPT = """

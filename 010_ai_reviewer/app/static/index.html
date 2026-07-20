@@ -9,7 +9,10 @@
 <body>
   <div class="container">
     <div class="header-row">
-      <h1>AI PowerPoint レビュアー</h1>
+      <div class="header-title">
+        <h1>AI PowerPoint レビュアー</h1>
+        <button id="review-point-settings-btn" class="btn-settings">レビュー観点設定</button>
+      </div>
       <div class="header-actions">
         <button id="download-csv-btn" class="btn-download" disabled>指摘事項をダウンロード</button>
         <button id="download-suggestion-btn" class="btn-download" disabled>修正後スライドをダウンロード</button>
@@ -121,6 +124,10 @@
                   <div class="suggestion-compare-title">修正後</div>
                   <div class="slide-image-wrap">
                     <img id="suggestion-after-img" src="" alt="修正後">
+                    <div id="suggestion-after-spinner" class="image-spinner hidden">
+                      <span class="loading loading-lg"></span>
+                      <span>生成中...</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -134,6 +141,53 @@
 
     </div><!-- /panels -->
   </div><!-- /container -->
+
+  <!-- ========== レビュー観点設定モーダル ========== -->
+  <div id="review-point-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>レビュー観点設定</h2>
+      </div>
+      <p class="hint-text">チェックを入れた観点のみ「AIによるレビュー」で評価対象になります。</p>
+      <div id="review-point-loading" class="placeholder-text">読み込み中...</div>
+      <div id="review-point-columns" class="review-point-columns hidden">
+        <div class="review-point-column">
+          <div class="review-point-column-title">資料内容の観点（review_point.csv）</div>
+          <div id="review-point-list-left" class="review-point-list"></div>
+        </div>
+        <div class="review-point-column">
+          <div class="review-point-column-title">資料デザインの観点（pp_check_points.csv）</div>
+          <div id="review-point-list-right" class="review-point-list"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div id="review-point-message" class="message hidden"></div>
+        <div class="modal-footer-buttons">
+          <button id="review-point-cancel-btn" class="btn-secondary">キャンセル</button>
+          <button id="review-point-save-btn" class="btn-settings">保存する</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 修正対象指摘事項選択モーダル ========== -->
+  <div id="suggest-selection-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>修正対象の指摘事項を選択</h2>
+      </div>
+      <p class="hint-text">チェックを入れた指摘事項のみ、修正方針の提案に反映されます。</p>
+      <div id="suggest-selection-empty" class="placeholder-text hidden">指摘事項がありません。</div>
+      <div id="suggest-selection-list" class="review-point-list review-point-list-standalone"></div>
+      <div class="modal-footer">
+        <div id="suggest-selection-message" class="message hidden"></div>
+        <div class="modal-footer-buttons">
+          <button id="suggest-selection-cancel-btn" class="btn-secondary">キャンセル</button>
+          <button id="suggest-selection-run-btn" class="btn-settings">修正実行</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

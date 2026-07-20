@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import uvicorn
 import tempfile
 from io import BytesIO
@@ -11,17 +12,19 @@ from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.prompt import (
     LAYOUT_GUIDANCE_SUFFIX,
     build_change_description_prompt_package,
-    build_image_edit_instruction_prompt_package,
     build_overall_per_type_prompt_packages_by_type,
     build_overall_per_type_summarize_prompt_package,
     build_revision_findings_text,
+    build_slide_edit_plan_prompt_package,
+    list_review_point_settings,
+    update_review_point_settings,
 )
 from app.renderer import render_pptx_to_images, images_to_base64_dict
 from app.azure_ai_service import call_image_edit, call_review
@@ -62,6 +65,26 @@ class ExportSlideInput(BaseModel):
 class ExportPdfRequest(BaseModel):
     slides: list[ExportSlideInput]
 
+
+class ReviewPointItem(BaseModel):
+    source: str
+    row_index: int
+    perspective_type: str
+    perspective_label: str
+    role: str | None = None
+    apply_flag: bool
+    detail: str
+
+
+class ReviewPointUpdateItem(BaseModel):
+    source: str
+    row_index: int
+    apply_flag: bool
+
+
+class ReviewPointUpdateRequest(BaseModel):
+    updates: list[ReviewPointUpdateItem]
+
 # フロントエンドのHTMLパス
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -74,6 +97,11 @@ PTYPE_LABELS: dict[str, str] = {
     "priority":    "優先度・差別化",
     "feasibility": "実現可能性",
     "evaluation":  "評価・検証",
+    "composition": "レイアウト構成",
+    "character":   "文字表現",
+    "colors":      "配色",
+    "figures":     "図表・画像",
+    "sentence":    "文章表現",
 }
 
 
@@ -109,6 +137,47 @@ def health() -> dict:
     ヘルスチェックエンドポイント
     """
     return {"status": "ok"}
+
+
+def _build_review_point_items() -> list[ReviewPointItem]:
+    """
+    CSVから読み込んだ観点設定一覧を、日本語ラベル付きのレスポンス形式に変換する
+    """
+    items = []
+    for row in list_review_point_settings():
+        ptype = row["perspective_type"]
+        items.append(ReviewPointItem(
+            source=row["source"],
+            row_index=row["row_index"],
+            perspective_type=ptype,
+            perspective_label=PTYPE_LABELS.get(ptype, ptype),
+            role=row["role"],
+            apply_flag=row["apply_flag"],
+            detail=row["detail"],
+        ))
+    return items
+
+
+@app.get("/api/review-points")
+def get_review_points() -> dict:
+    """
+    レビュー観点設定（CSVに記載された観点とapply_flagの状態）の一覧を返す
+    """
+    return {"items": [item.model_dump() for item in _build_review_point_items()]}
+
+
+@app.post("/api/review-points")
+def update_review_points(request: ReviewPointUpdateRequest) -> dict:
+    """
+    レビュー観点設定のapply_flagを更新し、CSVファイルへ書き戻す
+    """
+    if not request.updates:
+        raise HTTPException(status_code=400, detail="更新内容がありません。")
+    try:
+        update_review_point_settings([u.model_dump() for u in request.updates])
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"観点設定の更新に失敗しました: {exc}") from exc
+    return {"items": [item.model_dump() for item in _build_review_point_items()]}
 
 
 @app.post("/api/upload")
@@ -211,31 +280,50 @@ async def review_pptx(request: ReviewRequest) -> dict:
     }
 
 
-def _suggest_revision_for_slide(slide: dict, findings_text: str) -> dict:
+def _plan_slide_edits(slides: list[dict], findings_text: str) -> dict[int, str]:
     """
-    1枚のスライドについて、指摘事項をもとに画像編集AIで修正後スライド画像と修正内容説明を生成する（同期処理）
+    全スライド画像と指摘事項から、資料全体を見渡してスライドごとの編集指示を一括で決定する（同期処理）
+
+    Returns
+    -----------------
+    - plans: dict[int, str],   slide_number をキーとする編集指示の辞書（該当なしのスライドは含まれない）
+
+    """
+    plan_package = build_slide_edit_plan_prompt_package(slides, findings_text)
+    try:
+        plan_result = call_review(plan_package)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AIレビュー（修正方針の一括決定）に失敗しました: {exc}") from exc
+
+    plans: dict[int, str] = {}
+    for entry in plan_result.get("slide_plans", []):
+        instruction = (entry.get("instruction") or "").strip()
+        if not instruction:
+            continue
+        slide_number = entry.get("slide_number")
+        if isinstance(slide_number, int):
+            plans[slide_number] = instruction
+    return plans
+
+
+def _suggest_revision_for_slide(slide: dict, edit_instruction: str) -> dict:
+    """
+    1枚のスライドについて、割り当てられた編集指示をもとに画像編集AIで修正後スライド画像と修正内容説明を生成する（同期処理）
     """
     slide_number = slide["slide_number"]
     original_image_b64 = slide["image_png_b64"]
 
-    # Step1: 指摘事項を画像編集AI向けの指示文に変換
-    instruction_package = build_image_edit_instruction_prompt_package(slide_number, findings_text)
-    try:
-        instruction_result = call_review(instruction_package)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"AIレビュー（修正指示文生成）に失敗しました: {exc}") from exc
-    edit_instruction = instruction_result.get("image_edit_instruction", "")
     # AIの出力内容によらず、余白確保のガイダンスを必ず付加する
     edit_instruction = f"{edit_instruction}\n{LAYOUT_GUIDANCE_SUFFIX}"
 
-    # Step2: 画像編集AIで元スライド画像を修正
+    # Step1: 画像編集AIで元スライド画像を修正
     try:
         edited_image_bytes = call_image_edit(edit_instruction, base64.b64decode(original_image_b64))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"AI画像修正に失敗しました: {exc}") from exc
     edited_image_b64 = base64.b64encode(edited_image_bytes).decode()
 
-    # Step3: 修正前後の画像を比較し、実際に施した修正内容の説明を生成
+    # Step2: 修正前後の画像を比較し、実際に施した修正内容の説明を生成
     description_package = build_change_description_prompt_package(slide_number, original_image_b64, edited_image_b64)
     try:
         description_result = call_review(description_package)
@@ -249,10 +337,64 @@ def _suggest_revision_for_slide(slide: dict, findings_text: str) -> dict:
     }
 
 
+async def _stream_slide_suggestions(slides: list[dict], findings_text: str):
+    """
+    資料全体を見渡してスライドごとの編集方針を決定し、その方針にもとづく修正をスライドごとに並列実行して、
+    完了したものから順にSSE形式でyieldする（非同期ジェネレータ）
+
+    Args
+    -----------------
+    - slides: list[dict],       スライドデータのリスト
+    - findings_text: str,       観点別レビュー結果（指摘事項）のテキスト
+
+    """
+    total = len(slides)
+    yield f"data: {json.dumps({'type': 'start', 'total': total})}\n\n"
+
+    loop = asyncio.get_running_loop()
+
+    # Step1: 全スライドを見渡して、スライドごとの編集方針を一括決定する
+    try:
+        plans = await loop.run_in_executor(None, _plan_slide_edits, slides, findings_text)
+    except Exception as exc:
+        detail = getattr(exc, "detail", str(exc))
+        for slide in slides:
+            error_payload = {"type": "slide_error", "slide_number": slide["slide_number"], "detail": detail}
+            yield f"data: {json.dumps(error_payload, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        return
+
+    async def _run(executor: ThreadPoolExecutor, slide: dict) -> dict:
+        # 該当する指摘がないスライドは画像編集自体をスキップする
+        slide_number = slide["slide_number"]
+        instruction = plans.get(slide_number)
+        if not instruction:
+            return {"type": "slide_skipped", "slide_number": slide_number}
+
+        # 1スライド分の処理を実行し、失敗しても他スライドの処理を止めないようエラーを結果として返す
+        try:
+            result = await loop.run_in_executor(executor, _suggest_revision_for_slide, slide, instruction)
+            return {"type": "slide_done", **result}
+        except Exception as exc:
+            detail = getattr(exc, "detail", str(exc))
+            return {"type": "slide_error", "slide_number": slide_number, "detail": detail}
+
+    # スライド枚数がPythonのデフォルトスレッドプール上限を超えても待機が発生しないよう、
+    # スライド枚数分のワーカーを持つ専用スレッドプールで並列実行する
+    with ThreadPoolExecutor(max_workers=total) as executor:
+        tasks = [_run(executor, slide) for slide in slides]
+        for coro in asyncio.as_completed(tasks):
+            payload = await coro
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+
 @app.post("/api/suggest")
-async def suggest_revision(request: SuggestionRequest) -> dict:
+async def suggest_revision(request: SuggestionRequest) -> StreamingResponse:
     """
     観点別レビュー結果とスライド画像をもとに、AIがスライドごとの修正方針を提案する
+    完了したスライドから順にSSE形式でストリーミング返却する
     """
     # スライド情報が読み取れなかった場合
     if not request.slides:
@@ -264,20 +406,11 @@ async def suggest_revision(request: SuggestionRequest) -> dict:
     data = request.model_dump()
     findings_text = build_revision_findings_text(data["perspectives"])
 
-    # スライド枚数がPythonのデフォルトスレッドプール上限を超えても待機が発生しないよう、
-    # スライド枚数分のワーカーを持つ専用スレッドプールで並列実行する
-    loop = asyncio.get_running_loop()
-    with ThreadPoolExecutor(max_workers=len(data["slides"])) as executor:
-        slide_suggestions = await asyncio.gather(
-            *(
-                loop.run_in_executor(executor, _suggest_revision_for_slide, slide, findings_text)
-                for slide in data["slides"]
-            )
-        )
-
-    return {
-        "slide_suggestions": list(slide_suggestions),
-    }
+    return StreamingResponse(
+        _stream_slide_suggestions(data["slides"], findings_text),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 def _build_pdf_from_slides(slides: list[dict]) -> bytes:

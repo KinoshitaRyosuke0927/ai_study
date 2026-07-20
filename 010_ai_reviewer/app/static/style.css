@@ -181,6 +181,13 @@ button {
   margin-top: 12px;
 }
 
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -193,6 +200,31 @@ button {
   width: auto;
   padding: 8px 16px;
   font-size: 0.82rem;
+}
+
+.btn-settings {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  background-color: #0052cc;
+}
+
+.btn-settings:hover:not(:disabled) {
+  background-color: #0041a3;
+}
+
+.btn-secondary {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  background-color: #e2e8f0;
+  color: #333;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #cbd5e0;
 }
 
 button:hover:not(:disabled) {
@@ -424,7 +456,9 @@ button:disabled {
 /* ========== スライド画像（フル幅） ========== */
 
 .slide-image-wrap {
+  position: relative;
   width: 100%;
+  min-height: 160px;
   background: #f8f9fa;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
@@ -439,6 +473,31 @@ button:disabled {
   height: auto;
   max-height: 460px;
   object-fit: contain;
+}
+
+.slide-image-wrap img.hidden { display: none; }
+
+.image-spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #a0aec0;
+  font-size: 0.8rem;
+}
+
+.image-spinner.hidden { display: none; }
+
+.image-spinner .loading-lg {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+  border-color: rgba(0, 82, 204, 0.2);
+  border-top-color: #0052cc;
+  margin-right: 0;
 }
 
 /* ========== 修正方針タブ（修正前後の画像比較） ========== */
@@ -639,6 +698,139 @@ button:disabled {
   animation: spin 0.7s linear infinite;
   vertical-align: middle;
   margin-right: 5px;
+}
+
+/* ========== レビュー観点設定モーダル ========== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-overlay.hidden { display: none; }
+
+.modal-box {
+  background: #fff;
+  border-radius: 8px;
+  width: 90vw;
+  max-height: 84vh;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  margin-bottom: 4px;
+}
+
+.modal-header h2 {
+  margin-bottom: 0;
+}
+
+.review-point-columns {
+  display: flex;
+  gap: 24px;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+}
+
+.review-point-columns.hidden { display: none; }
+
+.review-point-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.review-point-column-title {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #444;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.review-point-list {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.review-point-list-standalone {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+}
+
+.review-point-list-standalone.hidden { display: none; }
+
+.review-point-group {
+  margin-bottom: 16px;
+}
+
+.review-point-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: #0052cc;
+  margin-bottom: 6px;
+}
+
+.review-point-group-title input[type="checkbox"] {
+  width: auto;
+  flex-shrink: 0;
+}
+
+.review-point-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 4px;
+}
+
+.review-point-row:hover {
+  background: #f7fafc;
+}
+
+.review-point-row input[type="checkbox"] {
+  width: auto;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.review-point-row label {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #333;
+  cursor: pointer;
+}
+
+.modal-footer {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+  margin-top: 12px;
+  flex-shrink: 0;
+}
+
+.modal-footer-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-footer-buttons button {
+  width: auto;
 }
 
 @keyframes spin {
