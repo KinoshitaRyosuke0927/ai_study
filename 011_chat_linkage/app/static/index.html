@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mattermost チャット連携</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Mattermost チャット連携</h1>
+
+    <div class="panels">
+
+      <!-- ========== 左: チャンネル選択 + 履歴一覧 ========== -->
+      <div class="panel panel-left">
+
+        <section class="section">
+          <h2>チャンネル・期間を選択</h2>
+          <div class="form-group">
+            <label for="channel-select">チャンネル</label>
+            <select id="channel-select">
+              <option value="">読み込み中...</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="start-date">取得開始日</label>
+              <input type="date" id="start-date">
+            </div>
+            <div class="form-group">
+              <label for="end-date">取得終了日</label>
+              <input type="date" id="end-date">
+            </div>
+          </div>
+          <button id="fetch-posts-btn" disabled>履歴を取得</button>
+          <div id="posts-message" class="message hidden"></div>
+        </section>
+
+        <section class="section last post-list-section">
+          <h2>取得した投稿一覧</h2>
+          <div id="post-list" class="post-list">
+            <p class="post-list-placeholder">履歴を取得すると一覧が表示されます</p>
+          </div>
+        </section>
+
+      </div><!-- /panel-left -->
+
+      <div class="panel-divider"></div>
+
+      <!-- ========== 右: 投稿詳細 + DM投稿 ========== -->
+      <div class="panel panel-right">
+
+        <section class="section detail-section">
+          <h2>投稿内容</h2>
+          <div id="post-detail" class="post-detail">
+            <p class="post-detail-placeholder">左の一覧から投稿を選択してください</p>
+          </div>
+        </section>
+
+        <section class="section last dm-section">
+          <h2><span id="dm-target-username">-</span> 宛にDMを投稿</h2>
+          <textarea id="dm-input" placeholder="メッセージを入力してください"></textarea>
+          <button id="dm-submit-btn">投稿</button>
+          <div id="dm-message" class="message hidden"></div>
+        </section>
+
+      </div><!-- /panel-right -->
+
+    </div><!-- /panels -->
+  </div><!-- /container -->
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

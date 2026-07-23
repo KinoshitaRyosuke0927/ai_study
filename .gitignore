@@ -32,6 +32,7 @@ node_modules/
 
 # シークレットが含まれるファイル
 docs/Qiita/appendix/crs_extend_01/project_codes.json
+011_chat_linkage/mattermost_key.txt
 
 # Kaggle 提出ファイル（大容量・コードではないため管理不要）
 **/submission_*.csv
