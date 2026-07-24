@@ -510,9 +510,38 @@ button:disabled {
   height: auto;
   max-height: 460px;
   object-fit: contain;
+  cursor: zoom-in;
 }
 
 .slide-image-wrap img.hidden { display: none; }
+
+/* ========== スライド画像拡大表示モーダル ========== */
+
+.lightbox-overlay {
+  z-index: 200;
+  cursor: zoom-out;
+}
+
+.lightbox-overlay.hidden { display: none; }
+
+.lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 32px;
+  font-size: 2.2rem;
+  line-height: 1;
+  color: #fff;
+  cursor: pointer;
+  user-select: none;
+}
 
 .image-spinner {
   position: absolute;

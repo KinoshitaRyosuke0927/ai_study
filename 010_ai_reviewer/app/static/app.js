@@ -550,7 +550,7 @@ reviewBtn.addEventListener("click", async () => {
     showMessage(reviewMessage, `ネットワークエラー: ${err.message}`, "error");
   } finally {
     reviewBtn.disabled = false;
-    reviewBtn.textContent = "AIでレビューする";
+    reviewBtn.textContent = "レビューする";
   }
 });
 
@@ -689,7 +689,7 @@ async function runSuggestionProcess(perspectives) {
     if (hasError) {
       showMessage(suggestMessage, "一部のスライドで修正方針の生成に失敗しました", "error");
     } else {
-      showMessage(suggestMessage, "修正方針の提案が完了しました", "success");
+      showMessage(suggestMessage, "修正方針の検討が完了しました", "success");
     }
   } catch (err) {
     showMessage(suggestMessage, `ネットワークエラー: ${err.message}`, "error");
@@ -1113,6 +1113,43 @@ reviewPointSaveBtn.addEventListener("click", async () => {
   } finally {
     reviewPointSaveBtn.disabled = false;
     reviewPointSaveBtn.textContent = "保存する";
+  }
+});
+
+// ============================================================
+// スライド画像拡大表示（ライトボックス）
+// ============================================================
+
+const imageLightboxModal = document.getElementById("image-lightbox-modal");
+const imageLightboxImg   = document.getElementById("image-lightbox-img");
+const imageLightboxClose = document.getElementById("image-lightbox-close");
+
+function openImageLightbox(src, alt) {
+  if (!src) return;
+  imageLightboxImg.src = src;
+  imageLightboxImg.alt = alt || "";
+  imageLightboxModal.classList.remove("hidden");
+}
+
+function closeImageLightbox() {
+  imageLightboxModal.classList.add("hidden");
+  imageLightboxImg.src = "";
+}
+
+// スライド画像エリア（伝えたいこと / 指摘事項 / 修正方針の各タブ）のクリックで拡大表示
+document.querySelectorAll(".slide-image-wrap img").forEach((img) => {
+  img.addEventListener("click", () => {
+    if (!img.getAttribute("src") || img.classList.contains("hidden")) return;
+    openImageLightbox(img.src, img.alt);
+  });
+});
+
+imageLightboxModal.addEventListener("click", closeImageLightbox);
+imageLightboxClose.addEventListener("click", closeImageLightbox);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !imageLightboxModal.classList.contains("hidden")) {
+    closeImageLightbox();
   }
 });
 
