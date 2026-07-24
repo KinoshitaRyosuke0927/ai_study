@@ -100,6 +100,25 @@ h3 {
   min-height: 0;
 }
 
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.detail-header h2 {
+  margin-bottom: 0;
+}
+
+.reminder-btn {
+  width: auto;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
 .detail-section {
   flex: 1;
   display: flex;
@@ -108,7 +127,15 @@ h3 {
 }
 
 .dm-section {
-  flex-shrink: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dm-section textarea {
+  flex: 1;
+  min-height: 0;
 }
 
 /* ========== フォームパーツ ========== */

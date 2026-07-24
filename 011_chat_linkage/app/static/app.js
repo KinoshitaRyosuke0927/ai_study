@@ -38,7 +38,9 @@ const postsMessage   = document.getElementById("posts-message");
 
 const postList = document.getElementById("post-list");
 
-const postDetail = document.getElementById("post-detail");
+const postDetail   = document.getElementById("post-detail");
+const reminderBtn  = document.getElementById("reminder-btn");
+const reminderMessage = document.getElementById("reminder-message");
 
 const dmTargetUsername = document.getElementById("dm-target-username");
 const dmInput           = document.getElementById("dm-input");
@@ -51,6 +53,8 @@ const dmMessage         = document.getElementById("dm-message");
 
 let fetchedPosts = [];
 let selectedPostId = null;
+let selectedPostMessage = null;
+let selectedPostUsername = null;
 
 // ============================================================
 // チャンネル一覧の取得
@@ -104,7 +108,7 @@ channelSelect.addEventListener("change", () => {
 // 履歴の取得
 // ============================================================
 
-fetchPostsBtn.addEventListener("click", async () => {
+async function fetchAndRenderPosts() {
   hideMessage(postsMessage);
   postList.innerHTML = "";
   resetPostDetail();
@@ -163,7 +167,9 @@ fetchPostsBtn.addEventListener("click", async () => {
     fetchPostsBtn.disabled = false;
     fetchPostsBtn.textContent = "履歴を取得";
   }
-});
+}
+
+fetchPostsBtn.addEventListener("click", fetchAndRenderPosts);
 
 // ============================================================
 // 投稿の選択・詳細表示（リアクション含む）
@@ -171,11 +177,19 @@ fetchPostsBtn.addEventListener("click", async () => {
 
 function resetPostDetail() {
   selectedPostId = null;
+  selectedPostMessage = null;
+  selectedPostUsername = null;
+  reminderBtn.disabled = true;
+  hideMessage(reminderMessage);
   postDetail.innerHTML = `<p class="post-detail-placeholder">左の一覧から投稿を選択してください</p>`;
 }
 
 async function selectPost(post, itemEl) {
   selectedPostId = post.id;
+  selectedPostMessage = post.message;
+  selectedPostUsername = post.username;
+  reminderBtn.disabled = false;
+  hideMessage(reminderMessage);
 
   document.querySelectorAll(".post-list-item").forEach((el) => el.classList.remove("selected"));
   itemEl.classList.add("selected");
@@ -215,6 +229,42 @@ async function selectPost(post, itemEl) {
     reactionsEl.innerHTML = `<h3>リアクション</h3><p class="post-reactions-error">ネットワークエラー: ${err.message}</p>`;
   }
 }
+
+// ============================================================
+// リマインド文章の作成
+// ============================================================
+
+reminderBtn.addEventListener("click", async () => {
+  hideMessage(reminderMessage);
+
+  if (!selectedPostMessage) {
+    showMessage(reminderMessage, "投稿を選択してください", "error");
+    return;
+  }
+
+  reminderBtn.disabled = true;
+  reminderBtn.textContent = "作成中...";
+
+  try {
+    const res = await fetch("/api/reminder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: selectedPostMessage, author_username: selectedPostUsername }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showMessage(reminderMessage, `エラー: ${data.detail}`, "error");
+      return;
+    }
+    dmInput.value = data.reminder;
+    showMessage(reminderMessage, "リマインド文章をDM入力欄に反映しました。", "success");
+  } catch (err) {
+    showMessage(reminderMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    reminderBtn.disabled = false;
+    reminderBtn.textContent = "リマインドを作成";
+  }
+});
 
 // ============================================================
 // DM投稿
@@ -266,5 +316,46 @@ async function loadTargetUsername() {
   }
 }
 
-loadChannels();
-loadTargetUsername();
+/** "YYYY-MM-DD" 形式の文字列を返す */
+function toDateInputValue(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** settings.ini の設定(対象チャンネル・取得期間)を画面に反映し、履歴取得を自動実行する */
+async function applySettingsAndFetch() {
+  try {
+    const res = await fetch("/api/settings");
+    const settings = await res.json();
+    if (!settings.channel) return;
+
+    const matched = Array.from(channelSelect.options).find(
+      (opt) => opt.value && opt.textContent.trim() === settings.channel.trim()
+    );
+    if (!matched) {
+      showMessage(postsMessage, `settings.iniのチャンネル「${settings.channel}」が見つかりませんでした`, "error");
+      return;
+    }
+    channelSelect.value = matched.value;
+    fetchPostsBtn.disabled = false;
+
+    const readDate = settings.read_date || 30;
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - (readDate - 1));
+    startDateInput.value = toDateInputValue(start);
+    endDateInput.value = toDateInputValue(end);
+
+    await fetchAndRenderPosts();
+  } catch (err) {
+    showMessage(postsMessage, `settings.iniの読み込みに失敗しました: ${err.message}`, "error");
+  }
+}
+
+async function init() {
+  await loadChannels();
+  loadTargetUsername();
+  await applySettingsAndFetch();
+}
+
+init();

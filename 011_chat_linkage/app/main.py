@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import configparser
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -14,13 +15,36 @@ from pydantic import BaseModel
 import requests
 
 from app import mattermost_service as mm
+from app.azure_ai_service import call_generate_reminder
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
+SETTINGS_PATH = BASE_DIR.parent / "settings.ini"
+
+
+def load_settings() -> dict:
+    """settings.ini を読み込んで辞書で返す。ファイルがない場合は空辞書"""
+    config = configparser.ConfigParser()
+    if not SETTINGS_PATH.exists():
+        print("[警告] settings.ini が見つかりません。画面からの手動選択が必要です。")
+        return {}
+    config.read(SETTINGS_PATH, encoding="utf-8")
+    return {
+        "channel": config.get("history", "channel", fallback=""),
+        "read_date": config.getint("history", "read_date", fallback=30),
+    }
+
+
+SETTINGS = load_settings()
 
 
 class DmRequest(BaseModel):
     message: str
+
+
+class ReminderRequest(BaseModel):
+    message: str
+    author_username: str
 
 
 app = FastAPI(title="Mattermost チャット連携", version="1.0.0")
@@ -51,6 +75,12 @@ def health() -> dict:
 @app.get("/api/target-username")
 def get_target_username() -> dict:
     return {"username": mm.MATTERMOST_TARGET_USERNAME}
+
+
+@app.get("/api/settings")
+def get_settings() -> dict:
+    """settings.ini に設定された、履歴取得対象のチャンネル名・期間(日数)を返す"""
+    return SETTINGS
 
 
 @app.get("/api/channels")
@@ -84,6 +114,20 @@ def get_post_reactions(post_id: str) -> list[dict]:
         return mm.get_post_reactions(post_id)
     except requests.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Mattermost APIエラー: {exc}") from exc
+
+
+@app.post("/api/reminder")
+def post_reminder(request: ReminderRequest) -> dict:
+    message = request.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="投稿内容がありません")
+
+    try:
+        reminder = call_generate_reminder(message, request.author_username.strip())
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AIによるリマインド生成に失敗しました: {exc}") from exc
+
+    return {"reminder": reminder}
 
 
 @app.post("/api/dm")
