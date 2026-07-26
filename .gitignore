@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Azure Functions ローカル設定（シークレットが含まれるため Git 管理対象外）
+local.settings.json
+
 # Python
 __pycache__/
 *.pyc
