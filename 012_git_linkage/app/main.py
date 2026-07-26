@@ -1,5 +1,6 @@
-"""GitHub Webhook 連携アプリの FastAPI エントリポイント。
+"""GitHub Webhook 連携アプリの FastAPI エントリポイント(ローカル動作確認用)。
 指定ブランチへのPRマージを検知し、差分をAIで要約してMattermostへ通知する。
+本番(Azure Functions)向けの処理本体は webhook_handler.py に共通化している。
 """
 
 from __future__ import annotations
@@ -7,11 +8,8 @@ from __future__ import annotations
 import logging
 
 from fastapi import FastAPI, Header, HTTPException, Request
-import requests
 
-from app import github_service as gh
-from app import mattermost_service as mm
-from app.azure_ai_service import call_summarize_diff
+from app.webhook_handler import WebhookError, process_github_webhook
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -39,47 +37,11 @@ async def github_webhook(
     # 署名検証のため、JSONパース前に生のリクエストボディを取得する
     body = await request.body()
 
-    # 正規のGitHubからのリクエストか署名を検証する
-    if not gh.verify_signature(body, x_hub_signature_256):
-        raise HTTPException(status_code=401, detail="署名の検証に失敗しました")
-
-    # pull_request イベント以外（push等）は対象外
-    if x_github_event != "pull_request":
-        return {"result": "ignored", "reason": f"unsupported event: {x_github_event}"}
-
-    payload = await request.json()
-
-    # 監視対象リポジトリ・監視対象ブランチへのマージでなければ何もしない
-    if not gh.is_target_merge_event(payload):
-        return {"result": "ignored", "reason": "not a target merge event"}
-
-    pr = payload["pull_request"]
-    pr_number = pr["number"]
-
     try:
-        # Step1: GitHub APIからPRの差分と変更ファイル一覧を取得
-        diff_text = gh.get_pr_diff(pr_number)
-        files_summary = gh.get_pr_files_summary(pr_number)
-        # Step2: AIで変更内容を要約
-        summary = call_summarize_diff(
-            diff_text=diff_text,
-            files_summary=files_summary,
-            pr_number=pr_number,
-            pr_title=pr["title"],
-            author=pr["user"]["login"],
-            base_branch=pr["base"]["ref"],
-            head_branch=pr["head"]["ref"],
-        )
-        # Step3: 要約メッセージをMattermostのDM送信先へ投稿
-        mm.post_dm_to_target(summary)
-    except requests.HTTPError as exc:
-        logger.exception("外部API呼び出しに失敗しました")
-        raise HTTPException(status_code=502, detail=f"外部APIエラー: {exc}") from exc
-    except Exception as exc:
+        return process_github_webhook(body, x_hub_signature_256, x_github_event)
+    except WebhookError as exc:
         logger.exception("マージ通知処理に失敗しました")
-        raise HTTPException(status_code=500, detail=f"通知処理に失敗しました: {exc}") from exc
-
-    return {"result": "notified", "pr_number": pr_number}
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 # サーバ起動用
