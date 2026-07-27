@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JBDカレンダー作成</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    .container {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+      padding: 40px 48px;
+      width: 900px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .btn-back-arrow {
+      font-size: 1.2rem;
+      color: #64748b;
+      text-decoration: none;
+      line-height: 1;
+      margin-right: 10px;
+      transition: color 0.15s;
+    }
+
+    .btn-back-arrow:hover { color: #1a2e44; }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #1a2e44;
+      flex: 1;
+    }
+
+    .period-info {
+      font-size: 0.875rem;
+      color: #475569;
+      margin-bottom: 24px;
+      padding: 10px 14px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border-left: 3px solid #94a3b8;
+    }
+
+    .panel {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+
+    .panel-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 12px;
+    }
+
+    .panel-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .panel-label {
+      font-size: 0.85rem;
+      color: #475569;
+      font-weight: 600;
+      min-width: 36px;
+    }
+
+    input[type="date"] {
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: #1a2e44;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="date"]:focus { border-color: #3b82f6; }
+
+    .btn-load {
+      background: #3b82f6;
+      color: #ffffff;
+      border: none;
+      padding: 8px 22px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-load:hover { background: #2563eb; }
+
+    .btn-create {
+      background: #6366f1;
+      color: #ffffff;
+      border: none;
+      padding: 6px 20px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-create:hover { background: #4f46e5; }
+
+    .btn-update {
+      background: #10b981;
+      color: #ffffff;
+      border: none;
+      padding: 8px 22px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-update:hover { background: #059669; }
+
+    .btn-update:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+    }
+
+    .btn-update:disabled:hover { background: #cbd5e1; }
+
+    .msg {
+      font-size: 0.875rem;
+      font-weight: 600;
+      min-height: 1.4em;
+      margin-bottom: 12px;
+    }
+
+    #calendar-area { display: none; }
+
+    .calendar-label {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a2e44;
+      margin-bottom: 12px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      font-size: 0.8rem;
+      color: #475569;
+      align-items: center;
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+
+    .legend-box {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+    }
+
+    .legend-box.bizday { background: #dbeafe; border: 1px solid #93c5fd; }
+    .legend-box.holiday { background: #f8fafc; border: 1px solid #e2e8f0; }
+
+    /* アコーディオン */
+    .year-section { margin-bottom: 8px; }
+
+    .year-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #475569;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    .year-label:hover { background: #f1f5f9; }
+
+    .year-label .chevron {
+      font-size: 0.75rem;
+      transition: transform 0.2s;
+      display: inline-block;
+    }
+
+    .year-label.collapsed .chevron { transform: rotate(-90deg); }
+
+    .months-wrap {
+      padding: 12px 0 4px;
+    }
+
+    .months-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .month-calendar {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .month-header {
+      background: #f8fafc;
+      text-align: center;
+      padding: 8px;
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: #334155;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      padding: 6px;
+      gap: 2px;
+    }
+
+    .weekday-header {
+      text-align: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #94a3b8;
+      padding: 4px 0;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.12s;
+    }
+
+    .weekday-header:hover { background: #f1f5f9; }
+    .weekday-header.sun { color: #f87171; }
+    .weekday-header.sat { color: #60a5fa; }
+
+    .day-cell {
+      text-align: center;
+      font-size: 0.75rem;
+      padding: 4px 2px;
+      border-radius: 4px;
+      line-height: 1.6;
+      cursor: pointer;
+      transition: opacity 0.1s;
+    }
+
+    .day-cell:hover { opacity: 0.75; }
+    .day-cell.empty { visibility: hidden; cursor: default; }
+    .day-cell.empty:hover { opacity: 1; }
+
+    .day-cell.bizday {
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-weight: 600;
+    }
+
+    .day-cell.holiday { color: #cbd5e1; }
+
+    /* 一括変更パネル */
+    .dow-checkboxes {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .dow-check-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.85rem;
+      color: #334155;
+      cursor: pointer;
+    }
+
+    .dow-check-item input[type="checkbox"] { cursor: pointer; }
+
+    .dow-check-item.sun { color: #ef4444; }
+    .dow-check-item.sat { color: #3b82f6; }
+
+    .bulk-btns { display: flex; gap: 8px; }
+
+    .btn-bulk-bizday {
+      background: #dbeafe;
+      color: #1d4ed8;
+      border: 1px solid #93c5fd;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-bulk-bizday:hover { background: #bfdbfe; }
+
+    .btn-bulk-holiday {
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-bulk-holiday:hover { background: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="/" class="btn-back-arrow">←</a>
+      <h1>JBDカレンダー作成</h1>
+      <button class="btn-update" id="btn-save" onclick="saveCalendar()" disabled>保存</button>
+    </div>
+
+    <div class="period-info">
+      現在の登録期間：<span id="period-text">{{ min_date }} 〜 {{ max_date }}</span>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">既存データの読み込み</div>
+      <div class="panel-row">
+        <button class="btn-load" onclick="loadExisting()">既存カレンダーを読み込む</button>
+      </div>
+
+      <div class="panel-title" style="margin-top:16px;">カレンダーを延長する</div>
+      <div class="panel-row">
+        <span class="panel-label">延長先</span>
+        <input type="date" id="extend-end" />
+        <button class="btn-create" onclick="extendCalendar()">延長する</button>
+        <button class="btn-create" onclick="addPublicHolidays()" title="すべての年の年末年始期間(12/29〜1/4)を休日に設定します">公休追加</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">期間を指定して新規作成</div>
+      <div class="panel-row">
+        <span class="panel-label">期間</span>
+        <input type="date" id="new-start" />
+        <span style="color:#94a3b8">〜</span>
+        <input type="date" id="new-end" />
+        <button class="btn-create" onclick="createNew()">新規作成</button>
+      </div>
+    </div>
+
+    <p class="msg" id="msg"></p>
+
+    <div id="calendar-area">
+      <p class="calendar-label" id="calendar-label">JBDカレンダー</p>
+
+      <div class="panel">
+        <div class="panel-title">期間・曜日指定 一括変更</div>
+        <div class="panel-row" style="margin-bottom:10px;">
+          <span class="panel-label">期間</span>
+          <input type="date" id="bulk-start" />
+          <span style="color:#94a3b8">〜</span>
+          <input type="date" id="bulk-end" />
+        </div>
+        <div class="panel-row" style="margin-bottom:10px;">
+          <span class="panel-label">曜日</span>
+          <div class="dow-checkboxes">
+            <label class="dow-check-item sun"><input type="checkbox" class="dow-checkbox" value="0" />日</label>
+            <label class="dow-check-item"><input type="checkbox" class="dow-checkbox" value="1" />月</label>
+            <label class="dow-check-item"><input type="checkbox" class="dow-checkbox" value="2" />火</label>
+            <label class="dow-check-item"><input type="checkbox" class="dow-checkbox" value="3" />水</label>
+            <label class="dow-check-item"><input type="checkbox" class="dow-checkbox" value="4" />木</label>
+            <label class="dow-check-item"><input type="checkbox" class="dow-checkbox" value="5" />金</label>
+            <label class="dow-check-item sat"><input type="checkbox" class="dow-checkbox" value="6" />土</label>
+          </div>
+        </div>
+        <div class="panel-row">
+          <span class="panel-label"></span>
+          <div class="bulk-btns">
+            <button class="btn-bulk-bizday" onclick="bulkChange(1)">営業日にする</button>
+            <button class="btn-bulk-holiday" onclick="bulkChange(0)">休日にする</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-box bizday"></div>
+          <span>営業日</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-box holiday"></div>
+          <span>休日</span>
+        </div>
+        <span style="font-size:0.78rem;color:#94a3b8;">（日付クリックで個別切り替え、曜日ヘッダークリックで月内一括切り替え）</span>
+      </div>
+      <div id="calendar-container"></div>
+    </div>
+  </div>
+
+  <script>
+    const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+    let currentData = {};
+
+    function setBulkRangeFromData() {
+      const dates = Object.keys(currentData).sort();
+      if (dates.length > 0) {
+        document.getElementById('bulk-start').value = dates[0];
+        document.getElementById('bulk-end').value   = dates[dates.length - 1];
+      }
+    }
+
+    async function loadExisting() {
+      const res = await fetch('/jbd_calendar/data');
+      if (!res.ok) { alert('データの取得に失敗しました'); return; }
+
+      currentData = await res.json();
+      setBulkRangeFromData();
+      clearMsg();
+      document.getElementById('calendar-label').textContent = 'JBDカレンダー（既存データ）';
+      document.getElementById('calendar-area').style.display = 'block';
+      document.getElementById('btn-save').disabled = false;
+      renderCalendars();
+    }
+
+    async function createNew() {
+      const start = document.getElementById('new-start').value;
+      const end   = document.getElementById('new-end').value;
+      if (!start || !end) { alert('開始日と終了日を入力してください'); return; }
+      if (start > end) { alert('開始日が終了日より後になっています'); return; }
+
+      const res = await fetch(`/jbd_calendar/new?start=${start}&end=${end}`);
+      if (!res.ok) { alert('新規作成に失敗しました'); return; }
+
+      currentData = await res.json();
+      setBulkRangeFromData();
+      clearMsg();
+      document.getElementById('calendar-label').textContent = 'JBDカレンダー（新規作成）';
+      document.getElementById('calendar-area').style.display = 'block';
+      document.getElementById('btn-save').disabled = false;
+      renderCalendars();
+    }
+
+    async function extendCalendar() {
+      const end = document.getElementById('extend-end').value;
+      if (!end) { alert('延長先の日付を入力してください'); return; }
+
+      const res = await fetch(`/jbd_calendar/extend?end=${end}`);
+      if (!res.ok) { alert('延長に失敗しました'); return; }
+
+      const result = await res.json();
+      if (result.added === 0) {
+        alert('延長できる期間がありません（現在の最新日以前の日付が指定されました）');
+        return;
+      }
+
+      currentData = result.data;
+      setBulkRangeFromData();
+      clearMsg();
+      document.getElementById('calendar-label').textContent = 'JBDカレンダー（延長）';
+      document.getElementById('calendar-area').style.display = 'block';
+      document.getElementById('btn-save').disabled = false;
+      renderCalendars();
+    }
+
+    function addPublicHolidays() {
+      if (Object.keys(currentData).length === 0) { alert('カレンダーを読み込むか新規作成してください'); return; }
+
+      let count = 0;
+      for (const dateStr of Object.keys(currentData)) {
+        const [, m, d] = dateStr.split('-').map(Number);
+        if ((m === 12 && d >= 29) || (m === 1 && d <= 4)) {
+          if (currentData[dateStr] !== 0) count++;
+          currentData[dateStr] = 0;
+          const cell = document.querySelector(`.day-cell[data-date="${dateStr}"]`);
+          if (cell) {
+            cell.classList.remove('bizday');
+            cell.classList.add('holiday');
+          }
+        }
+      }
+
+      if (count === 0) alert('変更対象の日付がありませんでした（既に休日設定済み、または対象期間が範囲外です）');
+    }
+
+    function formatDateJp(dateStr) {
+      const [y, m, d] = dateStr.split('-');
+      return `${y}年${m}月${d}日`;
+    }
+
+    async function saveCalendar() {
+      if (Object.keys(currentData).length === 0) { alert('カレンダーを読み込むか新規作成してください'); return; }
+
+      const res = await fetch('/jbd_calendar/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: currentData }),
+      });
+
+      const msg = document.getElementById('msg');
+      if (res.ok) {
+        msg.style.color = '#16a34a';
+        msg.textContent = '保存しました';
+        setTimeout(clearMsg, 3000);
+
+        const dates = Object.keys(currentData).sort();
+        if (dates.length > 0) {
+          document.getElementById('period-text').textContent =
+            `${formatDateJp(dates[0])} 〜 ${formatDateJp(dates[dates.length - 1])}`;
+        }
+      } else {
+        msg.style.color = '#dc2626';
+        msg.textContent = '保存に失敗しました';
+      }
+    }
+
+    function clearMsg() {
+      document.getElementById('msg').textContent = '';
+    }
+
+    function bulkChange(newVal) {
+      const startStr = document.getElementById('bulk-start').value;
+      const endStr   = document.getElementById('bulk-end').value;
+      const checkedDows = Array.from(document.querySelectorAll('.dow-checkbox:checked'))
+                               .map(cb => parseInt(cb.value));
+
+      if (!startStr || !endStr) { alert('期間を入力してください'); return; }
+      if (checkedDows.length === 0) { alert('曜日を選択してください'); return; }
+
+      const start = new Date(startStr);
+      const end   = new Date(endStr);
+      if (start > end) { alert('開始日が終了日より後になっています'); return; }
+
+      let count = 0;
+      for (const dateStr of Object.keys(currentData)) {
+        const d = new Date(dateStr);
+        if (d >= start && d <= end && checkedDows.includes(d.getDay())) {
+          currentData[dateStr] = newVal;
+          const cell = document.querySelector(`.day-cell[data-date="${dateStr}"]`);
+          if (cell) {
+            cell.classList.toggle('bizday',  newVal === 1);
+            cell.classList.toggle('holiday', newVal === 0);
+          }
+          count++;
+        }
+      }
+
+      if (count === 0) alert('対象の日付が見つかりませんでした');
+    }
+
+    function toggleWeekday(grid, dow) {
+      const cells = Array.from(grid.querySelectorAll(`.day-cell[data-dow="${dow}"]`))
+                         .filter(c => c.dataset.date);
+      if (cells.length === 0) return;
+      const allBizday = cells.every(c => c.classList.contains('bizday'));
+      const newVal = allBizday ? 0 : 1;
+      cells.forEach(c => {
+        c.classList.toggle('bizday', newVal === 1);
+        c.classList.toggle('holiday', newVal === 0);
+        currentData[c.dataset.date] = newVal;
+      });
+    }
+
+    function toggleDay(cell, dateStr) {
+      const isBizday = cell.classList.contains('bizday');
+      cell.classList.toggle('bizday', !isBizday);
+      cell.classList.toggle('holiday', isBizday);
+      currentData[dateStr] = isBizday ? 0 : 1;
+    }
+
+    function toggleYear(header) {
+      const wrap = header.nextElementSibling;
+      const isCollapsed = wrap.style.display === 'none';
+      wrap.style.display = isCollapsed ? '' : 'none';
+      header.classList.toggle('collapsed', !isCollapsed);
+    }
+
+    function renderCalendars() {
+      const dates = Object.keys(currentData).sort();
+      if (dates.length === 0) return;
+
+      const [sy, sm] = dates[0].split('-').map(Number);
+      const [ey, em] = dates[dates.length - 1].split('-').map(Number);
+
+      // 年ごとに月をまとめる（月は昇順）
+      const byYear = {};
+      let y = sy, m = sm;
+      while (y < ey || (y === ey && m <= em)) {
+        if (!byYear[y]) byYear[y] = [];
+        byYear[y].push(m);
+        m++;
+        if (m > 12) { m = 1; y++; }
+      }
+
+      const maxYear = Math.max(...Object.keys(byYear).map(Number));
+      // 年は降順
+      const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
+
+      const container = document.getElementById('calendar-container');
+      container.innerHTML = '';
+
+      for (const year of years) {
+        const isLatest = year === maxYear;
+        const section = document.createElement('div');
+        section.className = 'year-section';
+
+        const header = document.createElement('div');
+        header.className = 'year-label' + (isLatest ? '' : ' collapsed');
+        header.innerHTML = `<span class="chevron">▼</span>${year}年`;
+        header.onclick = () => toggleYear(header);
+        section.appendChild(header);
+
+        const wrap = document.createElement('div');
+        wrap.className = 'months-wrap';
+        wrap.style.display = isLatest ? '' : 'none';
+
+        const grid = document.createElement('div');
+        grid.className = 'months-grid';
+        for (const mon of byYear[year]) {
+          grid.appendChild(renderMonth(year, mon));
+        }
+        wrap.appendChild(grid);
+        section.appendChild(wrap);
+        container.appendChild(section);
+      }
+    }
+
+    function renderMonth(year, month) {
+      const wrap = document.createElement('div');
+      wrap.className = 'month-calendar';
+
+      const header = document.createElement('div');
+      header.className = 'month-header';
+      header.textContent = `${year}年${month}月`;
+      wrap.appendChild(header);
+
+      const grid = document.createElement('div');
+      grid.className = 'calendar-grid';
+
+      WEEKDAYS.forEach((d, i) => {
+        const cell = document.createElement('div');
+        cell.className = 'weekday-header' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '');
+        cell.textContent = d;
+        cell.onclick = () => toggleWeekday(grid, i);
+        grid.appendChild(cell);
+      });
+
+      const firstDow = new Date(year, month - 1, 1).getDay();
+      const daysInMonth = new Date(year, month, 0).getDate();
+
+      for (let i = 0; i < firstDow; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'day-cell empty';
+        grid.appendChild(cell);
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const val = currentData[dateStr];
+        const dow = (firstDow + d - 1) % 7;
+        const cell = document.createElement('div');
+        cell.className = 'day-cell ' + (val === 1 ? 'bizday' : 'holiday');
+        cell.textContent = d;
+        cell.dataset.date = dateStr;
+        cell.dataset.dow = dow;
+        if (val !== undefined) {
+          cell.onclick = () => toggleDay(cell, dateStr);
+        }
+        grid.appendChild(cell);
+      }
+
+      wrap.appendChild(grid);
+      return wrap;
+    }
+  </script>
+</body>
+</html>

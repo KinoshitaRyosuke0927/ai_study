@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
+import jpholiday
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, Request
@@ -137,6 +138,84 @@ async def work_day_save(request: Request):
     # 一時列を削除してCSV保存
     df = df.drop(columns=["_parsed"])
     df.to_csv(WORK_DAY_PATH, index=False)
+    return JSONResponse({"status": "ok"})
+
+
+# ── JBDカレンダー作成 ─────────────────────────────────────
+
+@app.get("/jbd_calendar", response_class=HTMLResponse)
+async def jbd_calendar_page(request: Request):
+    # 既存JBD営業日カレンダーCSVを読み込み
+    df = pd.read_csv(JBD_CALENDAR_PATH)
+    df["date"] = pd.to_datetime(df["date"])
+    # カレンダーの期間（表示用）を取得
+    min_date = df["date"].min().strftime("%Y年%m月%d日")
+    max_date = df["date"].max().strftime("%Y年%m月%d日")
+    return templates.TemplateResponse("jbd_calendar.html", {
+        "request": request,
+        "min_date": min_date,
+        "max_date": max_date,
+    })
+
+
+@app.get("/jbd_calendar/data")
+async def jbd_calendar_data():
+    # 既存JBD営業日カレンダーCSVを読み込み
+    df = pd.read_csv(JBD_CALENDAR_PATH)
+    df["date"] = pd.to_datetime(df["date"])
+    # 日付をキー, 営業日フラグを値とした辞書を返却
+    data = {
+        row["date"].strftime("%Y-%m-%d"): int(row["business_day_flag"])
+        for _, row in df.iterrows()
+    }
+    return JSONResponse(data)
+
+
+@app.get("/jbd_calendar/extend")
+async def jbd_calendar_extend(end: str):
+    # 既存JBD営業日カレンダーCSVを読み込み
+    df = pd.read_csv(JBD_CALENDAR_PATH)
+    df["date"] = pd.to_datetime(df["date"])
+    # 日付をキー, 営業日フラグを値とした辞書を構築
+    data = {
+        row["date"].strftime("%Y-%m-%d"): int(row["business_day_flag"])
+        for _, row in df.iterrows()
+    }
+    # 最新日の翌日から指定日まで、土日・国民の祝日を休日とする日付を追加
+    last_date = df["date"].max()
+    new_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), end=end)
+    for d in new_dates:
+        data[d.strftime("%Y-%m-%d")] = 0 if d.weekday() >= 5 or jpholiday.is_holiday(d.date()) else 1
+    return JSONResponse({"data": data, "added": len(new_dates)})
+
+
+@app.get("/jbd_calendar/new")
+async def jbd_calendar_new(start: str, end: str):
+    # 指定期間の日付を生成し、土日・国民の祝日を休日、それ以外を営業日とする初期データを作成
+    dates = pd.date_range(start=start, end=end)
+    data = {
+        d.strftime("%Y-%m-%d"): 0 if d.weekday() >= 5 or jpholiday.is_holiday(d.date()) else 1
+        for d in dates
+    }
+    return JSONResponse(data)
+
+
+@app.post("/jbd_calendar/save")
+async def jbd_calendar_save(request: Request):
+    # リクエストボディを取得
+    body = await request.json()
+    data = body.get("data", {})
+    # 日付昇順に整形してレコードを構築
+    records = []
+    for date_str in sorted(data.keys()):
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+        records.append({
+            # 既存CSVの表記（ゼロ埋めなし）に合わせて日付文字列を生成
+            "date": f"{d.year}/{d.month}/{d.day}",
+            "business_day_flag": int(data[date_str]),
+        })
+    df = pd.DataFrame(records, columns=["date", "business_day_flag"])
+    df.to_csv(JBD_CALENDAR_PATH, index=False)
     return JSONResponse({"status": "ok"})
 
 
