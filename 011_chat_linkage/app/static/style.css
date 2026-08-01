@@ -45,6 +45,72 @@ h3 {
   margin-bottom: 8px;
 }
 
+/* ========== ボタン ========== */
+
+.btn {
+  width: 100%;
+  padding: 11px;
+  background-color: #0052cc;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.btn:hover:not(:disabled) {
+  background-color: #0041a3;
+}
+
+.btn:disabled {
+  background-color: #a0aec0;
+  cursor: not-allowed;
+}
+
+/* ========== タブ ========== */
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  width: auto;
+  padding: 8px 20px;
+  background-color: #f0f2f5;
+  color: #718096;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.tab-btn:hover {
+  background-color: #e2e8f0;
+}
+
+.tab-btn.active {
+  background-color: #0052cc;
+  color: #fff;
+}
+
+.tab-content {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.tab-content.active {
+  display: flex;
+}
+
 /* ========== 2カラムレイアウト ========== */
 
 .panels {
@@ -126,16 +192,39 @@ h3 {
   min-height: 0;
 }
 
-.dm-section {
+.dm-slot {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
+.dm-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
 .dm-section textarea {
   flex: 1;
   min-height: 0;
+}
+
+.agenda-output-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.agenda-output-section textarea {
+  flex: 1;
+  min-height: 0;
+  font-family: "Courier New", monospace;
+  white-space: pre;
 }
 
 /* ========== フォームパーツ ========== */
@@ -188,30 +277,6 @@ textarea {
   margin-bottom: 12px;
 }
 
-/* ========== ボタン ========== */
-
-button {
-  width: 100%;
-  padding: 11px;
-  background-color: #0052cc;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  flex-shrink: 0;
-}
-
-button:hover:not(:disabled) {
-  background-color: #0041a3;
-}
-
-button:disabled {
-  background-color: #a0aec0;
-  cursor: not-allowed;
-}
-
 /* ========== 投稿一覧(左) ========== */
 
 .post-list {
@@ -240,8 +305,10 @@ button:disabled {
   border: none;
   border-bottom: 1px solid #f0f2f5;
   border-radius: 0;
+  font-size: 0.95rem;
   cursor: pointer;
   text-align: left;
+  transition: background-color 0.2s;
 }
 
 .post-list-item:last-child {
@@ -254,6 +321,29 @@ button:disabled {
 
 .post-list-item.selected {
   background-color: #e6f0ff;
+}
+
+/* アジェンダタブの一覧行(チェックボックス付き) */
+.agenda-list-item {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.agenda-item-checkbox {
+  width: auto;
+  margin-top: 3px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.post-list-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
 }
 
 .post-list-item-header {
@@ -280,6 +370,23 @@ button:disabled {
 .post-time {
   font-size: 0.75rem;
   color: #a0aec0;
+}
+
+.post-source-badge {
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+
+.post-source-badge-mattermost {
+  color: #0052cc;
+  background-color: #e6f0ff;
+}
+
+.post-source-badge-web {
+  color: #276749;
+  background-color: #f0fff4;
 }
 
 /* ========== 投稿詳細(右上) ========== */
@@ -312,6 +419,38 @@ button:disabled {
   margin-bottom: 20px;
   padding-bottom: 16px;
   border-bottom: 1px solid #e2e8f0;
+}
+
+/* GROUPSESSION記事本文はHTML/プレーンテキストいずれの投稿もあるため、
+   pre-wrapを維持しつつ、<p>タグ由来の余白のみ調整する */
+.post-detail-body-html p {
+  margin-bottom: 10px;
+}
+
+.post-attachments {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.attachment-list {
+  list-style: none;
+}
+
+.attachment-list li {
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+}
+
+.attachment-size {
+  color: #a0aec0;
+  font-size: 0.8rem;
+}
+
+.attachment-note {
+  margin-top: 8px;
+  color: #a0aec0;
+  font-size: 0.8rem;
 }
 
 .post-reactions-loading,

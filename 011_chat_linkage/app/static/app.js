@@ -42,10 +42,42 @@ const postDetail   = document.getElementById("post-detail");
 const reminderBtn  = document.getElementById("reminder-btn");
 const reminderMessage = document.getElementById("reminder-message");
 
+const dmSection         = document.getElementById("dm-section");
 const dmTargetUsername = document.getElementById("dm-target-username");
 const dmInput           = document.getElementById("dm-input");
 const dmSubmitBtn       = document.getElementById("dm-submit-btn");
 const dmMessage         = document.getElementById("dm-message");
+
+const tabBtnMattermost   = document.getElementById("tab-btn-mattermost");
+const tabBtnGroupsession = document.getElementById("tab-btn-groupsession");
+const tabMattermost      = document.getElementById("tab-mattermost");
+const tabGroupsession    = document.getElementById("tab-groupsession");
+
+const dmSlotMattermost   = document.getElementById("dm-slot-mattermost");
+const dmSlotGroupsession = document.getElementById("dm-slot-groupsession");
+
+const gsStartDateInput = document.getElementById("gs-start-date");
+const gsEndDateInput   = document.getElementById("gs-end-date");
+const gsFetchBtn      = document.getElementById("gs-fetch-btn");
+const gsMessage       = document.getElementById("gs-message");
+const gsPostList      = document.getElementById("gs-post-list");
+const gsPostDetail    = document.getElementById("gs-post-detail");
+const gsReminderBtn   = document.getElementById("gs-reminder-btn");
+const gsReminderMessage = document.getElementById("gs-reminder-message");
+
+const tabBtnAgenda = document.getElementById("tab-btn-agenda");
+const tabAgenda     = document.getElementById("tab-agenda");
+
+const agendaStartDateInput = document.getElementById("agenda-start-date");
+const agendaEndDateInput   = document.getElementById("agenda-end-date");
+const agendaFetchBtn       = document.getElementById("agenda-fetch-btn");
+const agendaMessage        = document.getElementById("agenda-message");
+const agendaPostList       = document.getElementById("agenda-post-list");
+const agendaPostDetail     = document.getElementById("agenda-post-detail");
+const agendaCreateBtn      = document.getElementById("agenda-create-btn");
+const agendaDetailMessage  = document.getElementById("agenda-detail-message");
+const agendaOutput         = document.getElementById("agenda-output");
+const agendaOutputMessage  = document.getElementById("agenda-output-message");
 
 // ============================================================
 // 状態管理
@@ -55,6 +87,41 @@ let fetchedPosts = [];
 let selectedPostId = null;
 let selectedPostMessage = null;
 let selectedPostUsername = null;
+
+let gsSelectedPostMessage = null;
+let gsSelectedPostUsername = null;
+let gsSelectedPostUrl = null;
+
+let agendaFetchedPosts = [];
+
+// ============================================================
+// タブ切り替え
+// ============================================================
+
+function switchTab(tabName) {
+  const isMattermost = tabName === "mattermost";
+  const isGroupsession = tabName === "groupsession";
+  const isAgenda = tabName === "agenda";
+
+  tabBtnMattermost.classList.toggle("active", isMattermost);
+  tabBtnGroupsession.classList.toggle("active", isGroupsession);
+  tabBtnAgenda.classList.toggle("active", isAgenda);
+  tabMattermost.classList.toggle("active", isMattermost);
+  tabGroupsession.classList.toggle("active", isGroupsession);
+  tabAgenda.classList.toggle("active", isAgenda);
+
+  // DM投稿エリアは共通なので、選択中タブの右パネル下半分へ実体を移動する
+  // (アジェンダタブにはDM投稿エリアが無いため、その場合は移動しない)
+  if (isMattermost) {
+    dmSlotMattermost.appendChild(dmSection);
+  } else if (isGroupsession) {
+    dmSlotGroupsession.appendChild(dmSection);
+  }
+}
+
+tabBtnMattermost.addEventListener("click", () => switchTab("mattermost"));
+tabBtnGroupsession.addEventListener("click", () => switchTab("groupsession"));
+tabBtnAgenda.addEventListener("click", () => switchTab("agenda"));
 
 // ============================================================
 // チャンネル一覧の取得
@@ -249,7 +316,12 @@ reminderBtn.addEventListener("click", async () => {
     const res = await fetch("/api/reminder", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: selectedPostMessage, author_username: selectedPostUsername }),
+      body: JSON.stringify({
+        source: "mattermost",
+        post_id: selectedPostId,
+        message: selectedPostMessage,
+        author_username: selectedPostUsername,
+      }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -263,6 +335,344 @@ reminderBtn.addEventListener("click", async () => {
   } finally {
     reminderBtn.disabled = false;
     reminderBtn.textContent = "リマインドを作成";
+  }
+});
+
+// ============================================================
+// GROUPSESSION: 新着記事の取得
+// ============================================================
+
+function resetGroupsessionDetail() {
+  gsSelectedPostMessage = null;
+  gsSelectedPostUsername = null;
+  gsSelectedPostUrl = null;
+  gsReminderBtn.disabled = true;
+  hideMessage(gsReminderMessage);
+  gsPostDetail.innerHTML = `<p class="post-detail-placeholder">左の一覧から記事を選択してください</p>`;
+}
+
+function selectGroupsessionPost(post, itemEl) {
+  gsSelectedPostMessage = post.message;
+  gsSelectedPostUsername = post.username;
+  gsSelectedPostUrl = post.url;
+  gsReminderBtn.disabled = false;
+  hideMessage(gsReminderMessage);
+
+  gsPostList.querySelectorAll(".post-list-item").forEach((el) => el.classList.remove("selected"));
+  itemEl.classList.add("selected");
+
+  const attachments = post.attachments || [];
+  const attachmentsHtml = attachments.length
+    ? `
+      <div class="post-attachments">
+        <h3>添付ファイル</h3>
+        <ul class="attachment-list">
+          ${attachments
+            .map(
+              (a) =>
+                `<li><a href="${a.url}" target="_blank" rel="noopener">${a.name}</a> <span class="attachment-size">${a.size}</span></li>`
+            )
+            .join("")}
+        </ul>
+        <p class="attachment-note">※ダウンロードにはブラウザでGROUPSESSIONにログイン済みである必要があります</p>
+      </div>
+    `
+    : "";
+
+  gsPostDetail.innerHTML = `
+    <div class="post-detail-header">
+      <span class="post-username">${post.username}</span>
+      <span class="post-time">${formatTimestamp(post.create_at)}</span>
+    </div>
+    <div class="post-detail-body post-detail-body-html">${post.detail_html || ""}</div>
+    ${attachmentsHtml}
+  `;
+}
+
+async function fetchAndRenderGroupsessionPosts() {
+  hideMessage(gsMessage);
+  gsPostList.innerHTML = "";
+  resetGroupsessionDetail();
+
+  const start = gsStartDateInput.value;
+  const end = gsEndDateInput.value;
+  if (!start || !end) {
+    showMessage(gsMessage, "取得開始日・取得終了日を選択してください", "error");
+    return;
+  }
+
+  gsFetchBtn.disabled = true;
+  gsFetchBtn.textContent = "取得中...";
+
+  try {
+    const res = await fetch(
+      `/api/webpage/announcements?start=${start}&end=${end}`
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      showMessage(gsMessage, `エラー: ${data.detail}`, "error");
+      return;
+    }
+
+    if (data.length === 0) {
+      gsPostList.innerHTML = `<p class="post-list-placeholder">対象期間内にリマインド対象の記事はありませんでした</p>`;
+      return;
+    }
+
+    data.forEach((post) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "post-list-item";
+      item.innerHTML = `
+        <div class="post-list-item-header">
+          <span class="post-username">${post.username}</span>
+          <span class="post-time">${formatTimestamp(post.create_at)}</span>
+        </div>
+        <div class="post-list-item-body"></div>
+      `;
+      item.querySelector(".post-list-item-body").textContent = truncateForPreview(post.message);
+      item.addEventListener("click", () => selectGroupsessionPost(post, item));
+      gsPostList.appendChild(item);
+    });
+  } catch (err) {
+    showMessage(gsMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    gsFetchBtn.disabled = false;
+    gsFetchBtn.textContent = "新着記事を取得";
+  }
+}
+
+gsFetchBtn.addEventListener("click", fetchAndRenderGroupsessionPosts);
+
+// ============================================================
+// GROUPSESSION: リマインド文章の作成
+// ============================================================
+
+gsReminderBtn.addEventListener("click", async () => {
+  hideMessage(gsReminderMessage);
+
+  if (!gsSelectedPostMessage) {
+    showMessage(gsReminderMessage, "記事を選択してください", "error");
+    return;
+  }
+
+  gsReminderBtn.disabled = true;
+  gsReminderBtn.textContent = "作成中...";
+
+  try {
+    const res = await fetch("/api/reminder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "web",
+        message: gsSelectedPostMessage,
+        author_username: gsSelectedPostUsername,
+        source_url: gsSelectedPostUrl,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showMessage(gsReminderMessage, `エラー: ${data.detail}`, "error");
+      return;
+    }
+    dmInput.value = data.reminder;
+    showMessage(gsReminderMessage, "リマインド文章をDM入力欄に反映しました。", "success");
+  } catch (err) {
+    showMessage(gsReminderMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    gsReminderBtn.disabled = false;
+    gsReminderBtn.textContent = "リマインドを作成";
+  }
+});
+
+// ============================================================
+// アジェンダ: Mattermost履歴・GROUPSESSION新着記事の取得
+// ============================================================
+
+function resetAgendaDetail() {
+  agendaCreateBtn.disabled = true;
+  hideMessage(agendaDetailMessage);
+  agendaPostDetail.innerHTML = `<p class="post-detail-placeholder">左の一覧から投稿・記事を選択してください</p>`;
+}
+
+function selectAgendaPost(post, itemEl) {
+  agendaCreateBtn.disabled = false;
+  hideMessage(agendaDetailMessage);
+
+  agendaPostList.querySelectorAll(".post-list-item").forEach((el) => el.classList.remove("selected"));
+  itemEl.classList.add("selected");
+
+  if (post.source === "web") {
+    const attachments = post.attachments || [];
+    const attachmentsHtml = attachments.length
+      ? `
+        <div class="post-attachments">
+          <h3>添付ファイル</h3>
+          <ul class="attachment-list">
+            ${attachments
+              .map(
+                (a) =>
+                  `<li><a href="${a.url}" target="_blank" rel="noopener">${a.name}</a> <span class="attachment-size">${a.size}</span></li>`
+              )
+              .join("")}
+          </ul>
+          <p class="attachment-note">※ダウンロードにはブラウザでGROUPSESSIONにログイン済みである必要があります</p>
+        </div>
+      `
+      : "";
+
+    agendaPostDetail.innerHTML = `
+      <div class="post-detail-header">
+        <span class="post-username">${post.username}</span>
+        <span class="post-time">${formatTimestamp(post.create_at)}</span>
+      </div>
+      <div class="post-detail-body post-detail-body-html">${post.detail_html || ""}</div>
+      ${attachmentsHtml}
+    `;
+  } else {
+    agendaPostDetail.innerHTML = `
+      <div class="post-detail-header">
+        <span class="post-username">${post.username}</span>
+        <span class="post-time">${formatTimestamp(post.create_at)}</span>
+      </div>
+      <div class="post-detail-body"></div>
+    `;
+    agendaPostDetail.querySelector(".post-detail-body").textContent = post.message;
+  }
+}
+
+function renderAgendaPostList() {
+  agendaPostList.innerHTML = "";
+
+  if (agendaFetchedPosts.length === 0) {
+    agendaPostList.innerHTML = `<p class="post-list-placeholder">指定期間内の投稿・記事はありませんでした</p>`;
+    return;
+  }
+
+  agendaFetchedPosts.forEach((post) => {
+    const item = document.createElement("div");
+    item.className = "post-list-item agenda-list-item";
+    item.dataset.postId = post.id;
+    item.innerHTML = `
+      <input type="checkbox" class="agenda-item-checkbox">
+      <div class="post-list-item-main">
+        <div class="post-list-item-header">
+          <span class="post-username">${post.username}</span>
+          <span class="post-source-badge post-source-badge-${post.source}">${
+      post.source === "web" ? "GROUPSESSION" : "Mattermost"
+    }</span>
+          <span class="post-time">${formatTimestamp(post.create_at)}</span>
+        </div>
+        <div class="post-list-item-body"></div>
+      </div>
+    `;
+    item.querySelector(".post-list-item-body").textContent = truncateForPreview(post.message);
+    item
+      .querySelector(".post-list-item-main")
+      .addEventListener("click", () => selectAgendaPost(post, item));
+    agendaPostList.appendChild(item);
+  });
+}
+
+async function fetchAndRenderAgendaPosts() {
+  hideMessage(agendaMessage);
+  resetAgendaDetail();
+
+  const channelId = channelSelect.value;
+  const start = agendaStartDateInput.value;
+  const end = agendaEndDateInput.value;
+  if (!channelId) {
+    showMessage(agendaMessage, "Mattermostのチャンネルが選択されていません(Mattermostタブを確認してください)", "error");
+    return;
+  }
+  if (!start || !end) {
+    showMessage(agendaMessage, "取得開始日・取得終了日を選択してください", "error");
+    return;
+  }
+
+  agendaFetchBtn.disabled = true;
+  agendaFetchBtn.textContent = "取得中...";
+  agendaPostList.innerHTML = "";
+
+  try {
+    const [mattermostRes, groupsessionRes] = await Promise.all([
+      fetch(`/api/channels/${encodeURIComponent(channelId)}/posts?start=${start}&end=${end}`),
+      fetch(`/api/webpage/announcements?start=${start}&end=${end}`),
+    ]);
+    const mattermostData = await mattermostRes.json();
+    const groupsessionData = await groupsessionRes.json();
+
+    if (!mattermostRes.ok) {
+      showMessage(agendaMessage, `Mattermostの取得エラー: ${mattermostData.detail}`, "error");
+      return;
+    }
+    if (!groupsessionRes.ok) {
+      showMessage(agendaMessage, `GROUPSESSIONの取得エラー: ${groupsessionData.detail}`, "error");
+      return;
+    }
+
+    agendaFetchedPosts = [
+      ...mattermostData.map((post) => ({ ...post, source: "mattermost" })),
+      ...groupsessionData.map((post) => ({ ...post, source: "web" })),
+    ].sort((a, b) => a.create_at - b.create_at);
+
+    renderAgendaPostList();
+  } catch (err) {
+    showMessage(agendaMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    agendaFetchBtn.disabled = false;
+    agendaFetchBtn.textContent = "履歴・新着記事を取得";
+  }
+}
+
+agendaFetchBtn.addEventListener("click", fetchAndRenderAgendaPosts);
+
+// ============================================================
+// アジェンダの作成
+// ============================================================
+
+agendaCreateBtn.addEventListener("click", async () => {
+  hideMessage(agendaOutputMessage);
+
+  const checkedIds = Array.from(
+    agendaPostList.querySelectorAll(".agenda-item-checkbox:checked")
+  ).map((checkbox) => checkbox.closest(".agenda-list-item").dataset.postId);
+
+  if (checkedIds.length === 0) {
+    showMessage(agendaOutputMessage, "アジェンダに含める投稿・記事にチェックを入れてください", "error");
+    return;
+  }
+
+  const items = agendaFetchedPosts
+    .filter((post) => checkedIds.includes(post.id))
+    .map((post) => ({
+      message: post.message,
+      username: post.username,
+      source: post.source,
+      url: post.url || null,
+    }));
+
+  agendaCreateBtn.disabled = true;
+  agendaCreateBtn.textContent = "作成中...";
+
+  try {
+    const res = await fetch("/api/agenda", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showMessage(agendaOutputMessage, `エラー: ${data.detail}`, "error");
+      return;
+    }
+    agendaOutput.value = data.agenda;
+    showMessage(agendaOutputMessage, "部会アジェンダを作成しました。", "success");
+  } catch (err) {
+    showMessage(agendaOutputMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    agendaCreateBtn.disabled = false;
+    agendaCreateBtn.textContent = "アジェンダを作成";
   }
 });
 
@@ -322,8 +732,8 @@ function toDateInputValue(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** settings.ini の設定(対象チャンネル・取得期間)を画面に反映し、履歴取得を自動実行する */
-async function applySettingsAndFetch() {
+/** settings.ini の設定(対象チャンネル・取得期間)を画面に反映する(履歴取得は自動実行しない) */
+async function applySettings() {
   try {
     const res = await fetch("/api/settings");
     const settings = await res.json();
@@ -345,17 +755,53 @@ async function applySettingsAndFetch() {
     start.setDate(start.getDate() - (readDate - 1));
     startDateInput.value = toDateInputValue(start);
     endDateInput.value = toDateInputValue(end);
-
-    await fetchAndRenderPosts();
   } catch (err) {
     showMessage(postsMessage, `settings.iniの読み込みに失敗しました: ${err.message}`, "error");
   }
 }
 
+/** settings.ini の設定(GROUPSESSIONの取得期間)を画面に反映する */
+async function applyGroupsessionSettings() {
+  try {
+    const res = await fetch("/api/settings");
+    const settings = await res.json();
+
+    const readDate = settings.groupsession_read_date || 30;
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - (readDate - 1));
+    gsStartDateInput.value = toDateInputValue(start);
+    gsEndDateInput.value = toDateInputValue(end);
+  } catch (err) {
+    showMessage(gsMessage, `settings.iniの読み込みに失敗しました: ${err.message}`, "error");
+  }
+}
+
+/** settings.ini の設定(Mattermost・GROUPSESSIONそれぞれの取得期間のうち長い方)をアジェンダタブの期間初期値に反映する */
+async function applyAgendaSettings() {
+  try {
+    const res = await fetch("/api/settings");
+    const settings = await res.json();
+
+    const readDate = Math.max(settings.read_date || 30, settings.groupsession_read_date || 30);
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - (readDate - 1));
+    agendaStartDateInput.value = toDateInputValue(start);
+    agendaEndDateInput.value = toDateInputValue(end);
+  } catch (err) {
+    showMessage(agendaMessage, `settings.iniの読み込みに失敗しました: ${err.message}`, "error");
+  }
+}
+
 async function init() {
+  dmSlotMattermost.appendChild(dmSection);
+
   await loadChannels();
   loadTargetUsername();
-  await applySettingsAndFetch();
+  await applySettings();
+  await applyGroupsessionSettings();
+  await applyAgendaSettings();
 }
 
 init();

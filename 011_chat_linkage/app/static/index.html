@@ -3,76 +3,203 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mattermost チャット連携</title>
+  <title>AIリマインダー</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <div class="container">
-    <h1>Mattermost チャット連携</h1>
+    <h1>AIリマインダー</h1>
 
-    <div class="panels">
+    <div class="tabs">
+      <button type="button" id="tab-btn-mattermost" class="tab-btn active">Mattermost</button>
+      <button type="button" id="tab-btn-groupsession" class="tab-btn">GROUPSESSION</button>
+      <button type="button" id="tab-btn-agenda" class="tab-btn">アジェンダ</button>
+    </div>
 
-      <!-- ========== 左: チャンネル選択 + 履歴一覧 ========== -->
-      <div class="panel panel-left">
+    <!-- ========== Mattermostタブ ========== -->
+    <div id="tab-mattermost" class="tab-content active">
+      <div class="panels">
 
-        <section class="section">
-          <h2>チャンネル・期間を選択</h2>
-          <div class="form-group">
-            <label for="channel-select">チャンネル</label>
-            <select id="channel-select">
-              <option value="">読み込み中...</option>
-            </select>
-          </div>
-          <div class="form-row">
+        <!-- ========== 左: チャンネル選択 + 履歴一覧 ========== -->
+        <div class="panel panel-left">
+
+          <section class="section">
+            <h2>チャンネル・期間を選択</h2>
             <div class="form-group">
-              <label for="start-date">取得開始日</label>
-              <input type="date" id="start-date">
+              <label for="channel-select">チャンネル</label>
+              <select id="channel-select">
+                <option value="">読み込み中...</option>
+              </select>
             </div>
-            <div class="form-group">
-              <label for="end-date">取得終了日</label>
-              <input type="date" id="end-date">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="start-date">取得開始日</label>
+                <input type="date" id="start-date">
+              </div>
+              <div class="form-group">
+                <label for="end-date">取得終了日</label>
+                <input type="date" id="end-date">
+              </div>
             </div>
-          </div>
-          <button id="fetch-posts-btn" disabled>履歴を取得</button>
-          <div id="posts-message" class="message hidden"></div>
-        </section>
+            <button id="fetch-posts-btn" class="btn" disabled>履歴を取得</button>
+            <div id="posts-message" class="message hidden"></div>
+          </section>
 
-        <section class="section last post-list-section">
-          <h2>取得した投稿一覧</h2>
-          <div id="post-list" class="post-list">
-            <p class="post-list-placeholder">履歴を取得すると一覧が表示されます</p>
-          </div>
-        </section>
+          <section class="section last post-list-section">
+            <h2>取得した投稿一覧</h2>
+            <div id="post-list" class="post-list">
+              <p class="post-list-placeholder">履歴を取得すると一覧が表示されます</p>
+            </div>
+          </section>
 
-      </div><!-- /panel-left -->
+        </div><!-- /panel-left -->
 
-      <div class="panel-divider"></div>
+        <div class="panel-divider"></div>
 
-      <!-- ========== 右: 投稿詳細 + DM投稿 ========== -->
-      <div class="panel panel-right">
+        <!-- ========== 右: 投稿詳細 + DM投稿 ========== -->
+        <div class="panel panel-right">
 
-        <section class="section detail-section">
-          <div class="detail-header">
-            <h2>投稿内容</h2>
-            <button id="reminder-btn" class="reminder-btn" disabled>リマインドを作成</button>
-          </div>
-          <div id="post-detail" class="post-detail">
-            <p class="post-detail-placeholder">左の一覧から投稿を選択してください</p>
-          </div>
-          <div id="reminder-message" class="message hidden"></div>
-        </section>
+          <section class="section detail-section">
+            <div class="detail-header">
+              <h2>投稿内容</h2>
+              <button id="reminder-btn" class="btn reminder-btn" disabled>リマインドを作成</button>
+            </div>
+            <div id="post-detail" class="post-detail">
+              <p class="post-detail-placeholder">左の一覧から投稿を選択してください</p>
+            </div>
+            <div id="reminder-message" class="message hidden"></div>
+          </section>
 
-        <section class="section last dm-section">
-          <h2><span id="dm-target-username">-</span> 宛にDMを投稿</h2>
-          <textarea id="dm-input" placeholder="メッセージを入力してください"></textarea>
-          <button id="dm-submit-btn">投稿</button>
-          <div id="dm-message" class="message hidden"></div>
-        </section>
+          <div id="dm-slot-mattermost" class="dm-slot"></div>
 
-      </div><!-- /panel-right -->
+        </div><!-- /panel-right -->
 
-    </div><!-- /panels -->
+      </div><!-- /panels -->
+    </div><!-- /tab-mattermost -->
+
+    <!-- ========== GROUPSESSIONタブ ========== -->
+    <div id="tab-groupsession" class="tab-content">
+      <div class="panels">
+
+        <!-- ========== 左: 新着記事一覧 ========== -->
+        <div class="panel panel-left">
+
+          <section class="section">
+            <h2>期間を選択</h2>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="gs-start-date">取得開始日</label>
+                <input type="date" id="gs-start-date">
+              </div>
+              <div class="form-group">
+                <label for="gs-end-date">取得終了日</label>
+                <input type="date" id="gs-end-date">
+              </div>
+            </div>
+            <button id="gs-fetch-btn" class="btn">新着記事を取得</button>
+            <div id="gs-message" class="message hidden"></div>
+          </section>
+
+          <section class="section last post-list-section">
+            <h2>取得した記事一覧</h2>
+            <div id="gs-post-list" class="post-list">
+              <p class="post-list-placeholder">新着記事を取得すると一覧が表示されます</p>
+            </div>
+          </section>
+
+        </div><!-- /panel-left -->
+
+        <div class="panel-divider"></div>
+
+        <!-- ========== 右: 記事詳細 + DM投稿 ========== -->
+        <div class="panel panel-right">
+
+          <section class="section detail-section">
+            <div class="detail-header">
+              <h2>記事内容</h2>
+              <button id="gs-reminder-btn" class="btn reminder-btn" disabled>リマインドを作成</button>
+            </div>
+            <div id="gs-post-detail" class="post-detail">
+              <p class="post-detail-placeholder">左の一覧から記事を選択してください</p>
+            </div>
+            <div id="gs-reminder-message" class="message hidden"></div>
+          </section>
+
+          <div id="dm-slot-groupsession" class="dm-slot"></div>
+
+        </div><!-- /panel-right -->
+
+      </div><!-- /panels -->
+    </div><!-- /tab-groupsession -->
+
+    <!-- ========== アジェンダタブ ========== -->
+    <div id="tab-agenda" class="tab-content">
+      <div class="panels">
+
+        <!-- ========== 左: 期間選択 + 取得した投稿一覧 ========== -->
+        <div class="panel panel-left">
+
+          <section class="section">
+            <h2>期間を選択</h2>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="agenda-start-date">取得開始日</label>
+                <input type="date" id="agenda-start-date">
+              </div>
+              <div class="form-group">
+                <label for="agenda-end-date">取得終了日</label>
+                <input type="date" id="agenda-end-date">
+              </div>
+            </div>
+            <button id="agenda-fetch-btn" class="btn">履歴・新着記事を取得</button>
+            <div id="agenda-message" class="message hidden"></div>
+          </section>
+
+          <section class="section last post-list-section">
+            <h2>取得した投稿一覧</h2>
+            <div id="agenda-post-list" class="post-list">
+              <p class="post-list-placeholder">履歴・新着記事を取得すると一覧が表示されます</p>
+            </div>
+          </section>
+
+        </div><!-- /panel-left -->
+
+        <div class="panel-divider"></div>
+
+        <!-- ========== 右: 詳細内容 ========== -->
+        <div class="panel panel-right">
+
+          <section class="section detail-section">
+            <div class="detail-header">
+              <h2>詳細内容</h2>
+              <button id="agenda-create-btn" class="btn reminder-btn" disabled>アジェンダを作成</button>
+            </div>
+            <div id="agenda-post-detail" class="post-detail">
+              <p class="post-detail-placeholder">左の一覧から投稿・記事を選択してください</p>
+            </div>
+            <div id="agenda-detail-message" class="message hidden"></div>
+          </section>
+
+          <section class="section last agenda-output-section">
+            <h2>部会アジェンダ</h2>
+            <textarea id="agenda-output" placeholder="チェックした投稿・記事を選び「アジェンダを作成」を押すと、ここに文章が作成されます"></textarea>
+            <div id="agenda-output-message" class="message hidden"></div>
+          </section>
+
+        </div><!-- /panel-right -->
+
+      </div><!-- /panels -->
+    </div><!-- /tab-agenda -->
+
   </div><!-- /container -->
+
+  <!-- ========== DM投稿(共通・タブ切り替え時に右パネル下半分へ移動する) ========== -->
+  <section id="dm-section" class="section last dm-section">
+    <h2><span id="dm-target-username">-</span> 宛にDMを投稿</h2>
+    <textarea id="dm-input" placeholder="メッセージを入力してください"></textarea>
+    <button id="dm-submit-btn" class="btn">投稿</button>
+    <div id="dm-message" class="message hidden"></div>
+  </section>
 
   <script src="/static/app.js"></script>
 </body>

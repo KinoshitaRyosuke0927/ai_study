@@ -14,8 +14,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import requests
 
+from app import groupsession_service as gs
 from app import mattermost_service as mm
-from app.azure_ai_service import call_generate_reminder
+from app.azure_ai_service import call_filter_reminder_posts, call_generate_agenda, call_generate_reminder
+
+# リマインド作成時に、リアクション済みとみなす絵文字名
+REMINDER_DONE_EMOJI = "sumi"
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -29,9 +33,14 @@ def load_settings() -> dict:
         print("[警告] settings.ini が見つかりません。画面からの手動選択が必要です。")
         return {}
     config.read(SETTINGS_PATH, encoding="utf-8")
+    members_raw = config.get("channel_users", "members", fallback="")
+    members = [m.strip() for m in members_raw.split(",") if m.strip()]
     return {
         "channel": config.get("history", "channel", fallback=""),
         "read_date": config.getint("history", "read_date", fallback=30),
+        "members": members,
+        "groupsession_forum_sid": config.getint("groupsession", "forum_sid", fallback=0),
+        "groupsession_read_date": config.getint("groupsession", "read_date", fallback=30),
     }
 
 
@@ -43,8 +52,22 @@ class DmRequest(BaseModel):
 
 
 class ReminderRequest(BaseModel):
+    source: str = "mattermost"
+    post_id: str | None = None
+    source_url: str | None = None
     message: str
     author_username: str
+
+
+class AgendaItem(BaseModel):
+    message: str
+    username: str
+    source: str
+    url: str | None = None
+
+
+class AgendaRequest(BaseModel):
+    items: list[AgendaItem]
 
 
 app = FastAPI(title="Mattermost チャット連携", version="1.0.0")
@@ -103,9 +126,44 @@ def get_channel_posts(channel_id: str, start: str, end: str) -> list[dict]:
         raise HTTPException(status_code=400, detail="取得開始日は取得終了日より前にしてください")
 
     try:
-        return mm.get_channel_posts_in_range(channel_id, start_ts, end_ts)
+        posts = mm.get_channel_posts_in_range(channel_id, start_ts, end_ts)
     except requests.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Mattermost APIエラー: {exc}") from exc
+
+    try:
+        target_ids = call_filter_reminder_posts(posts)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AIによる投稿の絞り込みに失敗しました: {exc}") from exc
+
+    return [p for p in posts if p["id"] in target_ids]
+
+
+@app.get("/api/webpage/announcements")
+def get_webpage_announcements(start: str, end: str) -> list[dict]:
+    forum_sid = SETTINGS.get("groupsession_forum_sid", 0)
+    if not forum_sid:
+        raise HTTPException(status_code=400, detail="settings.iniにgroupsessionのforum_sidが設定されていません")
+
+    try:
+        since_ts_ms = date_str_to_epoch_ms(start, end_of_day=False)
+        until_ts_ms = date_str_to_epoch_ms(end, end_of_day=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="日付の形式が正しくありません (YYYY-MM-DD)") from exc
+
+    if since_ts_ms > until_ts_ms:
+        raise HTTPException(status_code=400, detail="取得開始日は取得終了日より前にしてください")
+
+    try:
+        posts = gs.get_recent_announcements(forum_sid, since_ts_ms, until_ts_ms)
+    except requests.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"GROUPSESSIONへのアクセスに失敗しました: {exc}") from exc
+
+    try:
+        target_ids = call_filter_reminder_posts(posts)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AIによる投稿の絞り込みに失敗しました: {exc}") from exc
+
+    return [p for p in posts if p["id"] in target_ids]
 
 
 @app.get("/api/posts/{post_id}/reactions")
@@ -123,11 +181,61 @@ def post_reminder(request: ReminderRequest) -> dict:
         raise HTTPException(status_code=400, detail="投稿内容がありません")
 
     try:
-        reminder = call_generate_reminder(message, request.author_username.strip())
+        reminder = call_generate_reminder(
+            message, request.author_username.strip(), source_url=request.source_url
+        )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AIによるリマインド生成に失敗しました: {exc}") from exc
 
+    members = SETTINGS.get("members", [])
+    if request.source == "mattermost" and request.post_id:
+        try:
+            reactions = mm.get_post_reactions(request.post_id)
+        except requests.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=f"Mattermost APIエラー: {exc}") from exc
+
+        reacted_usernames = {
+            r["username"] for r in reactions if r["emoji_name"] == REMINDER_DONE_EMOJI
+        }
+        mention_targets = [m for m in members if m not in reacted_usernames]
+        mention_line = " ".join(f"@{m}" for m in mention_targets)
+    else:
+        # Web記事にはリアクションの概念がないため、メンバー全員をメンション対象とする
+        mention_line = "@channel"
+
+    reminder = reminder.replace("@channel", mention_line, 1)
+
     return {"reminder": reminder}
+
+
+@app.post("/api/agenda")
+def post_agenda(request: AgendaRequest) -> dict:
+    if not request.items:
+        raise HTTPException(status_code=400, detail="アジェンダに含める投稿・記事が選択されていません")
+
+    try:
+        agenda_body = call_generate_agenda([item.model_dump() for item in request.items])
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AIによるアジェンダ生成に失敗しました: {exc}") from exc
+
+    now = datetime.now()
+    agenda = f"""# {now.year}年{now.month}月度アジェンダ
+- 実施日時：{now.year}/{now.month}/dd 15:00-16:00
+
+## 第一部
+#### 役員会の共有
+
+#### 全体共有事項
+{agenda_body}
+
+## 第二部
+#### 進捗報告
+#### 豆知識コーナー
+
+#### その他プロジェクト等の共有事項
+"""
+
+    return {"agenda": agenda}
 
 
 @app.post("/api/dm")

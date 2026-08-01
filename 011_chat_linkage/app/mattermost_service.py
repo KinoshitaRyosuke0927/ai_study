@@ -60,6 +60,19 @@ def post_dm_to_target(message: str) -> None:
     post_message(channel_id, message)
 
 
+def get_channel(channel_id: str) -> dict:
+    return _get(f"/api/v4/channels/{channel_id}")
+
+
+def get_team(team_id: str) -> dict:
+    return _get(f"/api/v4/teams/{team_id}")
+
+
+def build_post_permalink(team_name: str, post_id: str) -> str:
+    """投稿の恒久リンク(パーマリンク)を組み立てる"""
+    return f"{MATTERMOST_URL}/{team_name}/pl/{post_id}"
+
+
 def get_my_teams() -> list[dict]:
     return _get("/api/v4/users/me/teams")
 
@@ -127,12 +140,17 @@ def get_channel_posts_in_range(channel_id: str, start_ts_ms: int, end_ts_ms: int
     collected.sort(key=lambda p: p["create_at"])
 
     usernames = get_usernames_by_ids([p["user_id"] for p in collected])
+
+    channel = get_channel(channel_id)
+    team_name = get_team(channel["team_id"])["name"]
+
     return [
         {
             "id": p["id"],
             "username": usernames.get(p["user_id"], p["user_id"]),
             "message": p["message"],
             "create_at": p["create_at"],
+            "url": build_post_permalink(team_name, p["id"]),
         }
         for p in collected
     ]
