@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI PowerPoint Chat</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <!-- 数式(LaTeX)表示用ライブラリ -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>AI PowerPoint Chat</h1>
+
+    <div class="panels">
+
+      <!-- ========== 左: チャットエリア ========== -->
+      <div class="panel panel-left">
+        <section class="section last chat-section">
+          <div class="chat-section-header">
+            <h2>チャット</h2>
+            <button id="reset-btn" class="btn reset-btn" type="button">履歴を初期化</button>
+          </div>
+
+          <div id="chat-log" class="chat-log"></div>
+
+          <div class="chat-input-area">
+            <textarea id="chat-input" placeholder="メッセージを入力..." rows="1"></textarea>
+            <button id="send-button" class="btn send-btn" type="button">送信</button>
+          </div>
+        </section>
+      </div><!-- /panel-left -->
+
+      <div class="panel-divider"></div>
+
+      <!-- ========== 右: 資料イメージ確認エリア ========== -->
+      <div class="panel panel-right">
+        <div class="slides-section-header">
+          <h2>資料イメージ</h2>
+          <div class="slides-section-actions">
+            <button id="revise-btn" class="btn revise-btn" type="button" disabled>修正依頼</button>
+            <button id="download-btn" class="btn download-btn" type="button" disabled>資料ダウンロード</button>
+          </div>
+        </div>
+        <div id="slides-message" class="notice hidden"></div>
+        <div id="slide-cards" class="slide-cards">
+          <p id="slide-cards-placeholder" class="panel-right-placeholder">
+            チャットで資料の方向性が固まると、ここに資料イメージが表示されます
+          </p>
+        </div>
+      </div><!-- /panel-right -->
+
+    </div><!-- /panels -->
+  </div><!-- /container -->
+
+  <!-- ========== スライド画像拡大表示モーダル ========== -->
+  <div id="image-lightbox-modal" class="modal-overlay lightbox-overlay hidden">
+    <span id="image-lightbox-close" class="lightbox-close">&times;</span>
+    <img id="image-lightbox-img" class="lightbox-img" src="" alt="">
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
