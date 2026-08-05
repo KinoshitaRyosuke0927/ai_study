@@ -6,6 +6,8 @@ const chatLog = document.getElementById("chat-log");
 const chatInput = document.getElementById("chat-input");
 const sendButton = document.getElementById("send-button");
 const resetButton = document.getElementById("reset-btn");
+const pptxUploadBtn = document.getElementById("pptx-upload-btn");
+const pptxUploadInput = document.getElementById("pptx-upload-input");
 
 const slideCardsEl = document.getElementById("slide-cards");
 const reviseBtn = document.getElementById("revise-btn");
@@ -300,6 +302,11 @@ async function sendMessage(presetText) {
         chatInput.style.height = "auto";
     }
 
+    await fetchAssistantReply();
+}
+
+/** 直近の履歴をもとにAIの返答を取得し、チャット欄・選択肢・スタイル案/スライド生成に反映する */
+async function fetchAssistantReply() {
     // 送信中はボタンと入力欄を無効化
     sendButton.disabled = true;
     chatInput.disabled = true;
@@ -344,6 +351,47 @@ async function sendMessage(presetText) {
     }
 }
 
+/** アップロードされたpptxを解析してスタイル説明を取得し、参考資料としてチャット履歴に追加する */
+async function uploadPptxStyle(file) {
+    pptxUploadBtn.disabled = true;
+    const pending = appendMessage("assistant", "アップロードされた資料のスタイルを解析中...");
+    pending.bubble.classList.add("pending");
+
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/style/analyze-pptx", {
+            method: "POST",
+            body: formData,
+        });
+
+        if (!res.ok) {
+            const errorBody = await res.json().catch(() => ({}));
+            throw new Error(errorBody.detail || "資料のスタイル解析に失敗しました。");
+        }
+
+        const data = await res.json();
+        pending.row.remove();
+
+        const shortText = `参考資料「${file.name}」をアップロードしました。このスタイルを踏襲してください。`;
+        const styleText = `[スタイル分析結果]\n${data.style_description}`;
+
+        // 表示上はユーザー発言・AI発言の2つの吹き出しに分けるが、
+        // AIに送る履歴としては1つのユーザー発言にまとめて渡す
+        appendMessage("user", shortText);
+        appendMessage("assistant", styleText);
+        history.push({ role: "user", content: `${shortText}\n\n${styleText}` });
+
+        await fetchAssistantReply();
+    } catch (err) {
+        pending.row.remove();
+        appendMessage("assistant", `エラー: ${err.message}`);
+    } finally {
+        pptxUploadBtn.disabled = false;
+        pptxUploadInput.value = "";
+    }
+}
+
 function showSlideCardsPlaceholder() {
     slideCardsEl.innerHTML =
         '<p id="slide-cards-placeholder" class="panel-right-placeholder">チャットで資料の方向性が固まると、ここに資料イメージが表示されます</p>';
@@ -363,6 +411,14 @@ function resetChat() {
 
 sendButton.addEventListener("click", () => sendMessage());
 resetButton.addEventListener("click", resetChat);
+
+pptxUploadBtn.addEventListener("click", () => pptxUploadInput.click());
+pptxUploadInput.addEventListener("change", () => {
+    const file = pptxUploadInput.files && pptxUploadInput.files[0];
+    if (file) {
+        uploadPptxStyle(file);
+    }
+});
 
 chatInput.addEventListener("keydown", (event) => {
     // Ctrl+Enter（Macの場合はCmd+Enter）で送信、Enter単独では改行する

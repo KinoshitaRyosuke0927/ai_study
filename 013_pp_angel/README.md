@@ -6,6 +6,7 @@
 
 - チャットでAIがヒアリングを進行（一度に資料を作らず、質問を重ねながら方向性を固める）
 - AIが提示する選択肢をクリックして回答できる（テキストの選択肢／資料スタイルの画像案）
+- 既存のpptxをアップロードし、そのスタイル（配色・レイアウト傾向・雰囲気）を分析して、以降のスタイル案生成に反映
 - 資料のスタイル案を3つ、画像イメージとして生成して提示（完成した案から順に表示）
 - ヒアリングが完了すると、選択したスタイルをベースにスライドごとの資料イメージを自動生成（完成したスライドから順にカード表示）
 - 各カードの入力欄に修正指示を入力し、「修正依頼」で該当スライドのみ一斉に再生成
@@ -28,7 +29,20 @@ AZURE_OPENAI_ENDPOINT=https://your-resource.services.ai.azure.com/openai/v1
 AZURE_OPENAI_KEY=your-api-key
 ```
 
-> チャットの発言生成には `gpt-5.4-mini`、資料スタイル案・スライド画像の生成/編集には `gpt-image-2` を使用します。
+> チャットの発言生成・pptxスタイル分析には `gpt-5.4-mini`、資料スタイル案・スライド画像の生成/編集には `gpt-image-2` を使用します。
+
+pptxアップロード機能（既存資料のスタイル分析）を使う場合は、スライドの画像化に LibreOffice + Poppler（pdf2image）を使用します。
+
+#### LibreOffice のインストール（pptx→PDF変換に必要）
+
+[LibreOffice 公式サイト](https://www.libreoffice.org/download/) からインストーラーをダウンロードして実行します。
+Windowsの場合、インストール後は `C:\Program Files\LibreOffice\program\soffice.exe` が自動的に検出されます。
+Ubuntuの場合は `sudo apt install libreoffice` を実行してください。
+
+#### Poppler のインストール（PDF→画像変換に必要）
+
+Windowsの場合は [poppler-windows releases](https://github.com/oschwartz10612/poppler-windows/releases/) から最新版のzipをダウンロードし、展開後に `bin` フォルダをシステムPATHに追加してください。
+Ubuntuの場合は `sudo apt install poppler-utils` を実行してください。
 
 ### 3. サーバー起動
 ```bash
@@ -44,6 +58,7 @@ uvicorn app.main:app --reload --port 8000
 | GET | `/` | フロントエンド（index.html） |
 | GET | `/api/health` | ヘルスチェック |
 | POST | `/api/chat` | チャット履歴を送信し、AIの発言・選択肢・スタイル案・スライド構成案（準備が整った場合）を返す |
+| POST | `/api/style/analyze-pptx` | アップロードされたpptxの1枚目のスライドを画像化し、スタイル（配色・レイアウト傾向・雰囲気）を分析して説明文を返す |
 | POST | `/api/chat/style-images` | 資料スタイル案ごとの画像を生成（SSEストリーミング） |
 | POST | `/api/slides/generate` | スライド構成案とスタイル画像をもとに、スライドごとの資料イメージを生成（SSEストリーミング） |
 | POST | `/api/slides/revise` | カードごとの修正指示にもとづき、対象スライドの資料イメージを修正（SSEストリーミング） |
@@ -52,8 +67,9 @@ uvicorn app.main:app --reload --port 8000
 ## ファイル構成
 
 - `app/main.py` — FastAPI エントリポイント
-- `app/prompt.py` — チャット用システムプロンプト（ヒアリング〜構造化出力のスキーマ定義）・画像生成/編集ガイダンス
+- `app/prompt.py` — チャット用システムプロンプト（ヒアリング〜構造化出力のスキーマ定義）・画像生成/編集ガイダンス・pptxスタイル分析用プロンプト
 - `app/azure_ai_service.py` — Azure OpenAI 呼び出し（チャット: `gpt-5.4-mini` / 画像生成・編集: `gpt-image-2`）
+- `app/pptx_utils.py` — LibreOffice + pdf2imageによる、pptx1枚目のスライド画像化
 - `app/static/` — フロントエンド（HTML / CSS / JS）
 - `images/` — チャットのAIアイコンなど、アプリで使用する画像素材
 - `sample_story.md` — チャットの対話例・利用シナリオ

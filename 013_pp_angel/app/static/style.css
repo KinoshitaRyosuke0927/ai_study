@@ -281,6 +281,27 @@ h2 {
   padding: 10px 20px;
 }
 
+.upload-btn {
+  padding: 10px 14px;
+  background-color: #fff;
+  color: #0052cc;
+  border: 1px solid #0052cc;
+  white-space: nowrap;
+}
+
+.upload-btn:hover:not(:disabled) {
+  background-color: #f0f4ff;
+}
+
+.upload-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#pptx-upload-input.hidden {
+  display: none;
+}
+
 /* ========== チャット内選択肢（テキスト/スタイル画像） ========== */
 
 .chat-options {
@@ -343,6 +364,10 @@ h2 {
   width: 20px;
   height: 20px;
   border-width: 2px;
+}
+
+.chat-option-spinner.hidden {
+  display: none;
 }
 
 .chat-option-thumb-wrap.chat-option-thumb-error {

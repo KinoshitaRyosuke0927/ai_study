@@ -3,20 +3,22 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import tempfile
 from io import BytesIO
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 import uvicorn
 from PIL import Image
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.prompt import LAYOUT_GUIDANCE_SUFFIX
-from app.azure_ai_service import call_chat, call_image_generate, call_image_edit
+from app.azure_ai_service import call_chat, call_image_generate, call_image_edit, analyze_pptx_style
+from app.pptx_utils import render_pptx_first_slide_to_png
 
 
 class ChatMessage(BaseModel):
@@ -177,6 +179,35 @@ async def generate_style_images(request: StyleImagesRequest) -> StreamingRespons
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/api/style/analyze-pptx")
+async def analyze_pptx_style_endpoint(file: UploadFile = File(...)) -> dict:
+    """
+    アップロードされたpptxの1枚目のスライドを画像化し、AIでスタイルを分析する
+
+    分析結果の説明文は、チャット履歴上のユーザ発言としてフロントエンドから送信され、
+    以降のstyle_proposals生成時に参考資料のスタイルを踏襲するために使われる
+    """
+    if not (file.filename or "").lower().endswith(".pptx"):
+        raise HTTPException(status_code=400, detail="pptxファイルをアップロードしてください。")
+
+    pptx_bytes = await file.read()
+    if not pptx_bytes:
+        raise HTTPException(status_code=400, detail="ファイルの内容を読み込めませんでした。")
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            work_dir = Path(tmpdir)
+            preview_bytes = await asyncio.to_thread(render_pptx_first_slide_to_png, pptx_bytes, work_dir)
+            style_description = await asyncio.to_thread(analyze_pptx_style, preview_bytes)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"資料のスタイル解析に失敗しました: {exc}") from exc
+
+    return {
+        "style_description": style_description,
+        "preview_image_b64": base64.b64encode(preview_bytes).decode(),
+    }
 
 
 def _build_slide_instruction(title: str, description: str) -> str:

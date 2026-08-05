@@ -12,7 +12,7 @@ from PIL import Image
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from app.prompt import HEARING_SYSTEM_PROMPT
+from app.prompt import HEARING_SYSTEM_PROMPT, STYLE_ANALYSIS_PROMPT
 
 # 環境変数(.env)を読み込む
 if getattr(sys, "frozen", False):
@@ -69,6 +69,37 @@ def call_chat(history: list[dict[str, Any]]) -> dict[str, Any]:
         # 先頭の1つのJSONオブジェクトのみを取り出して救済する
         obj, _ = json.JSONDecoder().raw_decode(text)
         return obj
+
+
+def analyze_pptx_style(image_bytes: bytes) -> str:
+    """
+    アップロードされたpptxのスライド画像をVision対応チャットモデルに読み込ませ、
+    配色・レイアウト傾向・雰囲気を、style_proposals生成の参考にできる説明文として言語化する
+
+    Args
+    -----------------
+    - image_bytes: bytes,    分析対象のスライド画像（PNG）のバイト列
+
+    Returns
+    -----------------
+    - style_description: str,    スタイルの説明文（日本語）
+
+    """
+    b64 = base64.b64encode(image_bytes).decode()
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": STYLE_ANALYSIS_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "このスライドのデザインスタイルを分析してください。"},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                ],
+            },
+        ],
+    )
+    return response.choices[0].message.content.strip()
 
 
 def call_image_generate(prompt: str, size: str = DEFAULT_IMAGE_SIZE) -> bytes:
