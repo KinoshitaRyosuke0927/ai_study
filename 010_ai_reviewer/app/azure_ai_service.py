@@ -26,6 +26,8 @@ AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY", "")
 # デプロイしたモデルの名称
 MODEL_NAME = "gpt-5.4-mini"
+# 想定質問生成用のモデルの名称
+MODEL_NAME_QA = "gpt-5.4"
 MODEL_NAME_IMAGE = "gpt-image-2"
 # 画像編集APIが受け付けるsizeオプション（幅x高さ）
 IMAGE_EDIT_SIZE_OPTIONS = ("1024x1024", "1536x1024", "1024x1536")
@@ -37,9 +39,37 @@ client = OpenAI(
 )
 
 
+def _call_chat(prompt_package: dict[str, Any], model: str) -> dict[str, Any]:
+    """
+    プロンプトパッケージを指定モデルでAzure OpenAIに送信し、JSON形式の結果を返す
+
+    Args
+    -----------------
+    - prompt_package: dict[str, Any],   system_prompt と user_prompt を含むプロンプトパッケージ
+    - model: str,                       送信先のAzure OpenAIデプロイモデル名
+
+    Returns
+    -----------------
+    - result: dict[str, Any],           AIが生成した結果（JSON形式）
+
+    """
+    # Azure OpenAI にリクエストを送信
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": prompt_package["system_prompt"]},
+            {"role": "user", "content": prompt_package["user_prompt"]},
+        ],
+        response_format={"type": "json_object"},
+    )
+    # レスポンスをJSONとして解析して返却
+    text = response.choices[0].message.content.strip()
+    return json.loads(text)
+
+
 def call_review(prompt_package: dict[str, Any]) -> dict[str, Any]:
     """
-    プロンプトパッケージをAzure OpenAIに送信してレビュー結果を返す
+    プロンプトパッケージをAzure OpenAI（レビュー用モデル）に送信してレビュー結果を返す
 
     Args
     -----------------
@@ -50,18 +80,23 @@ def call_review(prompt_package: dict[str, Any]) -> dict[str, Any]:
     - result: dict[str, Any],           AIが生成したレビュー結果（JSON形式）
 
     """
-    # Azure OpenAI にリクエストを送信
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": prompt_package["system_prompt"]},
-            {"role": "user", "content": prompt_package["user_prompt"]},
-        ],
-        response_format={"type": "json_object"},
-    )
-    # レスポンスをJSONとして解析して返却
-    text = response.choices[0].message.content.strip()
-    return json.loads(text)
+    return _call_chat(prompt_package, MODEL_NAME)
+
+
+def call_qa(prompt_package: dict[str, Any]) -> dict[str, Any]:
+    """
+    プロンプトパッケージをAzure OpenAI（想定質問生成用モデル）に送信して想定質問の生成結果を返す
+
+    Args
+    -----------------
+    - prompt_package: dict[str, Any],   system_prompt と user_prompt を含むプロンプトパッケージ
+
+    Returns
+    -----------------
+    - result: dict[str, Any],           AIが生成した想定質問の生成結果（JSON形式）
+
+    """
+    return _call_chat(prompt_package, MODEL_NAME_QA)
 
 
 def _pick_edit_size(width: int, height: int) -> str:

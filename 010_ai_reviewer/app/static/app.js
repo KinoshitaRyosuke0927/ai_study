@@ -108,8 +108,11 @@ const reviewBtn          = document.getElementById("review-btn");
 const reviewMessage      = document.getElementById("review-message");
 const suggestBtn         = document.getElementById("suggest-btn");
 const suggestMessage     = document.getElementById("suggest-message");
+const qaBtn              = document.getElementById("qa-btn");
+const qaMessage          = document.getElementById("qa-message");
 const downloadCsvBtn     = document.getElementById("download-csv-btn");
 const downloadSuggestionBtn = document.getElementById("download-suggestion-btn");
+const downloadQaBtn      = document.getElementById("download-qa-btn");
 // レビュー観点設定モーダル
 const reviewPointSettingsBtn = document.getElementById("review-point-settings-btn");
 const reviewPointModal       = document.getElementById("review-point-modal");
@@ -133,6 +136,7 @@ const tabBtns               = document.querySelectorAll(".tab-btn");
 const tabInputEl            = document.getElementById("tab-input");
 const tabSummaryEl          = document.getElementById("tab-summary");
 const tabSuggestionEl       = document.getElementById("tab-suggestion");
+const tabQaEl               = document.getElementById("tab-qa");
 const summaryPlaceholder    = document.getElementById("summary-placeholder");
 const summaryContent        = document.getElementById("summary-content");
 const summarySlideLabel     = document.getElementById("summary-slide-label");
@@ -146,6 +150,9 @@ const suggestionBeforeImg   = document.getElementById("suggestion-before-img");
 const suggestionAfterImg    = document.getElementById("suggestion-after-img");
 const suggestionAfterSpinner = document.getElementById("suggestion-after-spinner");
 const suggestionBody        = document.getElementById("suggestion-body");
+const qaPlaceholder         = document.getElementById("qa-placeholder");
+const qaContent             = document.getElementById("qa-content");
+const qaList                = document.getElementById("qa-list");
 
 // 伝えたいことタブ
 const inputSlideLabel    = document.getElementById("input-slide-label");
@@ -166,7 +173,8 @@ let selectedSlide     = null;      // 現在選択中のスライド番号（1�
 let perSlideMessages  = {};        // slideNum -> string
 let reviewData              = null;  // APIから返ってきたレビュー結果
 let suggestionBySlide       = {};    // slide_number -> 修正方針テキスト（またはエラー情報）
-let activeTab               = "input"; // "input" | "summary" | "suggestion"
+let qaData                  = null;  // APIから返ってきた想定質問一覧
+let activeTab               = "input"; // "input" | "summary" | "suggestion" | "qa"
 let activePerspectiveIndex  = 0;
 let suggestInProgress       = false; // 修正方針提案のストリーミング処理中かどうか
 
@@ -240,11 +248,14 @@ uploadBtn.addEventListener("click", async () => {
     slideCount    = data.slide_count || 0;
     reviewData    = null;
     suggestionBySlide = {};
+    qaData        = null;
     selectedSlide = null;
     perSlideMessages = {};
     downloadCsvBtn.disabled = true;
     suggestBtn.disabled = true;
+    qaBtn.disabled = false;
     downloadSuggestionBtn.disabled = true;
+    downloadQaBtn.disabled = true;
 
     // 左パネルの各セクションを表示
     overallSection.classList.remove("hidden");
@@ -254,6 +265,8 @@ uploadBtn.addEventListener("click", async () => {
     if (summaryContent) summaryContent.classList.add("hidden");
     if (suggestionPlaceholder) suggestionPlaceholder.classList.remove("hidden");
     if (suggestionContent) suggestionContent.classList.add("hidden");
+    if (qaPlaceholder) qaPlaceholder.classList.remove("hidden");
+    if (qaContent) qaContent.classList.add("hidden");
 
     // スライド一覧を構築
     buildSlideList(thumbnails, slideCount);
@@ -378,6 +391,7 @@ tabBtns.forEach((btn) => {
     tabInputEl.classList.toggle("hidden", activeTab !== "input");
     tabSummaryEl.classList.toggle("hidden", activeTab !== "summary");
     tabSuggestionEl.classList.toggle("hidden", activeTab !== "suggestion");
+    tabQaEl.classList.toggle("hidden", activeTab !== "qa");
     refreshRightPanel();
   });
 });
@@ -393,6 +407,8 @@ function refreshRightPanel() {
     if (selectedSlide) renderSummaryTab(selectedSlide);
   } else if (activeTab === "suggestion") {
     if (selectedSlide) renderSuggestionTab(selectedSlide);
+  } else if (activeTab === "qa") {
+    renderQaTab();
   }
 }
 
@@ -478,6 +494,28 @@ function renderSuggestionTab(num) {
   `;
 }
 
+// ============================================================
+// 想定質問タブ
+// ============================================================
+
+function renderQaTab() {
+  if (!qaData || qaData.length === 0) {
+    qaPlaceholder.classList.remove("hidden");
+    qaContent.classList.add("hidden");
+    return;
+  }
+
+  qaPlaceholder.classList.add("hidden");
+  qaContent.classList.remove("hidden");
+
+  qaList.innerHTML = qaData.map((q, i) => `
+    <div class="qa-item">
+      <div class="qa-question">Q${i + 1}. ${escHtml(q.question || "")}</div>
+      ${q.hint ? `<div class="qa-hint markdown-body">${renderMarkdown(q.hint)}</div>` : ""}
+    </div>
+  `).join("");
+}
+
 function showPerspective(perspectives, index) {
   const p = perspectives[index];
   if (!p) {
@@ -551,6 +589,59 @@ reviewBtn.addEventListener("click", async () => {
   } finally {
     reviewBtn.disabled = false;
     reviewBtn.textContent = "レビューする";
+  }
+});
+
+// ============================================================
+// 想定質問の生成
+// ============================================================
+
+qaBtn.addEventListener("click", async () => {
+  if (!currentFile) return;
+
+  saveCurrentInput();
+  hideMessage(qaMessage);
+  qaBtn.disabled = true;
+  qaBtn.innerHTML = '<span class="loading"></span>AIが想定質問を検討中...';
+
+  try {
+    const overallMsg = intendedMessage.value.trim();
+    const slides = thumbnails.map((thumb, i) => ({
+      slide_number: i + 1,
+      image_jpeg_b64: thumb,
+      intended_message: (perSlideMessages[i + 1] || "").trim() || overallMsg,
+    }));
+
+    const res  = await fetch("/api/anticipated-questions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ overall_intended_message: overallMsg, slides }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showMessage(qaMessage, `エラー: ${formatErrorDetail(data.detail)}`, "error");
+      return;
+    }
+
+    qaData = data.questions || [];
+    downloadQaBtn.disabled = qaData.length === 0;
+    showMessage(qaMessage, "想定質問の提案が完了しました", "success");
+
+    // 想定質問タブに切り替えて結果を表示
+    activeTab = "qa";
+    tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "qa"));
+    tabInputEl.classList.add("hidden");
+    tabSummaryEl.classList.add("hidden");
+    tabSuggestionEl.classList.add("hidden");
+    tabQaEl.classList.remove("hidden");
+
+    renderQaTab();
+  } catch (err) {
+    showMessage(qaMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    qaBtn.disabled = false;
+    qaBtn.textContent = "想定質問を提案する";
   }
 });
 
@@ -896,6 +987,31 @@ downloadCsvBtn.addEventListener("click", () => {
   const a = document.createElement("a");
   a.href = url;
   a.download = "review_result.md";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// ============================================================
+// 想定質問のMarkdownダウンロード
+// ============================================================
+
+downloadQaBtn.addEventListener("click", () => {
+  if (!qaData || qaData.length === 0) return;
+
+  const lines = ["| No | 想定質問 | 準備のヒント |", "| --- | --- | --- |"];
+  qaData.forEach((q, i) => {
+    lines.push(`| ${i + 1} | ${markdownTableEscape(q.question || "")} | ${markdownTableEscape(q.hint || "")} |`);
+  });
+
+  const markdownContent = lines.join("\n") + "\n";
+  const blob = new Blob([markdownContent], { type: "text/markdown;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "anticipated_questions.md";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

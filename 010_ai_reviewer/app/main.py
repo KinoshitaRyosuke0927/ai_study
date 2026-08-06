@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.prompt import (
     LAYOUT_GUIDANCE_SUFFIX,
+    build_anticipated_questions_prompt_package,
     build_change_description_prompt_package,
     build_overall_per_type_prompt_packages_by_type,
     build_overall_per_type_summarize_prompt_package,
@@ -27,7 +28,7 @@ from app.prompt import (
     update_review_point_settings,
 )
 from app.renderer import render_pptx_to_images, images_to_base64_dict
-from app.azure_ai_service import call_image_edit, call_review
+from app.azure_ai_service import call_image_edit, call_qa, call_review
 
 
 class SlideInput(BaseModel):
@@ -278,6 +279,26 @@ async def review_pptx(request: ReviewRequest) -> dict:
         },
         "slides": [],
     }
+
+
+@app.post("/api/anticipated-questions")
+async def anticipated_questions(request: ReviewRequest) -> dict:
+    """
+    スライド画像と伝えたい内容をもとに、AI技術者・アプリケーションエンジニア視点での想定質問をAIが提案する
+    """
+    # スライド情報が読み取れなかった場合
+    if not request.slides:
+        raise HTTPException(status_code=400, detail="スライドデータがありません。")
+
+    data = request.model_dump()
+    package = build_anticipated_questions_prompt_package(data)
+
+    try:
+        result = await asyncio.to_thread(call_qa, package)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AIによる想定質問の生成に失敗しました: {exc}") from exc
+
+    return {"questions": result.get("questions", [])}
 
 
 def _plan_slide_edits(slides: list[dict], findings_text: str) -> dict[int, str]:

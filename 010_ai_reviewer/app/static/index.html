@@ -16,6 +16,7 @@
       <div class="header-actions">
         <button id="download-csv-btn" class="btn-download" disabled>指摘事項をダウンロード</button>
         <button id="download-suggestion-btn" class="btn-download" disabled>修正後スライドをダウンロード</button>
+        <button id="download-qa-btn" class="btn-download" disabled>想定質問をダウンロード</button>
       </div>
     </div>
 
@@ -55,6 +56,8 @@
           <div id="review-message" class="message hidden"></div>
           <button id="suggest-btn" disabled>修正方針を提示する</button>
           <div id="suggest-message" class="message hidden"></div>
+          <button id="qa-btn" disabled>想定質問を提案する</button>
+          <div id="qa-message" class="message hidden"></div>
         </div>
 
       </div><!-- /panel-left -->
@@ -72,6 +75,7 @@
             <button class="tab-btn active" data-tab="input">伝えたいこと</button>
             <button class="tab-btn" data-tab="summary">指摘事項</button>
             <button class="tab-btn" data-tab="suggestion">修正方針</button>
+            <button class="tab-btn" data-tab="qa">想定質問</button>
           </div>
 
           <!-- 伝えたいことタブ -->
@@ -132,6 +136,16 @@
                 </div>
               </div>
               <div id="suggestion-body"></div>
+            </div>
+          </div>
+
+          <!-- 想定質問タブ -->
+          <div id="tab-qa" class="tab-content hidden">
+            <div id="qa-placeholder" class="placeholder-text">
+              「想定質問を提案する」を実行すると結果が表示されます
+            </div>
+            <div id="qa-content" class="hidden">
+              <div id="qa-list"></div>
             </div>
           </div>
 
