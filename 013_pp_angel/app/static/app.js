@@ -132,7 +132,8 @@ function appendMessage(role, content) {
     if (role === "assistant") {
         const avatar = document.createElement("img");
         avatar.className = "avatar";
-        avatar.src = "/images/kanata_icon.png";
+        // avatar.src = "/images/kanata_icon.png";
+        avatar.src = "/images/irasutoya_angel.png";
         avatar.alt = "AI";
         row.appendChild(avatar);
     }
