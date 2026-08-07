@@ -184,6 +184,19 @@
             <h2>部会アジェンダ</h2>
             <textarea id="agenda-output" placeholder="チェックした投稿・記事を選び「アジェンダを作成」を押すと、ここに文章が作成されます"></textarea>
             <div id="agenda-output-message" class="message hidden"></div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="agenda-publish-year">公開先: 年</label>
+                <input type="number" id="agenda-publish-year" min="2000" max="2100">
+              </div>
+              <div class="form-group">
+                <label for="agenda-publish-month">公開先: 月</label>
+                <input type="number" id="agenda-publish-month" min="1" max="12">
+              </div>
+            </div>
+            <button id="agenda-publish-btn" class="btn" disabled>wikiへ公開</button>
+            <div id="agenda-publish-message" class="message hidden"></div>
           </section>
 
         </div><!-- /panel-right -->

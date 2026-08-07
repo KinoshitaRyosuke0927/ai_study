@@ -15,6 +15,7 @@ from pydantic import BaseModel
 import requests
 
 from app import groupsession_service as gs
+from app import growi_service as growi
 from app import mattermost_service as mm
 from app.azure_ai_service import call_filter_reminder_posts, call_generate_agenda, call_generate_reminder
 
@@ -41,6 +42,7 @@ def load_settings() -> dict:
         "members": members,
         "groupsession_forum_sid": config.getint("groupsession", "forum_sid", fallback=0),
         "groupsession_read_date": config.getint("groupsession", "read_date", fallback=30),
+        "growi_root_path": config.get("growi", "root_path", fallback=""),
     }
 
 
@@ -68,6 +70,12 @@ class AgendaItem(BaseModel):
 
 class AgendaRequest(BaseModel):
     items: list[AgendaItem]
+
+
+class AgendaPublishRequest(BaseModel):
+    agenda: str
+    year: int
+    month: int
 
 
 app = FastAPI(title="Mattermost チャット連携", version="1.0.0")
@@ -236,6 +244,24 @@ def post_agenda(request: AgendaRequest) -> dict:
 """
 
     return {"agenda": agenda}
+
+
+@app.post("/api/agenda/publish")
+def publish_agenda(request: AgendaPublishRequest) -> dict:
+    agenda = request.agenda.strip()
+    if not agenda:
+        raise HTTPException(status_code=400, detail="公開するアジェンダがありません")
+
+    root_path = SETTINGS.get("growi_root_path", "")
+    if not root_path:
+        raise HTTPException(status_code=400, detail="settings.iniにgrowiのroot_pathが設定されていません")
+
+    try:
+        result = growi.publish_agenda(root_path, request.year, request.month, agenda)
+    except requests.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"GROWIへの公開に失敗しました: {exc}") from exc
+
+    return result
 
 
 @app.post("/api/dm")

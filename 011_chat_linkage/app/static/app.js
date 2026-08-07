@@ -78,6 +78,10 @@ const agendaCreateBtn      = document.getElementById("agenda-create-btn");
 const agendaDetailMessage  = document.getElementById("agenda-detail-message");
 const agendaOutput         = document.getElementById("agenda-output");
 const agendaOutputMessage  = document.getElementById("agenda-output-message");
+const agendaPublishYearInput  = document.getElementById("agenda-publish-year");
+const agendaPublishMonthInput = document.getElementById("agenda-publish-month");
+const agendaPublishBtn        = document.getElementById("agenda-publish-btn");
+const agendaPublishMessage    = document.getElementById("agenda-publish-message");
 
 // ============================================================
 // 状態管理
@@ -668,11 +672,60 @@ agendaCreateBtn.addEventListener("click", async () => {
     }
     agendaOutput.value = data.agenda;
     showMessage(agendaOutputMessage, "部会アジェンダを作成しました。", "success");
+
+    const now = new Date();
+    agendaPublishYearInput.value = now.getFullYear();
+    agendaPublishMonthInput.value = now.getMonth() + 1;
+    agendaPublishBtn.disabled = false;
+    hideMessage(agendaPublishMessage);
   } catch (err) {
     showMessage(agendaOutputMessage, `ネットワークエラー: ${err.message}`, "error");
   } finally {
     agendaCreateBtn.disabled = false;
     agendaCreateBtn.textContent = "アジェンダを作成";
+  }
+});
+
+// ============================================================
+// アジェンダのwiki公開
+// ============================================================
+
+agendaPublishBtn.addEventListener("click", async () => {
+  hideMessage(agendaPublishMessage);
+
+  const agenda = agendaOutput.value.trim();
+  const year = Number(agendaPublishYearInput.value);
+  const month = Number(agendaPublishMonthInput.value);
+
+  if (!agenda) {
+    showMessage(agendaPublishMessage, "公開するアジェンダがありません", "error");
+    return;
+  }
+  if (!year || !month) {
+    showMessage(agendaPublishMessage, "公開先の年・月を入力してください", "error");
+    return;
+  }
+
+  agendaPublishBtn.disabled = true;
+  agendaPublishBtn.textContent = "公開中...";
+
+  try {
+    const res = await fetch("/api/agenda/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agenda, year, month }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showMessage(agendaPublishMessage, `エラー: ${data.detail}`, "error");
+      return;
+    }
+    showMessage(agendaPublishMessage, `wikiへ公開しました: ${data.url}`, "success");
+  } catch (err) {
+    showMessage(agendaPublishMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    agendaPublishBtn.disabled = false;
+    agendaPublishBtn.textContent = "wikiへ公開";
   }
 });
 
