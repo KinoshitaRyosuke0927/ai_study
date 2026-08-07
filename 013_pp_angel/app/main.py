@@ -244,8 +244,8 @@ async def _stream_slide_generation(slide_plan: list[SlidePlanItem], style_image_
             detail = getattr(exc, "detail", str(exc))
             return {"type": "slide_error", "slide_number": slide.slide_number, "detail": detail}
 
-    # Azure側の通信上限があるため, 最大同時実行数を2にする
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    # gpt-image-2/gpt-image-2-2 の2デプロイに振り分けるため, 最大同時実行数を4にする
+    with ThreadPoolExecutor(max_workers=4) as executor:
         tasks = [_run(executor, slide) for slide in slide_plan]
         for coro in asyncio.as_completed(tasks):
             payload = await coro
@@ -301,8 +301,8 @@ async def _stream_slide_revision(slides: list[SlideRevision]):
             detail = getattr(exc, "detail", str(exc))
             return {"type": "slide_error", "slide_number": slide.slide_number, "detail": detail}
 
-    # Azure側の通信上限があるため, 最大同時実行数を2にする
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    # gpt-image-2/gpt-image-2-2 の2デプロイに振り分けるため, 最大同時実行数を4にする
+    with ThreadPoolExecutor(max_workers=4) as executor:
         tasks = [_run(executor, slide) for slide in slides]
         for coro in asyncio.as_completed(tasks):
             payload = await coro

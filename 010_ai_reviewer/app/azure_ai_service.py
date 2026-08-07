@@ -4,6 +4,8 @@ import os
 import sys
 import json
 import base64
+import itertools
+import threading
 from io import BytesIO
 from typing import Any
 from pathlib import Path
@@ -28,7 +30,9 @@ AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY", "")
 MODEL_NAME = "gpt-5.4-mini"
 # 想定質問生成用のモデルの名称
 MODEL_NAME_QA = "gpt-5.4"
-MODEL_NAME_IMAGE = "gpt-image-2"
+# 画像編集用モデルは、レート制限（RPM）を分散させるため同一モデルを複数デプロイし、
+# リクエストごとに交互に振り分けて疑似的に並列度を上げる
+MODEL_NAME_IMAGE_DEPLOYMENTS = ("gpt-image-2", "gpt-image-2-2")
 # 画像編集APIが受け付けるsizeオプション（幅x高さ）
 IMAGE_EDIT_SIZE_OPTIONS = ("1024x1024", "1536x1024", "1024x1536")
 
@@ -37,6 +41,18 @@ client = OpenAI(
     base_url=AZURE_OPENAI_ENDPOINT,
     api_key=AZURE_OPENAI_KEY
 )
+
+# 画像編集デプロイのラウンドロビン選択用（複数スレッドから呼ばれるためロックで保護する）
+_image_deployment_cycle = itertools.cycle(MODEL_NAME_IMAGE_DEPLOYMENTS)
+_image_deployment_lock = threading.Lock()
+
+
+def _next_image_deployment() -> str:
+    """
+    画像編集リクエストを振り分けるデプロイ名を、ラウンドロビンで1つ返す
+    """
+    with _image_deployment_lock:
+        return next(_image_deployment_cycle)
 
 
 def _call_chat(prompt_package: dict[str, Any], model: str) -> dict[str, Any]:
@@ -143,7 +159,7 @@ def call_image_edit(prompt: str, image_bytes: bytes) -> bytes:
     edit_size = _pick_edit_size(original_width, original_height)
 
     result = client.images.edit(
-        model=MODEL_NAME_IMAGE,
+        model=_next_image_deployment(),
         image=("slide.png", image_bytes, "image/png"),
         prompt=prompt,
         size=edit_size,
