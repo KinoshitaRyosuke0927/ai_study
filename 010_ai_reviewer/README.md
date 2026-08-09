@@ -44,6 +44,24 @@ uvicorn app.main:app --reload --port 8000
 
 ブラウザで `http://127.0.0.1:8000` を開いてください。
 
+## Dockerでのローカル起動（参考）
+
+Docker環境がある場合、以下でコンテナとして起動できます（LibreOffice/Popplerのローカルインストールは不要）。
+
+```bash
+docker compose up --build
+```
+
+`http://127.0.0.1:8000` で起動します。ワークスペースルートの `.env`（`AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_KEY`）を読み込みます。
+
+## Azureへのデプロイ
+
+Azure Container Apps（スケールtoゼロ・IPアクセス制限付き）へのデプロイ手順は [docs/azure_deploy.md](docs/azure_deploy.md) を参照してください。
+
+## 操作マニュアル
+
+社内向け操作マニュアル（[docs/user_manual.html](docs/user_manual.html)）は、Azure Blob Storage静的Webサイトとして公開しています: `https://staireviewerdocs.z11.web.core.windows.net/`（アプリ本体と同じIPアクセス制限あり）
+
 ## API エンドポイント
 
 | メソッド | パス | 説明 |
@@ -65,6 +83,9 @@ uvicorn app.main:app --reload --port 8000
 - `app/static/` — フロントエンド（HTML / CSS / JS）
 - `review_point.csv` — レビュー観点（資料内容の観点）
 - `pp_check_points.csv` — レビュー観点（資料デザイン・体裁の観点）
+- `Dockerfile` / `.dockerignore` / `docker-compose.yml` — コンテナ化関連ファイル
+- `infra/containerapp.json` — Azure Container Apps デプロイ用ARMテンプレート
+- `docs/azure_deploy.md` — Azure Container Apps へのデプロイ手順
 
 ## exe化（PyInstaller）
 

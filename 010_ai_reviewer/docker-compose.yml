@@ -1,0 +1,9 @@
+# ローカルにDocker環境がある場合の参考用構成。
+# ワークスペースルートの .env（AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_KEY）を読み込む。
+services:
+  ai-reviewer:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env

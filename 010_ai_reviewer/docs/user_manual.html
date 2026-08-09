@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI PowerPoint レビュアー 操作マニュアル</title>
+<style>
+  :root {
+    --accent: #0052cc;
+    --accent-dark: #0041a3;
+    --border: #e2e8f0;
+    --bg-soft: #f7fafc;
+    --text: #333;
+    --text-soft: #718096;
+    --warn-bg: #fff8e6;
+    --warn-border: #f0c96b;
+    --tip-bg: #f0fff4;
+    --tip-border: #9ae6b4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    color: var(--text);
+    line-height: 1.7;
+    padding: 32px 10vw 96px;
+    background: #fff;
+  }
+  h1 {
+    font-size: 1.8rem;
+    color: var(--accent);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 12px;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    color: var(--text-soft);
+    font-size: 0.95rem;
+    margin-bottom: 32px;
+  }
+  h2 {
+    font-size: 1.3rem;
+    color: var(--accent);
+    margin-top: 48px;
+    margin-bottom: 16px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.05rem;
+    color: #444;
+    margin-top: 28px;
+    margin-bottom: 10px;
+  }
+  p { margin: 0 0 12px; }
+  ul, ol { margin: 0 0 14px; padding-left: 1.6em; }
+  li { margin-bottom: 6px; }
+  code {
+    background: #eef1f5;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+  a { color: var(--accent); }
+
+  /* 目次 */
+  .toc {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 24px;
+    margin-bottom: 32px;
+  }
+  .toc h2 { margin-top: 0; border-bottom: none; font-size: 1.1rem; }
+  .toc ol { margin-bottom: 0; }
+  .toc a { text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* コールアウト */
+  .callout {
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 16px 0;
+    font-size: 0.92rem;
+  }
+  .callout.tip { background: var(--tip-bg); border: 1px solid var(--tip-border); }
+  .callout.warn { background: var(--warn-bg); border: 1px solid var(--warn-border); }
+  .callout .label { font-weight: bold; margin-bottom: 4px; display: block; }
+
+  /* 画面キャプチャ */
+  .screenshot {
+    margin: 16px 0 24px;
+    text-align: center;
+  }
+  .screenshot img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 0 auto;
+  }
+  /* 手順ステップ */
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    padding-left: 0;
+  }
+  .steps > li {
+    counter-increment: step;
+    position: relative;
+    padding: 4px 0 4px 42px;
+    margin-bottom: 14px;
+  }
+  .steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 2px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-weight: bold;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.9rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); }
+
+  .btn-label {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    padding: 1px 9px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: bold;
+  }
+  .tab-label {
+    display: inline-block;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 0px 9px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: bold;
+  }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    color: var(--text-soft);
+    font-size: 0.82rem;
+  }
+
+  @media print {
+    .screenshot { break-inside: avoid; }
+    h2 { break-before: page; }
+  }
+</style>
+</head>
+<body>
+
+<h1>AI PowerPoint レビュアー 操作マニュアル</h1>
+<p class="subtitle">社内向け公開版（Azure Container Apps ホスティング） — 最終更新: 2026/08/12</p>
+
+<nav class="toc">
+  <h2>目次</h2>
+  <ol>
+    <li><a href="#overview">アプリの概要</a></li>
+    <li><a href="#access">アクセス方法</a></li>
+    <li><a href="#screen">画面構成</a></li>
+    <li><a href="#flow-upload">1. PPTXファイルのアップロード</a></li>
+    <li><a href="#flow-message">2. 伝えたいことの入力</a></li>
+    <li><a href="#flow-points">3. レビュー観点の確認・絞り込み（任意）</a></li>
+    <li><a href="#flow-review">4. AIレビューの実行と指摘事項の確認</a></li>
+    <li><a href="#flow-suggest">5. 修正方針の生成</a></li>
+    <li><a href="#flow-qa">6. 想定質問の確認</a></li>
+    <li><a href="#flow-download">7. 結果のダウンロード</a></li>
+    <li><a href="#faq">よくある質問・トラブルシューティング</a></li>
+    <li><a href="#contact">問い合わせ先</a></li>
+  </ol>
+</nav>
+
+<h2 id="overview">アプリの概要</h2>
+<p>
+  <code>.pptx</code>形式のプレゼンテーション資料をアップロードすると、AIが以下の3つの観点で資料を確認してくれるWebアプリケーションです。
+</p>
+<ul>
+  <li><strong>AIレビュー</strong>: あらかじめ設定された観点（構成・計画・実現可能性・デザインなど）で指摘事項を洗い出します</li>
+  <li><strong>修正方針の提案</strong>: 指摘事項をもとに、AIがスライド画像を実際に修正した案を生成します</li>
+  <li><strong>想定質問の提案</strong>: 企画会議に同席する技術者（AIエンジニア・アプリケーションエンジニア）視点で、実装方式や技術的な課題について聞かれそうな質問を提案します</li>
+</ul>
+<p>ブラウザからアクセスするだけで利用でき、事前のソフトウェアインストールは不要です。</p>
+
+<h2 id="access">アクセス方法</h2>
+<div class="callout warn">
+  <span class="label">⚠️ アクセス制限について</span>
+  このアプリは社内オフィスのネットワーク、または社内VPN経由でのみアクセスできます。それ以外のネットワーク（自宅の回線やモバイル回線を直接利用する場合など）からは接続できません。
+</div>
+<p>ブラウザで以下のURLにアクセスしてください。</p>
+<p><code>https://ca-ai-reviewer.greentree-4bae97a2.japaneast.azurecontainerapps.io</code></p>
+<div class="callout tip">
+  <span class="label">💡 初回アクセス時の待ち時間について</span>
+  しばらく誰も利用していない状態からアクセスすると、サーバーの起動に数秒〜数十秒かかることがあります。画面が表示されるまで少し時間がかかっても、エラーではありませんのでそのままお待ちください。
+</div>
+
+<div class="screenshot">
+  <img src="images/image_001.png" alt="トップページ全体（初期状態）">
+</div>
+
+<h2 id="screen">画面構成</h2>
+<p>画面は左右2つのパネルに分かれています。</p>
+<ul>
+  <li><strong>左パネル</strong>: ファイルのアップロード、資料全体の「伝えたいこと」入力、スライド一覧、各種実行ボタン（レビューする／修正方針を提示する／想定質問を提案する）</li>
+  <li><strong>右パネル</strong>: 選択中のスライドに関する情報を、タブ切り替えで表示（<span class="tab-label">伝えたいこと</span> / <span class="tab-label">指摘事項</span> / <span class="tab-label">修正方針</span> / <span class="tab-label">想定質問</span>）</li>
+</ul>
+<p>画面上部のヘッダーには、レビュー観点を設定する <span class="btn-label">レビュー観点設定</span> ボタンと、結果をダウンロードする3つのボタンが並んでいます。</p>
+
+<div class="screenshot">
+  <img src="images/image_002.png" alt="アップロード後の画面全体">
+</div>
+
+<h2 id="flow-upload">1. PPTXファイルのアップロード</h2>
+<ol class="steps">
+  <li>左パネル上部の「PPTXをアップロード」エリアをクリックするか、<code>.pptx</code>ファイルをドラッグ＆ドロップします。</li>
+  <li>ファイルを選択すると、ファイル名が表示され「スライドを表示」ボタンが押せるようになります。</li>
+  <li>「スライドを表示」をクリックすると、スライドが画像として変換され、左パネルにサムネイル一覧が表示されます。</li>
+</ol>
+
+<div class="screenshot">
+  <img src="images/image_003.png" alt="ファイル選択後、スライドを表示ボタンが有効になった状態">
+</div>
+
+<div class="screenshot">
+  <img src="images/image_004.png" alt="左パネルのスライド一覧（サムネイル）">
+</div>
+
+<h2 id="flow-message">2. 伝えたいことの入力</h2>
+<p>
+  資料全体で伝えたい内容と、スライドごとに特に伝えたい内容を入力できます。この内容はAIレビューの精度向上に使われます（入力は任意です）。
+</p>
+<ol class="steps">
+  <li>左パネルの「資料全体の伝えたいこと」欄に、プレゼンテーション全体で伝えたい内容を入力します。</li>
+  <li>スライド一覧から確認したいスライドをクリックすると、右パネルの<span class="tab-label">伝えたいこと</span>タブにそのスライドの画像が表示されます。</li>
+  <li>必要に応じて「このスライドで伝えたいこと」欄に、そのスライド固有の意図を入力します（未入力の場合は全体の内容が適用されます）。</li>
+</ol>
+
+<div class="screenshot">
+  <img src="images/image_005.png" alt="資料全体の伝えたいこと入力欄">
+</div>
+
+<div class="screenshot">
+  <img src="images/image_006.png" alt="伝えたいことタブ全体">
+</div>
+
+<h2 id="flow-points">3. レビュー観点の確認・絞り込み（任意）</h2>
+<p>
+  AIレビューでチェックする観点（例:「計画・戦略」「実現可能性」「配色」など）は、あらかじめカテゴリごとに用意されています。特定の観点をレビュー対象から外したい場合に、この設定を使います。
+</p>
+<ol class="steps">
+  <li>画面上部の <span class="btn-label">レビュー観点設定</span> ボタンをクリックします。</li>
+  <li>モーダルが開き、左に資料内容に関する観点、右に資料デザインに関する観点が、カテゴリごとに一覧表示されます。</li>
+  <li>チェックボックスで、レビュー対象に含めるかどうかを観点ごとに切り替えられます。カテゴリ見出し横のチェックボックスで一括切り替えも可能です。</li>
+  <li>「保存する」をクリックすると設定が反映されます。「キャンセル」または枠外クリックで、変更を破棄して閉じられます。</li>
+</ol>
+<div class="callout tip">
+  <span class="label">💡 補足</span>
+  ここで変更した設定は、サーバー上に一時的に保持されますが、サーバーが再起動されると初期状態に戻ります。頻繁に使う組み合わせがある場合は、都度この画面で設定してからレビューを実行してください。
+</div>
+
+<div class="screenshot">
+  <img src="images/image_007.png" alt="レビュー観点設定モーダル">
+</div>
+
+<h2 id="flow-review">4. AIレビューの実行と指摘事項の確認</h2>
+<ol class="steps">
+  <li>左パネルの「レビューする」ボタンをクリックします。</li>
+  <li>AIがレビュー中は、ボタンに「AIがレビュー中...」というローディング表示が出ます。</li>
+  <li>完了すると自動的に右パネルが<span class="tab-label">指摘事項</span>タブに切り替わり、観点カテゴリごとのタブ（全体／構成・表現／計画・戦略 など）が表示されます。</li>
+  <li>各カテゴリタブをクリックすると、そのカテゴリの指摘内容が表示されます。指摘がない場合は「特に指摘事項はありません」と表示されます。</li>
+</ol>
+
+<div class="screenshot">
+  <img src="images/image_008.png" alt="レビュー中のローディング表示">
+</div>
+
+<div class="screenshot">
+  <img src="images/image_009.png" alt="指摘事項タブ全体">
+</div>
+
+<h2 id="flow-suggest">5. 修正方針の生成</h2>
+<p>AIレビューの指摘事項をもとに、AIがスライド画像を実際に修正した案を生成します。</p>
+<ol class="steps">
+  <li>レビュー完了後、左パネルの「修正方針を提示する」ボタンをクリックします。</li>
+  <li>「修正対象の指摘事項を選択」モーダルが開き、レビューで挙がった指摘事項がカテゴリごとに一覧表示されます。修正に反映したい指摘事項だけチェックを入れます（カテゴリ単位の一括切り替えも可能）。</li>
+  <li>「修正実行」をクリックすると、右パネルが<span class="tab-label">修正方針</span>タブに切り替わり、生成が始まります。</li>
+  <li>スライドごとに、完了したものから順に「修正前」「修正後」の画像比較と、実際に施した修正内容の説明が表示されます。生成中のスライドは画像エリアに「生成中...」のローディング表示が出ます。</li>
+  <li>選択した指摘事項に該当しなかったスライドは「このスライドに該当する指摘事項はありませんでした（修正不要と判断されました）」と表示され、画像は元のまま変更されません。</li>
+  <li>左パネルのスライド一覧には、各スライドの処理状況を示すアイコン（処理中／完了／対象外／エラー）が表示されます。</li>
+</ol>
+
+<div class="screenshot">
+  <img src="images/image_010.png" alt="修正対象の指摘事項を選択モーダル">
+</div>
+
+<div class="screenshot">
+  <img src="images/image_011.png" alt="修正方針タブ（修正前後比較と修正内容の説明）">
+</div>
+
+<div class="screenshot">
+  <img src="images/image_012.png" alt="修正後画像生成中のローディング表示">
+</div>
+
+<div class="screenshot">
+  <img src="images/image_013.png" alt="スライド一覧の進捗ステータスアイコン">
+</div>
+
+<h2 id="flow-qa">6. 想定質問の確認</h2>
+<p>
+  企画会議で技術者（AIエンジニア・アプリケーションエンジニア）から聞かれそうな質問を、AIが資料の内容から予測して提案します。実装方式・アーキテクチャ・性能・セキュリティ・運用・技術的リスクといった技術的な観点が中心で、ROIやKPIなどの意思決定に関する質問や、誤字脱字・デザインなどの見た目に関する指摘は対象外です（それらは「指摘事項」タブで確認できます）。
+</p>
+<ol class="steps">
+  <li>左パネルの「想定質問を提案する」ボタンをクリックします（AIレビューを事前に実行していなくても利用できます）。</li>
+  <li>生成が完了すると、右パネルが<span class="tab-label">想定質問</span>タブに切り替わり、想定される質問と、発表者が準備しておくべき観点（ヒント）が一覧表示されます。</li>
+</ol>
+
+<div class="screenshot">
+  <img src="images/image_014.png" alt="想定質問タブ全体">
+</div>
+
+<h2 id="flow-download">7. 結果のダウンロード</h2>
+<p>画面右上の3つのボタンから、それぞれの結果をMarkdown形式のファイル、またはPDFとしてダウンロードできます。</p>
+<table>
+  <tr><th>ボタン</th><th>内容</th><th>有効になるタイミング</th></tr>
+  <tr><td><span class="btn-label">指摘事項をダウンロード</span></td><td>AIレビューの指摘事項一覧（<code>review_result.md</code>）</td><td>「レビューする」完了後</td></tr>
+  <tr><td><span class="btn-label">修正後スライドをダウンロード</span></td><td>修正後のスライド画像をまとめたPDF（<code>revision_suggestion.pdf</code>）</td><td>「修正方針を提示する」で1件以上修正が生成された後</td></tr>
+  <tr><td><span class="btn-label">想定質問をダウンロード</span></td><td>想定質問と準備のヒント一覧（<code>anticipated_questions.md</code>）</td><td>「想定質問を提案する」完了後</td></tr>
+</table>
+
+<div class="screenshot">
+  <img src="images/image_015.png" alt="ヘッダーのダウンロードボタン3種">
+</div>
+
+<div class="callout tip">
+  <span class="label">💡 補足</span>
+  スライド画像はどのタブでもクリックすると拡大表示できます。拡大表示を閉じるには、画像の外側をクリックするか右上の×ボタンをクリックしてください。
+</div>
+
+<div class="screenshot">
+  <img src="images/image_016.png" alt="スライド画像の拡大表示（ライトボックス）">
+</div>
+
+<h2 id="faq">よくある質問・トラブルシューティング</h2>
+<table>
+  <tr><th>症状</th><th>原因・対処</th></tr>
+  <tr>
+    <td>ページが表示されない／エラーになる</td>
+    <td>社内オフィスのネットワーク、または社内VPN経由でアクセスしているか確認してください。それ以外のネットワークからはアクセスできない仕様です。</td>
+  </tr>
+  <tr>
+    <td>アクセスした際、画面が表示されるまで時間がかかる</td>
+    <td>しばらく利用されていない状態からのアクセスでは、サーバー起動のため初回のみ数秒〜数十秒かかります。エラーではないため、そのままお待ちください。</td>
+  </tr>
+  <tr>
+    <td>「修正方針を提示する」ボタンが押せない</td>
+    <td>先に「レビューする」を実行し、AIレビューを完了させてください。</td>
+  </tr>
+  <tr>
+    <td>修正方針の生成で、一部のスライドが「修正不要と判断されました」と表示される</td>
+    <td>選択した指摘事項の中に、そのスライドの内容に該当するものがないとAIが判断したためです。異常ではありません。また、修正されなかったスライドは「修正後スライドをダウンロード」実行時にPDFに含まれません。</td>
+  </tr>
+  <tr>
+    <td>レビュー観点の設定を変更したのに、後日アクセスすると元に戻っている</td>
+    <td>現在の運用では、観点設定の変更はサーバー再起動時にリセットされる仕様です。観点の内容自体を恒久的に変更したい場合はシステム管理者に相談してください。</td>
+  </tr>
+  <tr>
+    <td>アップロードや各処理に失敗する</td>
+    <td>時間をおいて再度お試しください。繰り返し失敗する場合は、エラーメッセージの内容とともにシステム管理者に連絡してください。</td>
+  </tr>
+</table>
+
+<h2 id="contact">問い合わせ先</h2>
+<p>不具合や利用方法に関するご質問は、Mattermostにて @r-kinoshita までご連絡ください。</p>
+
+<footer>
+  AI PowerPoint レビュアー 操作マニュアル
+</footer>
+
+</body>
+</html>

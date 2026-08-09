@@ -6,6 +6,9 @@
 # Azure Functions ローカル設定（シークレットが含まれるため Git 管理対象外）
 local.settings.json
 
+# ARMデプロイパラメータ（シークレットが含まれるため Git 管理対象外、*.example のみ管理）
+**/infra/*.parameters.json
+
 # Python
 __pycache__/
 *.pyc

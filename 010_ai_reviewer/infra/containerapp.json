@@ -1,0 +1,114 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "type": "string", "defaultValue": "japaneast" },
+    "logAnalyticsName": { "type": "string", "defaultValue": "log-ai-reviewer" },
+    "environmentName": { "type": "string", "defaultValue": "cae-ai-reviewer" },
+    "containerAppName": { "type": "string", "defaultValue": "ca-ai-reviewer" },
+    "acrLoginServer": { "type": "string" },
+    "acrUsername": { "type": "string" },
+    "acrPassword": { "type": "securestring" },
+    "imageName": { "type": "string" },
+    "azureOpenAiEndpoint": { "type": "string" },
+    "azureOpenAiKey": { "type": "securestring" },
+    "allowedIpRanges": {
+      "type": "array",
+      "defaultValue": ["221.117.124.90/32", "122.220.62.58/32"]
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[parameters('logAnalyticsName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": { "name": "PerGB2018" },
+        "retentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('environmentName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName'))]"
+      ],
+      "properties": {
+        "appLogsConfiguration": {
+          "destination": "log-analytics",
+          "logAnalyticsConfiguration": {
+            "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName')), '2022-10-01').customerId]",
+            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName')), '2022-10-01').primarySharedKey]"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('containerAppName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]"
+      ],
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
+        "configuration": {
+          "activeRevisionsMode": "Single",
+          "ingress": {
+            "external": true,
+            "targetPort": 8000,
+            "transport": "auto",
+            "allowInsecure": false,
+            "ipSecurityRestrictions": [
+              {
+                "name": "office",
+                "ipAddressRange": "221.117.124.90/32",
+                "action": "Allow"
+              },
+              {
+                "name": "vpn",
+                "ipAddressRange": "122.220.62.58/32",
+                "action": "Allow"
+              }
+            ]
+          },
+          "registries": [
+            {
+              "server": "[parameters('acrLoginServer')]",
+              "username": "[parameters('acrUsername')]",
+              "passwordSecretRef": "acr-password"
+            }
+          ],
+          "secrets": [
+            { "name": "acr-password", "value": "[parameters('acrPassword')]" },
+            { "name": "azure-openai-key", "value": "[parameters('azureOpenAiKey')]" }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "ai-reviewer",
+              "image": "[parameters('imageName')]",
+              "resources": { "cpu": 1.0, "memory": "2Gi" },
+              "env": [
+                { "name": "AZURE_OPENAI_ENDPOINT", "value": "[parameters('azureOpenAiEndpoint')]" },
+                { "name": "AZURE_OPENAI_KEY", "secretRef": "azure-openai-key" }
+              ]
+            }
+          ],
+          "scale": { "minReplicas": 0, "maxReplicas": 1 }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "fqdn": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('containerAppName'))).configuration.ingress.fqdn]"
+    }
+  }
+}

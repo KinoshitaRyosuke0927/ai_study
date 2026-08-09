@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "acrLoginServer": { "value": "acraireviewer.azurecr.io" },
+    "acrUsername": { "value": "<az acr credential show -n acraireviewer で取得したusername>" },
+    "acrPassword": { "value": "<az acr credential show -n acraireviewer で取得したpassword>" },
+    "imageName": { "value": "acraireviewer.azurecr.io/ai-reviewer:latest" },
+    "azureOpenAiEndpoint": { "value": "<ワークスペースルートの .env の AZURE_OPENAI_ENDPOINT>" },
+    "azureOpenAiKey": { "value": "<ワークスペースルートの .env の AZURE_OPENAI_KEY>" }
+  }
+}

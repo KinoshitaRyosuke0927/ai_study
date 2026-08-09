@@ -1,0 +1,14 @@
+dist/
+build/
+docs/
+manual.md
+__pycache__/
+*.pyc
+.venv/
+venv/
+.git/
+.gitignore
+.env
+.env.*
+*.spec
+レビュー観点抽出.xlsx
