@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import configparser
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -24,7 +25,11 @@ REMINDER_DONE_EMOJI = "sumi"
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
-SETTINGS_PATH = BASE_DIR.parent / "settings.ini"
+# settings.ini はユーザーが編集する運用のため、exe化(frozen)時はexeと同じ階層を参照する
+if getattr(sys, "frozen", False):
+    SETTINGS_PATH = Path(sys.executable).resolve().parent / "settings.ini"
+else:
+    SETTINGS_PATH = BASE_DIR.parent / "settings.ini"
 
 
 def load_settings() -> dict:
@@ -36,13 +41,20 @@ def load_settings() -> dict:
     config.read(SETTINGS_PATH, encoding="utf-8")
     members_raw = config.get("channel_users", "members", fallback="")
     members = [m.strip() for m in members_raw.split(",") if m.strip()]
+    remind_channels_raw = config.get("groupsession", "remind_channel", fallback="")
+    remind_channels = [c.strip() for c in remind_channels_raw.split(",") if c.strip()]
+    agenda_channels_raw = config.get("growi", "channel_list", fallback="")
+    agenda_channels = [c.strip() for c in agenda_channels_raw.split(",") if c.strip()]
     return {
         "channel": config.get("history", "channel", fallback=""),
         "read_date": config.getint("history", "read_date", fallback=30),
         "members": members,
         "groupsession_forum_sid": config.getint("groupsession", "forum_sid", fallback=0),
         "groupsession_read_date": config.getint("groupsession", "read_date", fallback=30),
+        "groupsession_remind_channels": remind_channels,
+        "agenda_mattermost_channels": agenda_channels,
         "growi_root_path": config.get("growi", "root_path", fallback=""),
+        "mattermost_target_username": config.get("mattermost", "target_username", fallback=""),
     }
 
 
@@ -51,6 +63,9 @@ SETTINGS = load_settings()
 
 class DmRequest(BaseModel):
     message: str
+    target: str = "dm"  # "dm": DM送信先へ投稿 / "channel": 投稿元チャンネルへ返信
+    channel_id: str | None = None
+    post_id: str | None = None
 
 
 class ReminderRequest(BaseModel):
@@ -105,7 +120,7 @@ def health() -> dict:
 
 @app.get("/api/target-username")
 def get_target_username() -> dict:
-    return {"username": mm.MATTERMOST_TARGET_USERNAME}
+    return {"username": SETTINGS.get("mattermost_target_username", "")}
 
 
 @app.get("/api/settings")
@@ -271,7 +286,15 @@ def post_dm(request: DmRequest) -> dict:
         raise HTTPException(status_code=400, detail="メッセージは必須です")
 
     try:
-        mm.post_dm_to_target(message)
+        if request.target == "channel":
+            if not request.channel_id:
+                raise HTTPException(status_code=400, detail="投稿先のチャンネルが指定されていません")
+            mm.post_message(request.channel_id, message, root_id=request.post_id)
+        else:
+            target_username = SETTINGS.get("mattermost_target_username", "")
+            if not target_username:
+                raise HTTPException(status_code=400, detail="settings.iniにmattermostのtarget_usernameが設定されていません")
+            mm.post_dm_to_target(message, target_username)
     except requests.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Mattermost APIエラー: {exc}") from exc
 

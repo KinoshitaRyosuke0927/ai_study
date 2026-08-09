@@ -70,7 +70,19 @@
             <div id="reminder-message" class="message hidden"></div>
           </section>
 
-          <div id="dm-slot-mattermost" class="dm-slot"></div>
+          <section class="section last dm-section">
+            <h2>Mattermostに投稿</h2>
+            <div class="form-group dm-target-group">
+              <label for="dm-target-select-mattermost">投稿先</label>
+              <select id="dm-target-select-mattermost" class="dm-target-value">
+                <option value="dm">DM: -</option>
+              </select>
+            </div>
+            <label for="dm-input-mattermost">投稿内容</label>
+            <textarea id="dm-input-mattermost" placeholder="メッセージを入力してください"></textarea>
+            <button id="dm-submit-btn-mattermost" class="btn">投稿</button>
+            <div id="dm-message-mattermost" class="message hidden"></div>
+          </section>
 
         </div><!-- /panel-right -->
 
@@ -125,7 +137,19 @@
             <div id="gs-reminder-message" class="message hidden"></div>
           </section>
 
-          <div id="dm-slot-groupsession" class="dm-slot"></div>
+          <section class="section last dm-section">
+            <h2>Mattermostに投稿</h2>
+            <div class="form-group dm-target-group">
+              <label for="dm-target-select-groupsession">投稿先</label>
+              <select id="dm-target-select-groupsession" class="dm-target-value">
+                <option value="dm">DM: -</option>
+              </select>
+            </div>
+            <label for="dm-input-groupsession">投稿内容</label>
+            <textarea id="dm-input-groupsession" placeholder="メッセージを入力してください"></textarea>
+            <button id="dm-submit-btn-groupsession" class="btn">投稿</button>
+            <div id="dm-message-groupsession" class="message hidden"></div>
+          </section>
 
         </div><!-- /panel-right -->
 
@@ -169,7 +193,7 @@
         <!-- ========== 右: 詳細内容 ========== -->
         <div class="panel panel-right">
 
-          <section class="section detail-section">
+          <section class="section detail-section agenda-detail-section">
             <div class="detail-header">
               <h2>詳細内容</h2>
               <button id="agenda-create-btn" class="btn reminder-btn" disabled>アジェンダを作成</button>
@@ -185,7 +209,7 @@
             <textarea id="agenda-output" placeholder="チェックした投稿・記事を選び「アジェンダを作成」を押すと、ここに文章が作成されます"></textarea>
             <div id="agenda-output-message" class="message hidden"></div>
 
-            <div class="form-row">
+            <div class="form-row agenda-publish-row">
               <div class="form-group">
                 <label for="agenda-publish-year">公開先: 年</label>
                 <input type="number" id="agenda-publish-year" min="2000" max="2100">
@@ -194,8 +218,10 @@
                 <label for="agenda-publish-month">公開先: 月</label>
                 <input type="number" id="agenda-publish-month" min="1" max="12">
               </div>
+              <div class="form-group agenda-publish-btn-group">
+                <button id="agenda-publish-btn" class="btn" disabled>wikiへ公開</button>
+              </div>
             </div>
-            <button id="agenda-publish-btn" class="btn" disabled>wikiへ公開</button>
             <div id="agenda-publish-message" class="message hidden"></div>
           </section>
 
@@ -205,14 +231,6 @@
     </div><!-- /tab-agenda -->
 
   </div><!-- /container -->
-
-  <!-- ========== DM投稿(共通・タブ切り替え時に右パネル下半分へ移動する) ========== -->
-  <section id="dm-section" class="section last dm-section">
-    <h2><span id="dm-target-username">-</span> 宛にDMを投稿</h2>
-    <textarea id="dm-input" placeholder="メッセージを入力してください"></textarea>
-    <button id="dm-submit-btn" class="btn">投稿</button>
-    <div id="dm-message" class="message hidden"></div>
-  </section>
 
   <script src="/static/app.js"></script>
 </body>

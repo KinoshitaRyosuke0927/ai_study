@@ -42,19 +42,20 @@ const postDetail   = document.getElementById("post-detail");
 const reminderBtn  = document.getElementById("reminder-btn");
 const reminderMessage = document.getElementById("reminder-message");
 
-const dmSection         = document.getElementById("dm-section");
-const dmTargetUsername = document.getElementById("dm-target-username");
-const dmInput           = document.getElementById("dm-input");
-const dmSubmitBtn       = document.getElementById("dm-submit-btn");
-const dmMessage         = document.getElementById("dm-message");
+const dmTargetSelectMattermost = document.getElementById("dm-target-select-mattermost");
+const dmInputMattermost          = document.getElementById("dm-input-mattermost");
+const dmSubmitBtnMattermost      = document.getElementById("dm-submit-btn-mattermost");
+const dmMessageMattermost        = document.getElementById("dm-message-mattermost");
+
+const dmTargetSelectGroupsession = document.getElementById("dm-target-select-groupsession");
+const dmInputGroupsession          = document.getElementById("dm-input-groupsession");
+const dmSubmitBtnGroupsession      = document.getElementById("dm-submit-btn-groupsession");
+const dmMessageGroupsession        = document.getElementById("dm-message-groupsession");
 
 const tabBtnMattermost   = document.getElementById("tab-btn-mattermost");
 const tabBtnGroupsession = document.getElementById("tab-btn-groupsession");
 const tabMattermost      = document.getElementById("tab-mattermost");
 const tabGroupsession    = document.getElementById("tab-groupsession");
-
-const dmSlotMattermost   = document.getElementById("dm-slot-mattermost");
-const dmSlotGroupsession = document.getElementById("dm-slot-groupsession");
 
 const gsStartDateInput = document.getElementById("gs-start-date");
 const gsEndDateInput   = document.getElementById("gs-end-date");
@@ -91,12 +92,15 @@ let fetchedPosts = [];
 let selectedPostId = null;
 let selectedPostMessage = null;
 let selectedPostUsername = null;
+let selectedPostChannelId = null;
+let selectedPostChannelName = null;
 
 let gsSelectedPostMessage = null;
 let gsSelectedPostUsername = null;
 let gsSelectedPostUrl = null;
 
 let agendaFetchedPosts = [];
+let agendaChannelIds = [];
 
 // ============================================================
 // タブ切り替え
@@ -113,14 +117,6 @@ function switchTab(tabName) {
   tabMattermost.classList.toggle("active", isMattermost);
   tabGroupsession.classList.toggle("active", isGroupsession);
   tabAgenda.classList.toggle("active", isAgenda);
-
-  // DM投稿エリアは共通なので、選択中タブの右パネル下半分へ実体を移動する
-  // (アジェンダタブにはDM投稿エリアが無いため、その場合は移動しない)
-  if (isMattermost) {
-    dmSlotMattermost.appendChild(dmSection);
-  } else if (isGroupsession) {
-    dmSlotGroupsession.appendChild(dmSection);
-  }
 }
 
 tabBtnMattermost.addEventListener("click", () => switchTab("mattermost"));
@@ -246,10 +242,35 @@ fetchPostsBtn.addEventListener("click", fetchAndRenderPosts);
 // 投稿の選択・詳細表示（リアクション含む）
 // ============================================================
 
+/** 投稿先プルダウンの「チャンネルへ返信」選択肢を、選択中の投稿に合わせて更新する */
+function updateReplyTargetOption() {
+  const existing = dmTargetSelectMattermost.querySelector('option[value="channel"]');
+
+  if (selectedPostChannelId && selectedPostChannelName) {
+    const label = `チャンネルへ返信: ${selectedPostChannelName}`;
+    if (existing) {
+      existing.textContent = label;
+    } else {
+      const option = document.createElement("option");
+      option.value = "channel";
+      option.textContent = label;
+      dmTargetSelectMattermost.appendChild(option);
+    }
+  } else if (existing) {
+    if (dmTargetSelectMattermost.value === "channel") {
+      dmTargetSelectMattermost.value = "dm";
+    }
+    existing.remove();
+  }
+}
+
 function resetPostDetail() {
   selectedPostId = null;
   selectedPostMessage = null;
   selectedPostUsername = null;
+  selectedPostChannelId = null;
+  selectedPostChannelName = null;
+  updateReplyTargetOption();
   reminderBtn.disabled = true;
   hideMessage(reminderMessage);
   postDetail.innerHTML = `<p class="post-detail-placeholder">左の一覧から投稿を選択してください</p>`;
@@ -259,6 +280,9 @@ async function selectPost(post, itemEl) {
   selectedPostId = post.id;
   selectedPostMessage = post.message;
   selectedPostUsername = post.username;
+  selectedPostChannelId = channelSelect.value;
+  selectedPostChannelName = channelSelect.options[channelSelect.selectedIndex]?.textContent || "";
+  updateReplyTargetOption();
   reminderBtn.disabled = false;
   hideMessage(reminderMessage);
 
@@ -332,7 +356,7 @@ reminderBtn.addEventListener("click", async () => {
       showMessage(reminderMessage, `エラー: ${data.detail}`, "error");
       return;
     }
-    dmInput.value = data.reminder;
+    dmInputMattermost.value = data.reminder;
     showMessage(reminderMessage, "リマインド文章をDM入力欄に反映しました。", "success");
   } catch (err) {
     showMessage(reminderMessage, `ネットワークエラー: ${err.message}`, "error");
@@ -479,7 +503,7 @@ gsReminderBtn.addEventListener("click", async () => {
       showMessage(gsReminderMessage, `エラー: ${data.detail}`, "error");
       return;
     }
-    dmInput.value = data.reminder;
+    dmInputGroupsession.value = data.reminder;
     showMessage(gsReminderMessage, "リマインド文章をDM入力欄に反映しました。", "success");
   } catch (err) {
     showMessage(gsReminderMessage, `ネットワークエラー: ${err.message}`, "error");
@@ -582,11 +606,10 @@ async function fetchAndRenderAgendaPosts() {
   hideMessage(agendaMessage);
   resetAgendaDetail();
 
-  const channelId = channelSelect.value;
   const start = agendaStartDateInput.value;
   const end = agendaEndDateInput.value;
-  if (!channelId) {
-    showMessage(agendaMessage, "Mattermostのチャンネルが選択されていません(Mattermostタブを確認してください)", "error");
+  if (agendaChannelIds.length === 0) {
+    showMessage(agendaMessage, "settings.iniのchannel_listに取得対象のチャンネルが設定されていません", "error");
     return;
   }
   if (!start || !end) {
@@ -599,17 +622,26 @@ async function fetchAndRenderAgendaPosts() {
   agendaPostList.innerHTML = "";
 
   try {
-    const [mattermostRes, groupsessionRes] = await Promise.all([
-      fetch(`/api/channels/${encodeURIComponent(channelId)}/posts?start=${start}&end=${end}`),
+    const [mattermostResults, groupsessionRes] = await Promise.all([
+      Promise.all(
+        agendaChannelIds.map((channelId) =>
+          fetch(`/api/channels/${encodeURIComponent(channelId)}/posts?start=${start}&end=${end}`)
+        )
+      ),
       fetch(`/api/webpage/announcements?start=${start}&end=${end}`),
     ]);
-    const mattermostData = await mattermostRes.json();
-    const groupsessionData = await groupsessionRes.json();
 
-    if (!mattermostRes.ok) {
-      showMessage(agendaMessage, `Mattermostの取得エラー: ${mattermostData.detail}`, "error");
-      return;
+    const mattermostData = [];
+    for (const res of mattermostResults) {
+      const data = await res.json();
+      if (!res.ok) {
+        showMessage(agendaMessage, `Mattermostの取得エラー: ${data.detail}`, "error");
+        return;
+      }
+      mattermostData.push(...data);
     }
+
+    const groupsessionData = await groupsessionRes.json();
     if (!groupsessionRes.ok) {
       showMessage(agendaMessage, `GROUPSESSIONの取得エラー: ${groupsessionData.detail}`, "error");
       return;
@@ -733,36 +765,61 @@ agendaPublishBtn.addEventListener("click", async () => {
 // DM投稿
 // ============================================================
 
-dmSubmitBtn.addEventListener("click", async () => {
-  hideMessage(dmMessage);
-  const message = dmInput.value.trim();
-  if (!message) {
-    showMessage(dmMessage, "メッセージを入力してください", "error");
-    return;
-  }
-
-  dmSubmitBtn.disabled = true;
-  dmSubmitBtn.textContent = "送信中...";
-
-  try {
-    const res = await fetch("/api/dm", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showMessage(dmMessage, `エラー: ${data.detail}`, "error");
+function setupDmSubmit(input, submitBtn, message, buildBody) {
+  submitBtn.addEventListener("click", async () => {
+    hideMessage(message);
+    const text = input.value.trim();
+    if (!text) {
+      showMessage(message, "メッセージを入力してください", "error");
       return;
     }
-    showMessage(dmMessage, "投稿しました。", "success");
-    dmInput.value = "";
-  } catch (err) {
-    showMessage(dmMessage, `ネットワークエラー: ${err.message}`, "error");
-  } finally {
-    dmSubmitBtn.disabled = false;
-    dmSubmitBtn.textContent = "投稿";
+
+    const body = buildBody(text);
+    if (body.error) {
+      showMessage(message, body.error, "error");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "送信中...";
+
+    try {
+      const res = await fetch("/api/dm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showMessage(message, `エラー: ${data.detail}`, "error");
+        return;
+      }
+      showMessage(message, "投稿しました。", "success");
+    } catch (err) {
+      showMessage(message, `ネットワークエラー: ${err.message}`, "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "投稿";
+    }
+  });
+}
+
+setupDmSubmit(dmInputMattermost, dmSubmitBtnMattermost, dmMessageMattermost, (text) => {
+  if (dmTargetSelectMattermost.value === "channel") {
+    if (!selectedPostChannelId || !selectedPostId) {
+      return { error: "返信先のチャンネル・投稿が選択されていません" };
+    }
+    return { message: text, target: "channel", channel_id: selectedPostChannelId, post_id: selectedPostId };
   }
+  return { message: text, target: "dm" };
+});
+
+setupDmSubmit(dmInputGroupsession, dmSubmitBtnGroupsession, dmMessageGroupsession, (text) => {
+  const target = dmTargetSelectGroupsession.value;
+  if (target === "dm") {
+    return { message: text, target: "dm" };
+  }
+  return { message: text, target: "channel", channel_id: target };
 });
 
 // ============================================================
@@ -770,13 +827,16 @@ dmSubmitBtn.addEventListener("click", async () => {
 // ============================================================
 
 async function loadTargetUsername() {
+  let text;
   try {
     const res = await fetch("/api/target-username");
     const data = await res.json();
-    dmTargetUsername.textContent = data.username;
+    text = data.username;
   } catch (err) {
-    dmTargetUsername.textContent = "(取得失敗)";
+    text = "(取得失敗)";
   }
+  dmTargetSelectMattermost.querySelector('option[value="dm"]').textContent = `DM: ${text}`;
+  dmTargetSelectGroupsession.querySelector('option[value="dm"]').textContent = `DM: ${text}`;
 }
 
 /** "YYYY-MM-DD" 形式の文字列を返す */
@@ -813,7 +873,15 @@ async function applySettings() {
   }
 }
 
-/** settings.ini の設定(GROUPSESSIONの取得期間)を画面に反映する */
+/** チャンネル一覧(channelSelect)から、表示名が一致するチャンネルのIDを返す */
+function getChannelIdByName(name) {
+  const matched = Array.from(channelSelect.options).find(
+    (opt) => opt.value && opt.textContent.trim() === name.trim()
+  );
+  return matched ? matched.value : null;
+}
+
+/** settings.ini の設定(GROUPSESSIONの取得期間・投稿先チャンネル)を画面に反映する */
 async function applyGroupsessionSettings() {
   try {
     const res = await fetch("/api/settings");
@@ -825,12 +893,24 @@ async function applyGroupsessionSettings() {
     start.setDate(start.getDate() - (readDate - 1));
     gsStartDateInput.value = toDateInputValue(start);
     gsEndDateInput.value = toDateInputValue(end);
+
+    (settings.groupsession_remind_channels || []).forEach((name) => {
+      const channelId = getChannelIdByName(name);
+      if (!channelId) {
+        showMessage(gsMessage, `settings.iniのチャンネル「${name}」が見つかりませんでした`, "error");
+        return;
+      }
+      const option = document.createElement("option");
+      option.value = channelId;
+      option.textContent = `チャンネルへ投稿: ${name}`;
+      dmTargetSelectGroupsession.appendChild(option);
+    });
   } catch (err) {
     showMessage(gsMessage, `settings.iniの読み込みに失敗しました: ${err.message}`, "error");
   }
 }
 
-/** settings.ini の設定(Mattermost・GROUPSESSIONそれぞれの取得期間のうち長い方)をアジェンダタブの期間初期値に反映する */
+/** settings.ini の設定(Mattermost・GROUPSESSIONそれぞれの取得期間のうち長い方・取得対象チャンネル)をアジェンダタブに反映する */
 async function applyAgendaSettings() {
   try {
     const res = await fetch("/api/settings");
@@ -842,14 +922,23 @@ async function applyAgendaSettings() {
     start.setDate(start.getDate() - (readDate - 1));
     agendaStartDateInput.value = toDateInputValue(start);
     agendaEndDateInput.value = toDateInputValue(end);
+
+    const channelNames = settings.agenda_mattermost_channels || [];
+    agendaChannelIds = [];
+    channelNames.forEach((name) => {
+      const channelId = getChannelIdByName(name);
+      if (!channelId) {
+        showMessage(agendaMessage, `settings.iniのチャンネル「${name}」が見つかりませんでした`, "error");
+        return;
+      }
+      agendaChannelIds.push(channelId);
+    });
   } catch (err) {
     showMessage(agendaMessage, `settings.iniの読み込みに失敗しました: ${err.message}`, "error");
   }
 }
 
 async function init() {
-  dmSlotMattermost.appendChild(dmSection);
-
   await loadChannels();
   loadTargetUsername();
   await applySettings();

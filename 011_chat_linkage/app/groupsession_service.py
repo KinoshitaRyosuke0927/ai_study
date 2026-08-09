@@ -10,6 +10,7 @@ from __future__ import annotations
 import html
 import os
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote, urlparse
@@ -18,7 +19,12 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import requests
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+# 環境変数(.env)を読み込む
+if getattr(sys, "frozen", False):
+    _env_path = Path(sys.executable).resolve().parent / ".env"
+else:
+    _env_path = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(_env_path)
 
 GROUPSESSION_BASE_URL = os.environ["GROUPSESSION_BASE_URL"].rstrip("/")
 GROUPSESSION_USERNAME = os.environ["GROUPSESSION_USERNAME"]

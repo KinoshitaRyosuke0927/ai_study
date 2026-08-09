@@ -192,13 +192,6 @@ h3 {
   min-height: 0;
 }
 
-.dm-slot {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
 .dm-section {
   flex: 1;
   display: flex;
@@ -213,8 +206,49 @@ h3 {
   min-height: 0;
 }
 
+.dm-section > label {
+  display: block;
+  font-size: 0.8rem;
+  color: #718096;
+  margin-bottom: 4px;
+}
+
+.form-group.dm-target-group {
+  flex: none;
+  margin-bottom: 8px;
+}
+
+.dm-target-value {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background-color: #f8f9fb;
+  color: #2d3748;
+  font-size: 0.95rem;
+}
+
+.agenda-detail-section {
+  flex: 4;
+}
+
+.agenda-publish-row {
+  align-items: flex-end;
+}
+
+.agenda-publish-btn-group {
+  flex: 0 0 auto;
+}
+
+.agenda-publish-btn-group .btn {
+  width: auto;
+  padding-left: 20px;
+  padding-right: 20px;
+  white-space: nowrap;
+}
+
 .agenda-output-section {
-  flex: 1;
+  flex: 6;
   display: flex;
   flex-direction: column;
   min-height: 0;

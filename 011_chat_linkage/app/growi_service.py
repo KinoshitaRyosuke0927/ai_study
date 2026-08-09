@@ -8,12 +8,18 @@ GROWI REST API v3 でページの取得・新規作成を行い、既存ペー�
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 import requests
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+# 環境変数(.env)を読み込む
+if getattr(sys, "frozen", False):
+    _env_path = Path(sys.executable).resolve().parent / ".env"
+else:
+    _env_path = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(_env_path)
 
 GROWI_BASE_URL = os.environ["GROWI_BASE_URL"].rstrip("/")
 GROWI_API_TOKEN = os.environ["GROWI_API_TOKEN"]

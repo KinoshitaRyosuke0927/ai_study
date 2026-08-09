@@ -8,7 +8,7 @@ Mattermost・GROUPSESSION 連携アプリ。パーソナルアクセストーク
 - 選択した投稿・記事の内容をもとに、AIでリマインド文章を生成
   - Mattermost投稿の場合: `settings.ini` の `channel_users.members` のうち、元投稿に `:sumi:` のリアクションをしていないメンバーを `@メンション`
   - GROUPSESSION記事の場合: メンバー全員を `@メンション`し、本文には元記事のURLを付与
-- DM送信先(`MATTERMOST_TARGET_USERNAME`)へのメッセージ投稿
+- DM送信先(`settings.ini` の `mattermost.target_username`)へのメッセージ投稿
 - Mattermost・GROUPSESSION双方から取得した投稿・記事のうち、チェックした項目をもとに、AIで部署定例会の「アジェンダ(全体共有事項)」を生成
 
 ## セットアップ
@@ -22,7 +22,6 @@ pip install -r requirements.txt
 ```
 MATTERMOST_URL=https://chat.jbdcl.com
 MATTERMOST_TOKEN=（パーソナルアクセストークン）
-MATTERMOST_TARGET_USERNAME=（DM送信先のユーザー名）
 
 GROUPSESSION_BASE_URL=https://gs.jbdcl.com/gsession
 GROUPSESSION_USERNAME=（GROUPSESSIONのログインID）
@@ -39,6 +38,9 @@ AZURE_OPENAI_KEY=your-api-key
 対象チャンネル・フォーラム・期間・メンバーは `settings.ini` に設定する（`011_chat_linkage` ディレクトリ直下）。
 
 ```ini
+[mattermost]
+target_username = r-kinoshita
+
 [history]
 channel = AIビジネス連絡事項
 read_date = 30
@@ -49,13 +51,22 @@ members = yano, endo, n-ishii, r-isahai, m-unno, r-asanoma, r-kinoshita, r-yurin
 [groupsession]
 forum_sid = 15
 read_date = 30
+remind_channel = AIビジネス連絡事項, AIC 連絡事項
+
+[growi]
+channel_list = AIビジネス連絡事項, AIC 連絡事項
+root_path = /100_AIM
 ```
 
-- `history.channel` — Mattermostの履歴を取得するチャンネルの表示名（`/api/channels` で取得できる名前と一致させる）
+- `mattermost.target_username` — DM投稿フォームの送信先ユーザー名
+- `history.channel` — Mattermostの履歴を取得するチャンネルの表示名(`/api/channels` で取得できる名前と一致させる)
 - `history.read_date` — 今日から遡って取得する日数
-- `channel_users.members` — リマインド作成時に `@メンション` する対象のユーザー名一覧（カンマ区切り）。Mattermost投稿の場合は、このうち元投稿に `:sumi:` のリアクションをしていない人のみがメンションされる
+- `channel_users.members` — リマインド作成時に `@メンション` する対象のユーザー名一覧(カンマ区切り)。Mattermost投稿の場合は、このうち元投稿に `:sumi:` のリアクションをしていない人のみがメンションされる
 - `groupsession.forum_sid` — 新着記事を取得するGROUPSESSIONフォーラムのID
-- `groupsession.read_date` — 今日から遡って取得する日数（画面表示時の初期値としてのみ使用。実際の取得期間は画面の日付指定に従う）
+- `groupsession.read_date` — 今日から遡って取得する日数(画面表示時の初期値としてのみ使用。実際の取得期間は画面の日付指定に従う)
+- `groupsession.remind_channel` — GROUPSESSIONタブの投稿先プルダウンに追加される、Mattermostチャンネルの表示名一覧(カンマ区切り)
+- `growi.channel_list` — アジェンダタブの「履歴・新着記事を取得」で参照するMattermostチャンネルの表示名一覧(カンマ区切り)
+- `growi.root_path` — アジェンダの公開先GROWIページの親パス(この下に「年/月」のページが作成・更新される)
 
 ## 実行
 
@@ -75,7 +86,7 @@ uvicorn app.main:app --reload --port 8000
 - 左上: チャンネル選択プルダウン、取得開始日・取得終了日のカレンダー、「履歴を取得」ボタン
 - 左下: 取得した投稿一覧（AIにより「期日のある提出物・申請、回答が必要なもの」のみに絞り込み済み）。クリックで選択
 - 右上: 選択した投稿の内容・リアクション一覧・「リマインドを作成」ボタン
-- 右下: `MATTERMOST_TARGET_USERNAME` 宛のDM投稿フォーム（GROUPSESSIONタブと共通で、タブ切り替え時に実体が移動する）
+- 右下: `settings.ini` の `mattermost.target_username` 宛のDM投稿フォーム(GROUPSESSIONタブと共通で、タブ切り替え時に実体が移動する)
 
 ### GROUPSESSIONタブ
 - 左上: 取得開始日・取得終了日のカレンダー、「新着記事を取得」ボタン
@@ -86,7 +97,7 @@ uvicorn app.main:app --reload --port 8000
 添付ファイルのダウンロードリンクは、閲覧しているブラウザでGROUPSESSIONに別途ログイン済みである必要がある（アプリのバックエンドとブラウザのセッションは別物のため）。
 
 ### アジェンダタブ
-- 左上: 取得開始日・取得終了日のカレンダー、「履歴・新着記事を取得」ボタン（クリックでMattermost履歴・GROUPSESSION新着記事の両方を取得。Mattermostのチャンネルは Mattermostタブで選択中のものを使用する）
+- 左上: 取得開始日・取得終了日のカレンダー、「履歴・新着記事を取得」ボタン（クリックでMattermost履歴・GROUPSESSION新着記事の両方を取得。Mattermostのチャンネルは `settings.ini` の `growi.channel_list` に設定された全チャンネルを対象とする）
 - 左下: Mattermost投稿・GROUPSESSION記事を合わせた一覧（取得元がわかるバッジ付き）。各行にチェックボックスがあり、詳細表示はクリック、アジェンダへの採否はチェックボックスで操作する
 - 右上: 選択した項目の詳細内容・「アジェンダを作成」ボタン（チェック済み項目をもとにAIが「全体共有事項」を生成）
 - 右下: 生成された部署定例会アジェンダ（Markdown）を表示するテキストエリア
@@ -116,6 +127,85 @@ DM投稿フォームはこのタブには存在しない。
 - `app/groupsession_service.py` — GROUPSESSIONへのログイン・スレッド一覧/本文取得（JSON APIを直接呼び出し、HTMLサニタイズ・添付ファイルURL組み立てを行う）
 - `app/azure_ai_service.py` — Azure OpenAI 呼び出し（投稿の絞り込み・リマインド文章生成・アジェンダ生成: `gpt-5.4-mini`）
 - `app/static/` — フロントエンド（HTML / CSS / JS）
+
+## exe化(PyInstaller)
+
+配布用に `chat_linkage.exe` を作成する手順です。エンドユーザー向けの利用方法は [manual.md](manual.md) を参照してください。
+
+### 1. PyInstaller のインストール
+```bash
+pip install pyinstaller
+```
+
+### 2. ビルド
+
+`011_chat_linkage` ディレクトリ直下(`app/` の一つ上の階層)で以下を実行します。
+
+```powershell
+pyinstaller --name chat_linkage `
+  --onedir `
+  --noconfirm `
+  --paths . `
+  --add-data "app/static;static" `
+  --hidden-import uvicorn.logging `
+  --hidden-import uvicorn.loops `
+  --hidden-import uvicorn.loops.auto `
+  --hidden-import uvicorn.protocols `
+  --hidden-import uvicorn.protocols.http `
+  --hidden-import uvicorn.protocols.http.auto `
+  --hidden-import uvicorn.protocols.websockets `
+  --hidden-import uvicorn.protocols.websockets.auto `
+  --hidden-import uvicorn.lifespan `
+  --hidden-import uvicorn.lifespan.on `
+  --exclude-module pandas `
+  --exclude-module numpy `
+  --exclude-module scipy `
+  --exclude-module torch `
+  --exclude-module torchvision `
+  --exclude-module torchaudio `
+  --exclude-module sklearn `
+  --exclude-module cv2 `
+  --exclude-module transformers `
+  --exclude-module matplotlib `
+  app/main.py
+```
+
+- `--onedir`(デフォルト): exeと依存ライブラリを同一フォルダに展開する形式でビルドします。`--onefile` は起動のたびに一時フォルダへ全ライブラリを展開するため使用しません。
+- `--paths .`: `app/main.py` が `from app import ...` のように `app` パッケージを絶対importしているため、その親ディレクトリ(カレントディレクトリ)をimport探索パスに追加します。
+- `--add-data "app/static;static"`: フロントエンドの静的ファイルを同梱します。frozen実行時、エントリスクリプト(`app/main.py`)はサブフォルダの階層を保持せずトップレベルスクリプトとして組み込まれるため、`STATIC_DIR`(`app/main.py` の `BASE_DIR / "static"`)と一致させるには同梱先を `app/static` ではなく `static` にする必要があります。
+- `--hidden-import uvicorn.*`: uvicornは動的importが多く、PyInstallerの静的解析だけでは検出できないモジュールがあるため明示指定します。
+- `--exclude-module pandas` 等: `openai` パッケージが(未使用の)CLIファイル検証機能向けに `pandas` を遅延import しており、それを起点に `torch` / `scikit-learn` / `opencv` / `transformers` などの大型ライブラリまでPyInstallerの静的解析で巻き込まれてしまう(このアプリでは実際には一切使用しない機能)。除外しないとビルド成果物が700MB超になるため、明示的に除外する。
+
+ビルド成果物は `dist/chat_linkage/` フォルダに生成されます(`chat_linkage.exe` 本体 + `_internal/` 配下の依存ライブラリ、除外指定込みで約70MB)。
+
+### 3. 配布用ファイルの配置
+
+`dist/chat_linkage/` フォルダに、exeと同じ階層で以下を追加してください(PyInstallerには同梱されません)。exe化時は `settings.ini` ・`.env` ともに **exeと同じフォルダ** を参照します(開発時は `011_chat_linkage` 直下・ワークスペースルートをそれぞれ参照)。
+
+- `.env` — Mattermost・GROUPSESSION・GROWIの接続情報に加え、Azure OpenAIの接続情報(`AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_KEY`)も1つのファイルにまとめて配置する
+  ```
+  AZURE_OPENAI_ENDPOINT=https://your-resource.services.ai.azure.com/openai/v1
+  AZURE_OPENAI_KEY=your-api-key
+
+  MATTERMOST_URL=https://chat.jbdcl.com
+  MATTERMOST_TOKEN=（パーソナルアクセストークン）
+
+  GROUPSESSION_BASE_URL=https://gs.jbdcl.com/gsession
+  GROUPSESSION_USERNAME=（GROUPSESSIONのログインID）
+  GROUPSESSION_PASSWORD=（GROUPSESSIONのログインパスワード）
+
+  GROWI_BASE_URL=https://wiki.jbdcl.com/
+  GROWI_API_TOKEN=（GROWIのAPIトークン）
+  ```
+- `settings.ini`(`011_chat_linkage/settings.ini` をコピーして配布環境向けに編集)
+- `起動.bat`(任意)— ダブルクリックでexe起動とブラウザオープンを行うショートカット
+  ```bat
+  @echo off
+  start "" http://localhost:8000
+  chat_linkage.exe
+  ```
+
+`dist/chat_linkage/` フォルダ一式をzip化して配布してください。エンドユーザー向けの利用手順は [manual.md](manual.md) を参照(または同梱)してください。
 
 ## 補足
 

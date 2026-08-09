@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 import requests
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+# 環境変数(.env)を読み込む
+if getattr(sys, "frozen", False):
+    _env_path = Path(sys.executable).resolve().parent / ".env"
+else:
+    _env_path = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(_env_path)
 
 MATTERMOST_URL = os.environ["MATTERMOST_URL"].rstrip("/")
 MATTERMOST_TOKEN = os.environ["MATTERMOST_TOKEN"]
-MATTERMOST_TARGET_USERNAME = os.environ["MATTERMOST_TARGET_USERNAME"]
 
 HEADERS = {"Authorization": f"Bearer {MATTERMOST_TOKEN}"}
 
@@ -48,14 +53,17 @@ def get_or_create_direct_channel(user_id_a: str, user_id_b: str) -> str:
     return _post("/api/v4/channels/direct", [user_id_a, user_id_b])["id"]
 
 
-def post_message(channel_id: str, message: str) -> None:
-    _post("/api/v4/posts", {"channel_id": channel_id, "message": message})
+def post_message(channel_id: str, message: str, root_id: str | None = None) -> None:
+    body = {"channel_id": channel_id, "message": message}
+    if root_id:
+        body["root_id"] = root_id
+    _post("/api/v4/posts", body)
 
 
-def post_dm_to_target(message: str) -> None:
-    """DM送信先(MATTERMOST_TARGET_USERNAME)にメッセージを投稿する。"""
+def post_dm_to_target(message: str, target_username: str) -> None:
+    """DM送信先(target_username)にメッセージを投稿する。"""
     my_id = get_my_user_id()
-    target_id = get_user_id_by_username(MATTERMOST_TARGET_USERNAME)
+    target_id = get_user_id_by_username(target_username)
     channel_id = get_or_create_direct_channel(my_id, target_id)
     post_message(channel_id, message)
 
