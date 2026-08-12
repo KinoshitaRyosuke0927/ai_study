@@ -224,6 +224,11 @@ def _get_thread_detail(session: requests.Session, forum_sid: int, thread_sid: in
     plain_html = _unescape(post.get("bwiValuePlain", ""))
     text = BeautifulSoup(plain_html, "html.parser").get_text(separator="\n").strip()
 
+    # 記事によっては bwiValuePlain が空で、本文が bwiValue 側にしか無いことがあるため、
+    # その場合は bwiValue(HTMLタグを含むことがある)からテキストを抽出する
+    if not text:
+        text = BeautifulSoup(_unescape(post.get("bwiValue", "")), "html.parser").get_text(separator="\n").strip()
+
     rich_html = _sanitize_html(post.get("bwiValue", ""))
 
     post_sid = post.get("bwiSid", 0)

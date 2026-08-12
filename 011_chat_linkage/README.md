@@ -4,7 +4,7 @@ Mattermost・GROUPSESSION 連携アプリ。パーソナルアクセストーク
 
 - Mattermostの指定チャンネルから、指定期間の投稿履歴を取得
 - GROUPSESSION(社内掲示板)の指定フォーラムから、指定期間の新着記事(本文・添付ファイル含む)を取得
-- 取得した投稿・記事を、Azure OpenAI(`gpt-5.4-mini`)で「期日のある提出物・申請、回答が必要なもの」のみに自動で絞り込んで一覧表示
+- 取得した投稿・記事を、Azure OpenAI(`gpt-5.4-mini`)で「期日のある提出物・申請、回答が必要なもの、避難訓練・工事等の要注意アナウンス」のみに自動で絞り込んで一覧表示
 - 選択した投稿・記事の内容をもとに、AIでリマインド文章を生成
   - Mattermost投稿の場合: `settings.ini` の `channel_users.members` のうち、元投稿に `:sumi:` のリアクションをしていないメンバーを `@メンション`
   - GROUPSESSION記事の場合: メンバー全員を `@メンション`し、本文には元記事のURLを付与
@@ -49,7 +49,7 @@ read_date = 30
 members = yano, endo, n-ishii, r-isahai, m-unno, r-asanoma, r-kinoshita, r-yurino
 
 [groupsession]
-forum_sid = 15
+forum_sid = 5, 15
 read_date = 30
 remind_channel = AIビジネス連絡事項, AIC 連絡事項
 
@@ -62,7 +62,7 @@ root_path = /100_AIM
 - `history.channel` — Mattermostの履歴を取得するチャンネルの表示名(`/api/channels` で取得できる名前と一致させる)
 - `history.read_date` — 今日から遡って取得する日数
 - `channel_users.members` — リマインド作成時に `@メンション` する対象のユーザー名一覧(カンマ区切り)。Mattermost投稿の場合は、このうち元投稿に `:sumi:` のリアクションをしていない人のみがメンションされる
-- `groupsession.forum_sid` — 新着記事を取得するGROUPSESSIONフォーラムのID
+- `groupsession.forum_sid` — 新着記事を取得するGROUPSESSIONフォーラムのID(カンマ区切りで複数指定可)
 - `groupsession.read_date` — 今日から遡って取得する日数(画面表示時の初期値としてのみ使用。実際の取得期間は画面の日付指定に従う)
 - `groupsession.remind_channel` — GROUPSESSIONタブの投稿先プルダウンに追加される、Mattermostチャンネルの表示名一覧(カンマ区切り)
 - `growi.channel_list` — アジェンダタブの「履歴・新着記事を取得」で参照するMattermostチャンネルの表示名一覧(カンマ区切り)
@@ -84,7 +84,7 @@ uvicorn app.main:app --reload --port 8000
 
 ### Mattermostタブ
 - 左上: チャンネル選択プルダウン、取得開始日・取得終了日のカレンダー、「履歴を取得」ボタン
-- 左下: 取得した投稿一覧（AIにより「期日のある提出物・申請、回答が必要なもの」のみに絞り込み済み）。クリックで選択
+- 左下: 取得した投稿一覧（AIにより「期日のある提出物・申請、回答が必要なもの、避難訓練・工事等の要注意アナウンス」のみに絞り込み済み）。クリックで選択
 - 右上: 選択した投稿の内容・リアクション一覧・「リマインドを作成」ボタン
 - 右下: `settings.ini` の `mattermost.target_username` 宛のDM投稿フォーム(GROUPSESSIONタブと共通で、タブ切り替え時に実体が移動する)
 
@@ -210,7 +210,7 @@ pyinstaller --name chat_linkage `
 ## 補足
 
 - 履歴取得は Mattermost API のページング(`/api/v4/channels/{id}/posts`)を新しい投稿から遡る形で行うため、対象期間が古い・投稿数が多いチャンネルほど取得に時間がかかる。
-- Mattermost投稿・GROUPSESSION記事の一覧取得時には、Azure OpenAIに投稿内容を渡して「期日のある提出物・申請、回答が必要なもの」のみを判定させ、それ以外(雑談・情報共有・完了報告など)は一覧に表示しない。
+- Mattermost投稿・GROUPSESSION記事の一覧取得時には、Azure OpenAIに投稿内容を渡して「期日のある提出物・申請、回答が必要なもの、避難訓練・工事等の要注意アナウンス」のみを判定させ、それ以外(雑談・情報共有・完了報告など)は一覧に表示しない。
 - リマインド文章中のURL（GROUPSESSION記事へのリンク等）や、アジェンダ文章中の各項目へのリンクは、AIに直接URLを生成させると誤り・改変のリスクがあるため、プレースホルダー文字列(`{{ARTICLE_URL}}` 等)を出力させたうえで、アプリ側で実際のURLに置換している。
 - アジェンダ生成で一度に多くの項目(10件超など)をチェックすると、AIが末尾の項目でリンク付与を省略することがまれにある。その場合は再実行すると改善することが多い。
 - GROUPSESSIONへのログインはStruts(CSRFトークン)方式のため、ログイン画面を都度GETしてトークンを取得したうえでPOSTしている。

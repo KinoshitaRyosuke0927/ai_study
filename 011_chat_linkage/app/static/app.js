@@ -523,8 +523,13 @@ function resetAgendaDetail() {
   agendaPostDetail.innerHTML = `<p class="post-detail-placeholder">左の一覧から投稿・記事を選択してください</p>`;
 }
 
+/** チェック済みの投稿・記事が1件以上あるかどうかで「アジェンダを作成」ボタンの活性状態を切り替える */
+function updateAgendaCreateBtnState() {
+  const hasChecked = agendaPostList.querySelector(".agenda-item-checkbox:checked") !== null;
+  agendaCreateBtn.disabled = !hasChecked;
+}
+
 function selectAgendaPost(post, itemEl) {
-  agendaCreateBtn.disabled = false;
   hideMessage(agendaDetailMessage);
 
   agendaPostList.querySelectorAll(".post-list-item").forEach((el) => el.classList.remove("selected"));
@@ -598,8 +603,13 @@ function renderAgendaPostList() {
     item
       .querySelector(".post-list-item-main")
       .addEventListener("click", () => selectAgendaPost(post, item));
+    item
+      .querySelector(".agenda-item-checkbox")
+      .addEventListener("change", updateAgendaCreateBtnState);
     agendaPostList.appendChild(item);
   });
+
+  updateAgendaCreateBtnState();
 }
 
 async function fetchAndRenderAgendaPosts() {

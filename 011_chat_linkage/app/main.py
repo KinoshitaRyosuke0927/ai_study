@@ -45,11 +45,13 @@ def load_settings() -> dict:
     remind_channels = [c.strip() for c in remind_channels_raw.split(",") if c.strip()]
     agenda_channels_raw = config.get("growi", "channel_list", fallback="")
     agenda_channels = [c.strip() for c in agenda_channels_raw.split(",") if c.strip()]
+    forum_sids_raw = config.get("groupsession", "forum_sid", fallback="")
+    forum_sids = [int(s.strip()) for s in forum_sids_raw.split(",") if s.strip()]
     return {
         "channel": config.get("history", "channel", fallback=""),
         "read_date": config.getint("history", "read_date", fallback=30),
         "members": members,
-        "groupsession_forum_sid": config.getint("groupsession", "forum_sid", fallback=0),
+        "groupsession_forum_sids": forum_sids,
         "groupsession_read_date": config.getint("groupsession", "read_date", fallback=30),
         "groupsession_remind_channels": remind_channels,
         "agenda_mattermost_channels": agenda_channels,
@@ -163,8 +165,8 @@ def get_channel_posts(channel_id: str, start: str, end: str) -> list[dict]:
 
 @app.get("/api/webpage/announcements")
 def get_webpage_announcements(start: str, end: str) -> list[dict]:
-    forum_sid = SETTINGS.get("groupsession_forum_sid", 0)
-    if not forum_sid:
+    forum_sids = SETTINGS.get("groupsession_forum_sids", [])
+    if not forum_sids:
         raise HTTPException(status_code=400, detail="settings.iniにgroupsessionのforum_sidが設定されていません")
 
     try:
@@ -177,7 +179,12 @@ def get_webpage_announcements(start: str, end: str) -> list[dict]:
         raise HTTPException(status_code=400, detail="取得開始日は取得終了日より前にしてください")
 
     try:
-        posts = gs.get_recent_announcements(forum_sid, since_ts_ms, until_ts_ms)
+        posts = [
+            post
+            for forum_sid in forum_sids
+            for post in gs.get_recent_announcements(forum_sid, since_ts_ms, until_ts_ms)
+        ]
+        posts.sort(key=lambda p: p["create_at"])
     except requests.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"GROUPSESSIONへのアクセスに失敗しました: {exc}") from exc
 
