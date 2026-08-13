@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI PowerPoint レビュアー (re-architecture)</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header-row">
+      <div class="header-title">
+        <h1>AI PowerPoint レビュアー <span class="render-badge">re-architecture</span></h1>
+      </div>
+      <div class="header-actions">
+        <button id="download-findings-btn" class="btn-download" disabled>指摘事項をダウンロード</button>
+        <button id="download-suggestion-btn" class="btn-download" disabled>修正後スライドをダウンロード</button>
+      </div>
+    </div>
+
+    <div class="panels">
+
+      <!-- ========== 左パネル ========== -->
+      <div class="panel panel-left">
+
+        <section class="section">
+          <h2>PPTXをアップロード</h2>
+          <div class="form-group">
+            <label class="file-drop" id="file-drop">
+              <input type="file" id="file-input" accept=".pptx">
+              <span id="file-name" class="file-name-hint">クリックまたはドロップして<br>.pptx を選択</span>
+            </label>
+          </div>
+          <button id="upload-btn" disabled>スライドを表示</button>
+          <div id="upload-message" class="message hidden"></div>
+        </section>
+
+        <section class="section hidden" id="overall-section">
+          <h2>資料全体の伝えたいこと</h2>
+          <textarea
+            id="intended-message"
+            rows="4"
+            placeholder="プレゼンテーション全体で伝えたいことを入力してください&#10;例: コスト削減施策の有効性と導入ロードマップを伝えたい"
+          ></textarea>
+        </section>
+
+        <section class="section hidden" id="slide-list-section">
+          <h2>スライド一覧</h2>
+          <div id="slide-list" class="slide-list"></div>
+        </section>
+
+        <div class="hidden" id="review-action">
+          <button id="review-btn">AIレビューを実行</button>
+          <div id="review-message" class="message hidden"></div>
+          <button id="suggest-btn" disabled>修正方針を提示する</button>
+          <div id="suggest-message" class="message hidden"></div>
+        </div>
+
+      </div><!-- /panel-left -->
+
+      <div class="panel-divider"></div>
+
+      <!-- ========== 右パネル ========== -->
+      <div class="panel panel-right">
+
+        <!-- スライド選択後のコンテンツ -->
+        <div id="right-content" class="hidden">
+
+          <!-- タブバー -->
+          <div class="tab-bar">
+            <button class="tab-btn active" data-tab="input">伝えたいこと</button>
+            <button class="tab-btn" data-tab="findings">指摘事項</button>
+            <button class="tab-btn" data-tab="suggestion">修正方針</button>
+          </div>
+
+          <!-- 伝えたいことタブ -->
+          <div id="tab-input" class="tab-content">
+            <div class="slide-panel-label" id="input-slide-label">スライド 1</div>
+            <div class="slide-image-wrap">
+              <img id="slide-preview-img" src="" alt="">
+            </div>
+            <div class="slide-input-area">
+              <h3>このスライドで伝えたいこと <span class="hint-label">（任意）</span></h3>
+              <p class="hint-text">省略した場合は全体の伝えたいことが適用されます</p>
+              <textarea
+                id="slide-message-input"
+                rows="5"
+                placeholder="このスライドで特に伝えたいことを入力してください"
+              ></textarea>
+            </div>
+          </div>
+
+          <!-- 指摘事項タブ -->
+          <div id="tab-findings" class="tab-content hidden">
+            <div id="findings-placeholder" class="placeholder-text">
+              「AIレビューを実行」すると結果が表示されます
+            </div>
+            <div id="findings-content" class="hidden">
+              <div class="summary-alignment" id="findings-overall-summary"></div>
+              <div class="slide-panel-label" id="findings-slide-label">スライド 1</div>
+              <div class="slide-image-wrap">
+                <img id="findings-slide-img" src="" alt="">
+              </div>
+              <div id="findings-slide-body"></div>
+            </div>
+          </div>
+
+          <!-- 修正方針タブ -->
+          <div id="tab-suggestion" class="tab-content hidden">
+            <div id="suggestion-placeholder" class="placeholder-text">
+              「修正方針を提示する」を実行すると結果が表示されます
+            </div>
+            <div id="suggestion-content" class="hidden">
+              <div class="slide-panel-label" id="suggestion-slide-label">スライド 1</div>
+              <div class="suggestion-compare">
+                <div class="suggestion-compare-col">
+                  <div class="suggestion-compare-title">修正前</div>
+                  <div class="slide-image-wrap">
+                    <img id="suggestion-before-img" src="" alt="修正前">
+                  </div>
+                </div>
+                <div class="suggestion-compare-col">
+                  <div class="suggestion-compare-title">修正後</div>
+                  <div class="slide-image-wrap">
+                    <img id="suggestion-after-img" src="" alt="修正後">
+                    <div id="suggestion-after-spinner" class="image-spinner hidden">
+                      <span class="loading loading-lg"></span>
+                      <span>生成中...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div id="suggestion-body"></div>
+            </div>
+          </div>
+
+        </div><!-- /right-content -->
+
+      </div><!-- /panel-right -->
+
+    </div><!-- /panels -->
+  </div><!-- /container -->
+
+  <!-- ========== 修正対象指摘事項選択モーダル ========== -->
+  <div id="suggest-selection-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>修正対象の指摘事項を選択</h2>
+      </div>
+      <p class="hint-text">チェックを入れた指摘事項のみ、修正方針の提案に反映されます。</p>
+      <div id="suggest-selection-empty" class="placeholder-text hidden">指摘事項がありません。</div>
+      <div id="suggest-selection-list" class="review-point-list review-point-list-standalone"></div>
+      <div class="modal-footer">
+        <div id="suggest-selection-message" class="message hidden"></div>
+        <div class="modal-footer-buttons">
+          <button id="suggest-selection-cancel-btn" class="btn-secondary">キャンセル</button>
+          <button id="suggest-selection-run-btn" class="btn-settings">修正実行</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== スライド画像拡大表示モーダル ========== -->
+  <div id="image-lightbox-modal" class="modal-overlay lightbox-overlay hidden">
+    <span id="image-lightbox-close" class="lightbox-close">&times;</span>
+    <img id="image-lightbox-img" class="lightbox-img" src="" alt="">
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
