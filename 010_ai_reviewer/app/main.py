@@ -7,6 +7,7 @@ import uvicorn
 import tempfile
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 from concurrent.futures import ThreadPoolExecutor
 
 from PIL import Image
@@ -29,6 +30,7 @@ from app.prompt import (
 )
 from app.renderer import render_pptx_to_images, images_to_base64_dict
 from app.azure_ai_service import call_image_edit, call_qa, call_review
+from app.share_service import create_share, get_share
 
 
 class SlideInput(BaseModel):
@@ -472,6 +474,45 @@ async def export_suggestion_pdf(request: ExportPdfRequest) -> Response:
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="revision_suggestion.pdf"'},
+    )
+
+
+@app.post("/api/share")
+async def create_share_link(payload: dict[str, Any]) -> dict:
+    """
+    現在のレビュー結果一式をBlob Storageに保存し、共有用URLを発行する
+    """
+    try:
+        meta = await asyncio.to_thread(create_share, payload)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"共有リンクの作成に失敗しました: {exc}") from exc
+
+    return {
+        "share_id": meta["share_id"],
+        "url": f"/share/{meta['share_id']}",
+        "expires_at": meta["expires_at"],
+    }
+
+
+@app.get("/api/share/{share_id}")
+async def get_share_data(share_id: str) -> dict:
+    """
+    共有されたレビュー結果一式を取得する（期限切れ・存在しない場合は404）
+    """
+    record = await asyncio.to_thread(get_share, share_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="共有リンクが見つからないか、有効期限が切れています。")
+    return record
+
+
+@app.get("/share/{share_id}")
+def share_page(share_id: str) -> FileResponse:
+    """
+    共有結果の閲覧専用ページ（share.html）を返す
+    """
+    return FileResponse(
+        STATIC_DIR / "share.html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 
 

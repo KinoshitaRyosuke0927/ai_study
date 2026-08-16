@@ -7,6 +7,7 @@
     "acrPassword": { "value": "<az acr credential show -n acraireviewer で取得したpassword>" },
     "imageName": { "value": "acraireviewer.azurecr.io/ai-reviewer:latest" },
     "azureOpenAiEndpoint": { "value": "<ワークスペースルートの .env の AZURE_OPENAI_ENDPOINT>" },
-    "azureOpenAiKey": { "value": "<ワークスペースルートの .env の AZURE_OPENAI_KEY>" }
+    "azureOpenAiKey": { "value": "<ワークスペースルートの .env の AZURE_OPENAI_KEY>" },
+    "shareStorageConnectionString": { "value": "<az storage account show-connection-string -n staireviewershare で取得した接続文字列>" }
   }
 }

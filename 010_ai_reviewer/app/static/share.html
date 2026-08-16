@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>共有されたレビュー結果 | AI PowerPoint レビュアー</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header-row">
+      <div class="header-title">
+        <h1>共有されたレビュー結果</h1>
+      </div>
+    </div>
+
+    <div id="share-banner" class="share-banner hidden">
+      <div><strong id="share-file-name"></strong> の共有結果です</div>
+      <div class="share-banner-meta">
+        <span id="share-created-at"></span>
+        <span id="share-expires-at"></span>
+      </div>
+    </div>
+
+    <div id="share-error" class="callout-error hidden">
+      共有リンクが見つからないか、有効期限が切れています。
+    </div>
+
+    <div id="share-loading" class="placeholder-text">読み込み中...</div>
+
+    <div class="panels hidden" id="share-panels">
+
+      <!-- ========== 左パネル ========== -->
+      <div class="panel panel-left">
+        <section class="section">
+          <h2>スライド一覧</h2>
+          <div id="slide-list" class="slide-list"></div>
+        </section>
+      </div><!-- /panel-left -->
+
+      <div class="panel-divider"></div>
+
+      <!-- ========== 右パネル ========== -->
+      <div class="panel panel-right">
+        <div id="right-content">
+
+          <!-- タブバー -->
+          <div class="tab-bar">
+            <button class="tab-btn active" data-tab="input">スライド</button>
+            <button class="tab-btn" data-tab="summary">指摘事項</button>
+            <button class="tab-btn" data-tab="suggestion">修正方針</button>
+            <button class="tab-btn" data-tab="qa">想定質問</button>
+          </div>
+
+          <!-- スライドタブ -->
+          <div id="tab-input" class="tab-content">
+            <div class="slide-panel-label" id="input-slide-label">スライド 1</div>
+            <div class="slide-image-wrap">
+              <img id="slide-preview-img" src="" alt="">
+            </div>
+            <div class="slide-input-area">
+              <h3>このスライドで伝えたいこと</h3>
+              <p id="slide-message-text" class="review-summary-text"></p>
+            </div>
+          </div>
+
+          <!-- 指摘事項タブ -->
+          <div id="tab-summary" class="tab-content hidden">
+            <div id="summary-placeholder" class="placeholder-text">
+              レビューは実行されていません
+            </div>
+            <div id="summary-content" class="hidden">
+              <div class="slide-panel-label" id="summary-slide-label">スライド 1</div>
+              <div class="slide-image-wrap">
+                <img id="summary-slide-img" src="" alt="">
+              </div>
+              <div id="perspective-selector" class="perspective-selector"></div>
+              <div id="summary-perspective-body"></div>
+            </div>
+          </div>
+
+          <!-- 修正方針タブ -->
+          <div id="tab-suggestion" class="tab-content hidden">
+            <div id="suggestion-placeholder" class="placeholder-text">
+              修正方針は生成されていません
+            </div>
+            <div id="suggestion-content" class="hidden">
+              <div class="slide-panel-label" id="suggestion-slide-label">スライド 1</div>
+              <div class="suggestion-compare">
+                <div class="suggestion-compare-col">
+                  <div class="suggestion-compare-title">修正前</div>
+                  <div class="slide-image-wrap">
+                    <img id="suggestion-before-img" src="" alt="修正前">
+                  </div>
+                </div>
+                <div class="suggestion-compare-col">
+                  <div class="suggestion-compare-title">修正後</div>
+                  <div class="slide-image-wrap">
+                    <img id="suggestion-after-img" src="" alt="修正後">
+                  </div>
+                </div>
+              </div>
+              <div id="suggestion-body"></div>
+            </div>
+          </div>
+
+          <!-- 想定質問タブ -->
+          <div id="tab-qa" class="tab-content hidden">
+            <div id="qa-placeholder" class="placeholder-text">
+              想定質問は生成されていません
+            </div>
+            <div id="qa-content" class="hidden">
+              <div id="qa-list"></div>
+            </div>
+          </div>
+
+        </div><!-- /right-content -->
+      </div><!-- /panel-right -->
+
+    </div><!-- /panels -->
+  </div><!-- /container -->
+
+  <!-- ========== スライド画像拡大表示モーダル ========== -->
+  <div id="image-lightbox-modal" class="modal-overlay lightbox-overlay hidden">
+    <span id="image-lightbox-close" class="lightbox-close">&times;</span>
+    <button id="image-lightbox-prev" class="lightbox-nav lightbox-nav-prev" aria-label="前のページ">&#10094;</button>
+    <img id="image-lightbox-img" class="lightbox-img" src="" alt="">
+    <button id="image-lightbox-next" class="lightbox-nav lightbox-nav-next" aria-label="次のページ">&#10095;</button>
+  </div>
+
+  <script src="/static/common.js"></script>
+  <script src="/static/share.js"></script>
+</body>
+</html>

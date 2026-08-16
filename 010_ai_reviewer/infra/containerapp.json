@@ -12,6 +12,7 @@
     "imageName": { "type": "string" },
     "azureOpenAiEndpoint": { "type": "string" },
     "azureOpenAiKey": { "type": "securestring" },
+    "shareStorageConnectionString": { "type": "securestring" },
     "allowedIpRanges": {
       "type": "array",
       "defaultValue": ["221.117.124.90/32", "122.220.62.58/32"]
@@ -85,7 +86,8 @@
           ],
           "secrets": [
             { "name": "acr-password", "value": "[parameters('acrPassword')]" },
-            { "name": "azure-openai-key", "value": "[parameters('azureOpenAiKey')]" }
+            { "name": "azure-openai-key", "value": "[parameters('azureOpenAiKey')]" },
+            { "name": "share-storage-connection-string", "value": "[parameters('shareStorageConnectionString')]" }
           ]
         },
         "template": {
@@ -96,7 +98,8 @@
               "resources": { "cpu": 1.0, "memory": "2Gi" },
               "env": [
                 { "name": "AZURE_OPENAI_ENDPOINT", "value": "[parameters('azureOpenAiEndpoint')]" },
-                { "name": "AZURE_OPENAI_KEY", "secretRef": "azure-openai-key" }
+                { "name": "AZURE_OPENAI_KEY", "secretRef": "azure-openai-key" },
+                { "name": "SHARE_STORAGE_CONNECTION_STRING", "secretRef": "share-storage-connection-string" }
               ]
             }
           ],

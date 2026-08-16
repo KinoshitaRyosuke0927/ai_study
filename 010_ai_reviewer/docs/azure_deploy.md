@@ -200,3 +200,43 @@ az storage blob upload-batch \
   --account-name staireviewerdocs --destination '$web/images' \
   --source images --auth-mode key --overwrite
 ```
+
+## レビュー結果の共有リンク機能用ストレージ
+
+「共有する」ボタンで発行するレビュー結果のスナップショットは、専用のBlob Storageに保存しています。
+
+- ストレージアカウント: `staireviewershare`（`test20251008` / `japaneast`、`--allow-blob-public-access false`）
+- コンテナ: `shares`（非公開・匿名アクセス不可）
+- 保存データはBlob Storageに直接アクセスできず、**Container App（アプリ本体）が接続文字列を使って読み書きする経路のみ**のため、このストレージアカウントにはIPファイアウォールを設定していません（アプリ側のIP制限が実質的なアクセス制御になっています）
+- 発行から**30日経過したデータはライフサイクル管理ポリシーで自動削除**されます
+
+### 初回セットアップ
+
+```bash
+az storage account create --name staireviewershare --resource-group test20251008 \
+  --location japaneast --sku Standard_LRS --kind StorageV2 --allow-blob-public-access false
+
+az storage container create --account-name staireviewershare --name shares --public-access off
+
+# 30日経過後に自動削除するライフサイクルポリシー
+az storage account management-policy create --account-name staireviewershare --resource-group test20251008 \
+  --policy '{"rules":[{"name":"delete-old-shares","type":"Lifecycle","definition":{
+    "filters":{"blobTypes":["blockBlob"],"prefixMatch":["shares/"]},
+    "actions":{"baseBlob":{"delete":{"daysAfterModificationGreaterThan":30}}}}}]}'
+
+# 接続文字列を取得し、infra/containerapp.parameters.json の shareStorageConnectionString に設定
+az storage account show-connection-string --name staireviewershare --resource-group test20251008
+```
+
+接続文字列を `infra/containerapp.parameters.json` に反映したら、「Container Apps環境・Container Appのデプロイ」の手順（`az deployment group create`）を再実行してください。
+
+### 共有データの手動削除・確認
+
+```bash
+# 保存されている共有データの一覧
+az storage blob list --account-name staireviewershare --container-name shares --auth-mode key --output table
+
+# 特定の共有を即時削除したい場合（30日を待たず削除）
+az storage blob delete --account-name staireviewershare --container-name shares \
+  --name "<share_id>.json" --auth-mode key
+```

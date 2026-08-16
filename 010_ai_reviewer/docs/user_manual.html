@@ -193,6 +193,7 @@
     <li><a href="#flow-suggest">5. 修正方針の生成</a></li>
     <li><a href="#flow-qa">6. 想定質問の確認</a></li>
     <li><a href="#flow-download">7. 結果のダウンロード</a></li>
+    <li><a href="#flow-share">8. レビュー結果を共有する</a></li>
     <li><a href="#faq">よくある質問・トラブルシューティング</a></li>
     <li><a href="#contact">問い合わせ先</a></li>
   </ol>
@@ -305,6 +306,15 @@
   <img src="images/image_009.png" alt="指摘事項タブ全体">
 </div>
 
+<div class="callout tip">
+  <span class="label">💡 補足</span>
+  観点カテゴリの数が多い、またはウィンドウの表示倍率によってタブが画面に収まりきらない場合は、観点タブの部分だけを左右にスクロールして選択できます。
+</div>
+
+<div class="screenshot">
+  <img src="images/image_019.png" alt="指摘事項タブの観点タブが横スクロールできる状態">
+</div>
+
 <h2 id="flow-suggest">5. 修正方針の生成</h2>
 <p>AIレビューの指摘事項をもとに、AIがスライド画像を実際に修正した案を生成します。</p>
 <ol class="steps">
@@ -330,6 +340,15 @@
 
 <div class="screenshot">
   <img src="images/image_013.png" alt="スライド一覧の進捗ステータスアイコン">
+</div>
+
+<div class="callout tip">
+  <span class="label">💡 補足</span>
+  修正前後の画像をクリックして拡大表示すると、左右の矢印ボタン（またはキーボードの←→キー）で「1枚目の修正前 → 1枚目の修正後 → 2枚目の修正前 → …」の順にたどって確認できます。
+</div>
+
+<div class="screenshot">
+  <img src="images/image_020.png" alt="修正方針タブでの拡大表示と前後移動ボタン">
 </div>
 
 <h2 id="flow-qa">6. 想定質問の確認</h2>
@@ -360,11 +379,40 @@
 
 <div class="callout tip">
   <span class="label">💡 補足</span>
-  スライド画像はどのタブでもクリックすると拡大表示できます。拡大表示を閉じるには、画像の外側をクリックするか右上の×ボタンをクリックしてください。
+  スライド画像はどのタブでもクリックすると拡大表示できます。拡大表示中は左右の矢印ボタン（またはキーボードの←→キー）で前後のスライドに移動できます。閉じるには、画像の外側をクリックするか右上の×ボタンをクリックしてください。
 </div>
 
 <div class="screenshot">
   <img src="images/image_016.png" alt="スライド画像の拡大表示（ライトボックス）">
+</div>
+
+<h2 id="flow-share">8. レビュー結果を共有する</h2>
+<p>
+  自分が実行したレビュー結果（指摘事項・修正前後の画像・想定質問）を、URLで他の人に共有できます。ChatGPTの共有リンクと同じように、URLを知っている人であれば社内ネットワーク内から誰でも閲覧できます（ログインは不要です）。
+</p>
+<ol class="steps">
+  <li>「レビューする」を実行し、AIレビューを完了させます（修正方針・想定質問は未生成でも共有できますが、生成済みであればあわせて共有されます）。</li>
+  <li>画面右上の「共有する」ボタンをクリックします。</li>
+  <li>共有URLが発行され、モーダルに表示されます。「URLをコピー」でクリップボードにコピーできます。</li>
+  <li>コピーしたURLを、社内チャットやメールなどで共有先に送ってください。</li>
+  <li>URLを開くと、閲覧専用画面でスライド・指摘事項・修正方針・想定質問を確認できます（内容の変更やAIの再実行はできません）。</li>
+</ol>
+
+<div class="screenshot">
+  <img src="images/image_017.png" alt="共有するボタンと発行された共有URLモーダル">
+</div>
+
+<div class="screenshot">
+  <img src="images/image_018.png" alt="共有された閲覧専用画面">
+</div>
+
+<div class="callout warn">
+  <span class="label">⚠️ 共有リンクについて</span>
+  <ul>
+    <li>共有リンクは<strong>発行から30日で自動的に無効</strong>になります（それ以降はアクセスしても表示されません）</li>
+    <li>URLを知っている人は誰でも閲覧できます。社外の人に転送しないよう注意してください</li>
+    <li>共有は「その時点のスナップショット」です。元のレビュー結果を後から更新しても、発行済みの共有内容は変わりません</li>
+  </ul>
 </div>
 
 <h2 id="faq">よくある質問・トラブルシューティング</h2>

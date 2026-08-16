@@ -1,95 +1,4 @@
 // ============================================================
-// ユーティリティ
-// ============================================================
-
-function showMessage(el, text, type) {
-  el.textContent = text;
-  el.className = `message ${type}`;
-}
-
-function hideMessage(el) {
-  el.className = "message hidden";
-}
-
-function formatErrorDetail(detail) {
-  if (Array.isArray(detail)) {
-    // FastAPI の 422 バリデーションエラー（{loc, msg, type} の配列）を整形
-    return detail
-      .map((d) => (d && typeof d === "object" ? `${(d.loc || []).join(".")}: ${d.msg || JSON.stringify(d)}` : String(d)))
-      .join(" / ");
-  }
-  if (detail && typeof detail === "object") {
-    return JSON.stringify(detail);
-  }
-  return String(detail);
-}
-
-function escHtml(str) {
-  return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-// ============================================================
-// 簡易Markdownレンダリング（箇条書き・太字・インラインコード対応）
-// ============================================================
-
-function inlineMarkdown(text) {
-  return escHtml(text)
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/`(.+?)`/g, "<code>$1</code>");
-}
-
-function renderMarkdown(text) {
-  const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
-  const htmlParts = [];
-  let currentListTag = null;
-  let paragraphLines = [];
-
-  const flushParagraph = () => {
-    if (paragraphLines.length) {
-      htmlParts.push(`<p>${paragraphLines.map(inlineMarkdown).join("<br>")}</p>`);
-      paragraphLines = [];
-    }
-  };
-  const closeList = () => {
-    if (currentListTag) {
-      htmlParts.push(`</${currentListTag}>`);
-      currentListTag = null;
-    }
-  };
-
-  lines.forEach((rawLine) => {
-    const bulletMatch = rawLine.match(/^\s*[-*+]\s+(.*)$/);
-    const orderedMatch = rawLine.match(/^\s*\d+[.)]\s+(.*)$/);
-    const match = bulletMatch || orderedMatch;
-
-    if (match) {
-      flushParagraph();
-      const tag = bulletMatch ? "ul" : "ol";
-      if (currentListTag !== tag) {
-        closeList();
-        htmlParts.push(`<${tag}>`);
-        currentListTag = tag;
-      }
-      htmlParts.push(`<li>${inlineMarkdown(match[1])}</li>`);
-    } else if (rawLine.trim() === "") {
-      closeList();
-      flushParagraph();
-    } else {
-      closeList();
-      paragraphLines.push(rawLine.trim());
-    }
-  });
-  closeList();
-  flushParagraph();
-
-  return htmlParts.join("");
-}
-
-// ============================================================
 // DOM 参照
 // ============================================================
 
@@ -130,6 +39,13 @@ const suggestSelectionList       = document.getElementById("suggest-selection-li
 const suggestSelectionCancelBtn  = document.getElementById("suggest-selection-cancel-btn");
 const suggestSelectionRunBtn     = document.getElementById("suggest-selection-run-btn");
 const suggestSelectionMessage    = document.getElementById("suggest-selection-message");
+// 共有リンク発行モーダル
+const shareBtn                = document.getElementById("share-btn");
+const shareModal              = document.getElementById("share-modal");
+const shareUrlInput           = document.getElementById("share-url-input");
+const shareMessage            = document.getElementById("share-message");
+const shareCloseBtn           = document.getElementById("share-close-btn");
+const shareCopyBtn            = document.getElementById("share-copy-btn");
 // 右パネル
 const rightContent       = document.getElementById("right-content");
 const tabBtns               = document.querySelectorAll(".tab-btn");
@@ -256,6 +172,7 @@ uploadBtn.addEventListener("click", async () => {
     qaBtn.disabled = false;
     downloadSuggestionBtn.disabled = true;
     downloadQaBtn.disabled = true;
+    shareBtn.disabled = true;
 
     // 左パネルの各セクションを表示
     overallSection.classList.remove("hidden");
@@ -568,6 +485,7 @@ reviewBtn.addEventListener("click", async () => {
     suggestionBySlide = {};
     downloadCsvBtn.disabled = false;
     suggestBtn.disabled = false;
+    shareBtn.disabled = false;
     downloadSuggestionBtn.disabled = true;
     if (suggestionPlaceholder) suggestionPlaceholder.classList.remove("hidden");
     if (suggestionContent) suggestionContent.classList.add("hidden");
@@ -939,33 +857,6 @@ slideMessageInput.addEventListener("input", () => {
 // レビュー結果のMarkdownダウンロード
 // ============================================================
 
-function markdownTableEscape(value) {
-  const str = String(value ?? "");
-  return str.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
-}
-
-// Markdownの箇条書き（- / * / + / 1. など）を1項目ずつのテキスト配列に分解する
-// 箇条書きが見つからない場合は、テキスト全体を1項目として扱う
-function extractMarkdownItems(text) {
-  const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
-  const items = [];
-
-  lines.forEach((rawLine) => {
-    const bulletMatch = rawLine.match(/^\s*[-*+]\s+(.*)$/);
-    const orderedMatch = rawLine.match(/^\s*\d+[.)]\s+(.*)$/);
-    const match = bulletMatch || orderedMatch;
-    const content = match ? match[1].trim() : rawLine.trim();
-    if (content) items.push(content);
-  });
-
-  if (items.length === 0) {
-    const whole = String(text || "").trim();
-    if (whole) items.push(whole);
-  }
-
-  return items;
-}
-
 downloadCsvBtn.addEventListener("click", () => {
   const perspectives = reviewData?.presentation_summary?.perspectives || [];
   if (perspectives.length === 0) return;
@@ -1016,6 +907,75 @@ downloadQaBtn.addEventListener("click", () => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+// ============================================================
+// レビュー結果の共有リンク発行
+// ============================================================
+
+shareBtn.addEventListener("click", async () => {
+  if (!reviewData) return;
+
+  hideMessage(shareMessage);
+  shareBtn.disabled = true;
+  shareBtn.innerHTML = '<span class="loading"></span>共有リンクを作成中...';
+
+  try {
+    const slides = slidePngs.map((png, i) => ({
+      slide_number: i + 1,
+      image_png_b64: png,
+      intended_message: perSlideMessages[i + 1] || "",
+    }));
+
+    const payload = {
+      file_name: currentFile ? currentFile.name : "",
+      overall_intended_message: intendedMessage.value.trim(),
+      slides,
+      review: reviewData,
+      suggestions: suggestionBySlide,
+      qa: qaData,
+    };
+
+    const res = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showMessage(shareMessage, `エラー: ${formatErrorDetail(data.detail)}`, "error");
+      shareModal.classList.remove("hidden");
+      return;
+    }
+
+    shareUrlInput.value = `${location.origin}${data.url}`;
+    shareModal.classList.remove("hidden");
+  } catch (err) {
+    showMessage(shareMessage, `ネットワークエラー: ${err.message}`, "error");
+    shareModal.classList.remove("hidden");
+  } finally {
+    shareBtn.disabled = false;
+    shareBtn.textContent = "共有する";
+  }
+});
+
+shareCloseBtn.addEventListener("click", () => {
+  shareModal.classList.add("hidden");
+});
+
+shareModal.addEventListener("click", (e) => {
+  if (e.target === shareModal) shareModal.classList.add("hidden");
+});
+
+shareCopyBtn.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(shareUrlInput.value);
+    showMessage(shareMessage, "URLをコピーしました", "success");
+  } catch (err) {
+    shareUrlInput.select();
+    showMessage(shareMessage, "自動コピーに失敗しました。選択されたURLを手動でコピーしてください", "error");
+  }
 });
 
 // ============================================================
@@ -1239,33 +1199,110 @@ reviewPointSaveBtn.addEventListener("click", async () => {
 const imageLightboxModal = document.getElementById("image-lightbox-modal");
 const imageLightboxImg   = document.getElementById("image-lightbox-img");
 const imageLightboxClose = document.getElementById("image-lightbox-close");
+const imageLightboxPrev  = document.getElementById("image-lightbox-prev");
+const imageLightboxNext  = document.getElementById("image-lightbox-next");
 
-function openImageLightbox(src, alt) {
-  if (!src) return;
-  imageLightboxImg.src = src;
-  imageLightboxImg.alt = alt || "";
+let lightboxSequence = [];  // { slideNum, variant, src, alt } の配列（開いた時点のタブに応じて構築）
+let lightboxIndex    = -1;
+
+// kind: "slide"（伝えたいこと・指摘事項タブ用、スライド1枚のみ） / "suggestion"（修正方針タブ用、修正前後を含む）
+function buildLightboxSequence(kind) {
+  const seq = [];
+  if (kind === "slide") {
+    for (let i = 1; i <= slideCount; i++) {
+      const src  = slidePngs[i - 1] || thumbnails[i - 1];
+      const mime = slidePngs[i - 1] ? "image/png" : thumbnailMime;
+      if (!src) continue;
+      seq.push({ slideNum: i, variant: "single", src: `data:${mime};base64,${src}`, alt: `スライド ${i}` });
+    }
+  } else if (kind === "suggestion") {
+    for (let i = 1; i <= slideCount; i++) {
+      const beforeSrc  = slidePngs[i - 1] || thumbnails[i - 1];
+      const beforeMime = slidePngs[i - 1] ? "image/png" : thumbnailMime;
+      if (beforeSrc) {
+        seq.push({ slideNum: i, variant: "before", src: `data:${beforeMime};base64,${beforeSrc}`, alt: `スライド ${i} 修正前` });
+      }
+      const data = suggestionBySlide[i];
+      if (data && data.edited_image_b64) {
+        seq.push({ slideNum: i, variant: "after", src: `data:image/png;base64,${data.edited_image_b64}`, alt: `スライド ${i} 修正後` });
+      }
+    }
+  }
+  return seq;
+}
+
+function showLightboxFrame() {
+  const item = lightboxSequence[lightboxIndex];
+  if (!item) return;
+  imageLightboxImg.src = item.src;
+  imageLightboxImg.alt = item.alt;
+  imageLightboxPrev.classList.toggle("hidden", lightboxIndex <= 0);
+  imageLightboxNext.classList.toggle("hidden", lightboxIndex >= lightboxSequence.length - 1);
+  // 背後の画面も、拡大表示で移動した先のスライドに連動させる
+  if (item.slideNum !== selectedSlide) selectSlide(item.slideNum);
+}
+
+function lightboxPrev() {
+  if (lightboxIndex > 0) {
+    lightboxIndex -= 1;
+    showLightboxFrame();
+  }
+}
+
+function lightboxNext() {
+  if (lightboxIndex < lightboxSequence.length - 1) {
+    lightboxIndex += 1;
+    showLightboxFrame();
+  }
+}
+
+// kind/slideNum/variant から該当する画像を探して拡大表示する
+function openImageLightbox(kind, slideNum, variant) {
+  const seq = buildLightboxSequence(kind);
+  const idx = seq.findIndex((item) => item.slideNum === slideNum && item.variant === variant);
+  if (idx === -1) return;
+  lightboxSequence = seq;
+  lightboxIndex = idx;
+  showLightboxFrame();
   imageLightboxModal.classList.remove("hidden");
 }
 
 function closeImageLightbox() {
   imageLightboxModal.classList.add("hidden");
   imageLightboxImg.src = "";
+  lightboxSequence = [];
+  lightboxIndex = -1;
 }
 
 // スライド画像エリア（伝えたいこと / 指摘事項 / 修正方針の各タブ）のクリックで拡大表示
-document.querySelectorAll(".slide-image-wrap img").forEach((img) => {
-  img.addEventListener("click", () => {
-    if (!img.getAttribute("src") || img.classList.contains("hidden")) return;
-    openImageLightbox(img.src, img.alt);
-  });
+slidePreviewImg.addEventListener("click", () => {
+  if (!slidePreviewImg.getAttribute("src")) return;
+  openImageLightbox("slide", selectedSlide, "single");
+});
+summarySlideImg.addEventListener("click", () => {
+  if (!summarySlideImg.getAttribute("src")) return;
+  openImageLightbox("slide", selectedSlide, "single");
+});
+suggestionBeforeImg.addEventListener("click", () => {
+  if (!suggestionBeforeImg.getAttribute("src")) return;
+  openImageLightbox("suggestion", selectedSlide, "before");
+});
+suggestionAfterImg.addEventListener("click", () => {
+  if (!suggestionAfterImg.getAttribute("src") || suggestionAfterImg.classList.contains("hidden")) return;
+  openImageLightbox("suggestion", selectedSlide, "after");
 });
 
-imageLightboxModal.addEventListener("click", closeImageLightbox);
+imageLightboxModal.addEventListener("click", (e) => {
+  if (e.target === imageLightboxModal) closeImageLightbox();
+});
 imageLightboxClose.addEventListener("click", closeImageLightbox);
+imageLightboxPrev.addEventListener("click", lightboxPrev);
+imageLightboxNext.addEventListener("click", lightboxNext);
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !imageLightboxModal.classList.contains("hidden")) {
-    closeImageLightbox();
-  }
+  if (imageLightboxModal.classList.contains("hidden")) return;
+  if (e.key === "Escape") closeImageLightbox();
+  else if (e.key === "ArrowLeft") lightboxPrev();
+  else if (e.key === "ArrowRight") lightboxNext();
 });
 
