@@ -8,7 +8,10 @@
 </head>
 <body>
   <div class="container">
-    <h1>AIリマインダー</h1>
+    <div class="header-row">
+      <h1>AIリマインダー</h1>
+      <button type="button" id="gs-login-open-btn" class="btn gs-login-open-btn">GROUPSESSIONログイン</button>
+    </div>
 
     <div class="tabs">
       <button type="button" id="tab-btn-mattermost" class="tab-btn active">Mattermost</button>
@@ -59,7 +62,7 @@
         <!-- ========== 右: 投稿詳細 + DM投稿 ========== -->
         <div class="panel panel-right">
 
-          <section class="section detail-section">
+          <section class="section detail-section" id="mattermost-top-section">
             <div class="detail-header">
               <h2>投稿内容</h2>
               <button id="reminder-btn" class="btn reminder-btn" disabled>リマインドを作成</button>
@@ -70,7 +73,9 @@
             <div id="reminder-message" class="message hidden"></div>
           </section>
 
-          <section class="section last dm-section">
+          <div class="v-resizer" data-prev="mattermost-top-section" data-next="mattermost-bottom-section"></div>
+
+          <section class="section last dm-section" id="mattermost-bottom-section">
             <h2>Mattermostに投稿</h2>
             <div class="form-group dm-target-group">
               <label for="dm-target-select-mattermost">投稿先</label>
@@ -108,7 +113,7 @@
                 <input type="date" id="gs-end-date">
               </div>
             </div>
-            <button id="gs-fetch-btn" class="btn">新着記事を取得</button>
+            <button id="gs-fetch-btn" class="btn" disabled>新着記事を取得</button>
             <div id="gs-message" class="message hidden"></div>
           </section>
 
@@ -126,7 +131,7 @@
         <!-- ========== 右: 記事詳細 + DM投稿 ========== -->
         <div class="panel panel-right">
 
-          <section class="section detail-section">
+          <section class="section detail-section" id="groupsession-top-section">
             <div class="detail-header">
               <h2>記事内容</h2>
               <button id="gs-reminder-btn" class="btn reminder-btn" disabled>リマインドを作成</button>
@@ -137,7 +142,9 @@
             <div id="gs-reminder-message" class="message hidden"></div>
           </section>
 
-          <section class="section last dm-section">
+          <div class="v-resizer" data-prev="groupsession-top-section" data-next="groupsession-bottom-section"></div>
+
+          <section class="section last dm-section" id="groupsession-bottom-section">
             <h2>Mattermostに投稿</h2>
             <div class="form-group dm-target-group">
               <label for="dm-target-select-groupsession">投稿先</label>
@@ -175,12 +182,19 @@
                 <input type="date" id="agenda-end-date">
               </div>
             </div>
-            <button id="agenda-fetch-btn" class="btn">履歴・新着記事を取得</button>
+            <button id="agenda-fetch-btn" class="btn" disabled>履歴・新着記事を取得</button>
             <div id="agenda-message" class="message hidden"></div>
           </section>
 
           <section class="section last post-list-section">
-            <h2>取得した投稿一覧</h2>
+            <div class="detail-header">
+              <h2>取得した投稿一覧</h2>
+              <div class="agenda-sort-buttons">
+                <button type="button" id="agenda-sort-date-btn" class="btn sort-btn">日時順</button>
+                <button type="button" id="agenda-sort-username-btn" class="btn sort-btn">投稿者順</button>
+                <button type="button" id="agenda-sort-source-btn" class="btn sort-btn">取得元順</button>
+              </div>
+            </div>
             <div id="agenda-post-list" class="post-list">
               <p class="post-list-placeholder">履歴・新着記事を取得すると一覧が表示されます</p>
             </div>
@@ -193,7 +207,7 @@
         <!-- ========== 右: 詳細内容 ========== -->
         <div class="panel panel-right">
 
-          <section class="section detail-section agenda-detail-section">
+          <section class="section detail-section agenda-detail-section" id="agenda-top-section">
             <div class="detail-header">
               <h2>詳細内容</h2>
               <button id="agenda-create-btn" class="btn reminder-btn" disabled>アジェンダを作成</button>
@@ -204,22 +218,38 @@
             <div id="agenda-detail-message" class="message hidden"></div>
           </section>
 
-          <section class="section last agenda-output-section">
+          <div class="v-resizer" data-prev="agenda-top-section" data-next="agenda-bottom-section"></div>
+
+          <section class="section last agenda-output-section" id="agenda-bottom-section">
             <h2>部会アジェンダ</h2>
             <textarea id="agenda-output" placeholder="チェックした投稿・記事を選び「アジェンダを作成」を押すと、ここに文章が作成されます"></textarea>
             <div id="agenda-output-message" class="message hidden"></div>
 
             <div class="form-row agenda-publish-row">
-              <div class="form-group">
+              <div class="form-group agenda-publish-year-group">
                 <label for="agenda-publish-year">公開先: 年</label>
                 <input type="number" id="agenda-publish-year" min="2000" max="2100">
               </div>
-              <div class="form-group">
+              <div class="form-group agenda-publish-month-group">
                 <label for="agenda-publish-month">公開先: 月</label>
                 <input type="number" id="agenda-publish-month" min="1" max="12">
               </div>
+              <div class="form-group agenda-publish-grant-group">
+                <label for="agenda-publish-grant-toggle">公開範囲</label>
+                <div class="toggle-switch-row">
+                  <span class="toggle-switch-label">公開</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="agenda-publish-grant-toggle">
+                    <span class="toggle-switch-slider"></span>
+                  </label>
+                  <span class="toggle-switch-label">自分のみ公開</span>
+                </div>
+              </div>
               <div class="form-group agenda-publish-btn-group">
                 <button id="agenda-publish-btn" class="btn" disabled>wikiへ公開</button>
+                <span class="tooltip-icon" tabindex="0">?
+                  <span class="tooltip-text">すでに公開されているページの公開範囲を変更する場合、該当記事を一度削除するためURLが変更になるのでご注意ください。</span>
+                </span>
               </div>
             </div>
             <div id="agenda-publish-message" class="message hidden"></div>
@@ -231,6 +261,26 @@
     </div><!-- /tab-agenda -->
 
   </div><!-- /container -->
+
+  <!-- ========== GROUPSESSIONログイン モーダル ========== -->
+  <div id="gs-login-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>GROUPSESSIONログイン</h2>
+      <div class="form-group">
+        <label for="gs-login-username">ID</label>
+        <input type="text" id="gs-login-username" class="dm-target-value" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="gs-login-password">パスワード</label>
+        <input type="password" id="gs-login-password" class="dm-target-value" autocomplete="current-password">
+      </div>
+      <div id="gs-login-message" class="message hidden"></div>
+      <div class="modal-actions">
+        <button type="button" id="gs-login-cancel-btn" class="btn modal-cancel-btn">キャンセル</button>
+        <button type="button" id="gs-login-btn" class="btn">ログイン</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

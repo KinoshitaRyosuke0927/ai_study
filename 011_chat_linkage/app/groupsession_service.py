@@ -27,14 +27,36 @@ else:
 load_dotenv(_env_path)
 
 GROUPSESSION_BASE_URL = os.environ["GROUPSESSION_BASE_URL"].rstrip("/")
-GROUPSESSION_USERNAME = os.environ["GROUPSESSION_USERNAME"]
-GROUPSESSION_PASSWORD = os.environ["GROUPSESSION_PASSWORD"]
 
 LOGIN_URL = f"{GROUPSESSION_BASE_URL}/common/cmn001.do"
 BULLETIN_URL = f"{GROUPSESSION_BASE_URL}/bulletin/bbs060.do"
 
 _BASE_PARSED = urlparse(GROUPSESSION_BASE_URL)
 _ORIGIN = f"{_BASE_PARSED.scheme}://{_BASE_PARSED.netloc}"
+
+# ID・パスワードは.envに保存せず、画面から入力してもらいメモリ上にのみ保持する
+_credentials: dict[str, str] = {}
+
+
+def has_credentials() -> bool:
+    return bool(_credentials.get("username")) and bool(_credentials.get("password"))
+
+
+def logout() -> None:
+    _credentials.clear()
+
+
+def login(username: str, password: str) -> None:
+    """指定のID・パスワードで実際にログインできるか検証し、成功した場合のみメモリに保持する"""
+    previous = dict(_credentials)
+    _credentials["username"] = username
+    _credentials["password"] = password
+    try:
+        _login()
+    except Exception:
+        _credentials.clear()
+        _credentials.update(previous)
+        raise
 
 
 def _build_thread_url(forum_sid: int, thread_sid: int) -> str:
@@ -95,6 +117,9 @@ def _sanitize_html(raw_html: str) -> str:
 
 def _login() -> requests.Session:
     """ログイン画面からCSRFトークンを取得し、ログイン済みセッションを返す"""
+    if not has_credentials():
+        raise RuntimeError("GROUPSESSIONのID・パスワードが未設定です。先にログインしてください。")
+
     session = requests.Session()
 
     login_page = session.get(LOGIN_URL, timeout=10)
@@ -103,7 +128,7 @@ def _login() -> requests.Session:
     token_input = soup.find("input", attrs={"name": "org.apache.struts.taglib.html.TOKEN"})
     token = token_input["value"] if token_input else ""
 
-    session.post(
+    response = session.post(
         LOGIN_URL,
         data={
             "org.apache.struts.taglib.html.TOKEN": token,
@@ -111,11 +136,18 @@ def _login() -> requests.Session:
             "cmn001loginType": "1",
             "url": "",
             "cmn001initAccess": "1",
-            "cmn001Userid": GROUPSESSION_USERNAME,
-            "cmn001Passwd": GROUPSESSION_PASSWORD,
+            "cmn001Userid": _credentials["username"],
+            "cmn001Passwd": _credentials["password"],
         },
         timeout=10,
-    ).raise_for_status()
+    )
+    response.raise_for_status()
+
+    # ID・パスワードが誤っている場合もHTTPステータスは200で返り、
+    # ログイン画面がそのまま再表示されるため、フォームの有無で成否を判定する
+    result_soup = BeautifulSoup(response.text, "html.parser")
+    if result_soup.find("input", attrs={"name": "cmn001Userid"}) is not None:
+        raise ValueError("IDまたはパスワードが正しくありません")
 
     return session
 

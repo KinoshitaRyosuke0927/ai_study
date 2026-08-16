@@ -25,11 +25,14 @@ REMINDER_DONE_EMOJI = "sumi"
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
-# settings.ini はユーザーが編集する運用のため、exe化(frozen)時はexeと同じ階層を参照する
+# settings.ini・agenda_template.txt はユーザーが編集する運用のため、
+# exe化(frozen)時はexeと同じ階層を参照する
 if getattr(sys, "frozen", False):
     SETTINGS_PATH = Path(sys.executable).resolve().parent / "settings.ini"
+    AGENDA_TEMPLATE_PATH = Path(sys.executable).resolve().parent / "agenda_template.txt"
 else:
     SETTINGS_PATH = BASE_DIR.parent / "settings.ini"
+    AGENDA_TEMPLATE_PATH = BASE_DIR.parent / "agenda_template.txt"
 
 
 def load_settings() -> dict:
@@ -93,6 +96,12 @@ class AgendaPublishRequest(BaseModel):
     agenda: str
     year: int
     month: int
+    grant: str = "public"  # "public": 公開 / "only_me": 自分のみ公開
+
+
+class GroupsessionLoginRequest(BaseModel):
+    username: str
+    password: str
 
 
 app = FastAPI(title="Mattermost チャット連携", version="1.0.0")
@@ -123,6 +132,34 @@ def health() -> dict:
 @app.get("/api/target-username")
 def get_target_username() -> dict:
     return {"username": SETTINGS.get("mattermost_target_username", "")}
+
+
+@app.get("/api/groupsession/login-status")
+def get_groupsession_login_status() -> dict:
+    return {"logged_in": gs.has_credentials()}
+
+
+@app.post("/api/groupsession/login")
+def post_groupsession_login(request: GroupsessionLoginRequest) -> dict:
+    username = request.username.strip()
+    password = request.password
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="IDとパスワードを入力してください")
+
+    try:
+        gs.login(username, password)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except requests.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"GROUPSESSION APIエラー: {exc}") from exc
+
+    return {"result": "ok"}
+
+
+@app.post("/api/groupsession/logout")
+def post_groupsession_logout() -> dict:
+    gs.logout()
+    return {"result": "ok"}
 
 
 @app.get("/api/settings")
@@ -165,6 +202,9 @@ def get_channel_posts(channel_id: str, start: str, end: str) -> list[dict]:
 
 @app.get("/api/webpage/announcements")
 def get_webpage_announcements(start: str, end: str) -> list[dict]:
+    if not gs.has_credentials():
+        raise HTTPException(status_code=401, detail="GROUPSESSIONにログインしてください")
+
     forum_sids = SETTINGS.get("groupsession_forum_sids", [])
     if not forum_sids:
         raise HTTPException(status_code=400, detail="settings.iniにgroupsessionのforum_sidが設定されていません")
@@ -185,6 +225,8 @@ def get_webpage_announcements(start: str, end: str) -> list[dict]:
             for post in gs.get_recent_announcements(forum_sid, since_ts_ms, until_ts_ms)
         ]
         posts.sort(key=lambda p: p["create_at"])
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
     except requests.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"GROUPSESSIONへのアクセスに失敗しました: {exc}") from exc
 
@@ -248,22 +290,19 @@ def post_agenda(request: AgendaRequest) -> dict:
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AIによるアジェンダ生成に失敗しました: {exc}") from exc
 
+    if not AGENDA_TEMPLATE_PATH.exists():
+        raise HTTPException(
+            status_code=400,
+            detail=f"アジェンダのひな形ファイルが見つかりません({AGENDA_TEMPLATE_PATH.name})",
+        )
+
     now = datetime.now()
-    agenda = f"""# {now.year}年{now.month}月度アジェンダ
-- 実施日時：{now.year}/{now.month}/dd 15:00-16:00
-
-## 第一部
-#### 役員会の共有
-
-#### 全体共有事項
-{agenda_body}
-
-## 第二部
-#### 進捗報告
-#### 豆知識コーナー
-
-#### その他プロジェクト等の共有事項
-"""
+    template = AGENDA_TEMPLATE_PATH.read_text(encoding="utf-8")
+    agenda = (
+        template.replace("{{YEAR}}", str(now.year))
+        .replace("{{MONTH}}", str(now.month))
+        .replace("{{AGENDA_BODY}}", agenda_body)
+    )
 
     return {"agenda": agenda}
 
@@ -278,8 +317,10 @@ def publish_agenda(request: AgendaPublishRequest) -> dict:
     if not root_path:
         raise HTTPException(status_code=400, detail="settings.iniにgrowiのroot_pathが設定されていません")
 
+    grant = growi.PAGE_GRANT_ONLY_ME if request.grant == "only_me" else growi.PAGE_GRANT_PUBLIC
+
     try:
-        result = growi.publish_agenda(root_path, request.year, request.month, agenda)
+        result = growi.publish_agenda(root_path, request.year, request.month, agenda, grant)
     except requests.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"GROWIへの公開に失敗しました: {exc}") from exc
 

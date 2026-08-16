@@ -26,9 +26,80 @@ body {
 
 h1 {
   font-size: 1.4rem;
-  margin-bottom: 24px;
   color: #0052cc;
+  white-space: nowrap;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  margin-bottom: 24px;
   flex-shrink: 0;
+}
+
+.btn.gs-login-open-btn {
+  width: auto;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  background-color: transparent;
+  color: #0052cc;
+  border: none;
+}
+
+.btn.gs-login-open-btn.logged-in {
+  color: #1a8a3e;
+}
+
+.btn.gs-login-open-btn:hover:not(:disabled) {
+  background-color: #e6f0ff;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal-box {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  width: 540px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.modal-actions .btn {
+  width: auto;
+  padding: 10px 20px;
+}
+
+.btn.modal-cancel-btn {
+  background-color: transparent;
+  color: #718096;
+  border: none;
+}
+
+.btn.modal-cancel-btn:hover:not(:disabled) {
+  background-color: #f0f2f5;
 }
 
 h2 {
@@ -144,6 +215,36 @@ h3 {
   flex-shrink: 0;
 }
 
+/* ========== 縦方向リサイザー(投稿内容/DM投稿エリアの境界) ========== */
+
+.v-resizer {
+  flex-shrink: 0;
+  height: 17px;
+  margin: 0 0 7px;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+}
+
+.v-resizer::before {
+  content: "";
+  width: 100%;
+  height: 1px;
+  background-color: #e2e8f0;
+  transition: background-color 0.15s;
+}
+
+.v-resizer:hover::before,
+.v-resizer.resizing::before {
+  background-color: #0052cc;
+  height: 2px;
+}
+
+body.resizing-vertical {
+  cursor: row-resize;
+  user-select: none;
+}
+
 /* ========== セクション ========== */
 
 .section {
@@ -185,11 +286,36 @@ h3 {
   flex-shrink: 0;
 }
 
+.agenda-sort-buttons {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sort-btn {
+  width: auto;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  background-color: #fff;
+  color: #0052cc;
+  border: 1px solid #0052cc;
+  flex-shrink: 0;
+}
+
+.sort-btn:hover:not(:disabled) {
+  background-color: #e6f0ff;
+}
+
 .detail-section {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
+  /* 下の仕切り(.v-resizer)と重複しないよう、通常の.sectionの余白・境界線は使わない */
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: none;
 }
 
 .dm-section {
@@ -197,8 +323,8 @@ h3 {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding-top: 20px;
-  border-top: 1px solid #e2e8f0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .dm-section textarea {
@@ -236,8 +362,17 @@ h3 {
   align-items: flex-end;
 }
 
-.agenda-publish-btn-group {
+.form-group.agenda-publish-year-group,
+.form-group.agenda-publish-month-group {
+  flex: 0 0 100px;
+}
+
+.form-group.agenda-publish-btn-group {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .agenda-publish-btn-group .btn {
@@ -247,11 +382,110 @@ h3 {
   white-space: nowrap;
 }
 
+.tooltip-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: #718096;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: bold;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 130%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 260px;
+  padding: 8px 10px;
+  background-color: #333;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: normal;
+  line-height: 1.5;
+  border-radius: 4px;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+
+.tooltip-icon:hover .tooltip-text,
+.tooltip-icon:focus .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+.form-group.agenda-publish-grant-group {
+  flex: 0 0 auto;
+}
+
+.toggle-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 43px;
+}
+
+.toggle-switch-label {
+  font-size: 0.85rem;
+  color: #444;
+  white-space: nowrap;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-switch-slider {
+  position: absolute;
+  inset: 0;
+  background-color: #0052cc;
+  border-radius: 22px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.toggle-switch-slider::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
+  background-color: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-switch-slider::before {
+  transform: translateX(18px);
+}
+
 .agenda-output-section {
   flex: 6;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .agenda-output-section textarea {
@@ -288,6 +522,8 @@ h3 {
 select,
 input[type="date"],
 input[type="number"],
+input[type="text"],
+input[type="password"],
 textarea {
   width: 100%;
   padding: 10px 12px;
@@ -302,6 +538,8 @@ textarea {
 select:focus,
 input[type="date"]:focus,
 input[type="number"]:focus,
+input[type="text"]:focus,
+input[type="password"]:focus,
 textarea:focus {
   outline: none;
   border-color: #0052cc;
@@ -433,7 +671,7 @@ textarea {
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   padding: 16px;
-  min-height: 120px;
+  min-height: 0;
 }
 
 .post-detail-placeholder {

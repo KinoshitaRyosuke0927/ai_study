@@ -57,6 +57,14 @@ const tabBtnGroupsession = document.getElementById("tab-btn-groupsession");
 const tabMattermost      = document.getElementById("tab-mattermost");
 const tabGroupsession    = document.getElementById("tab-groupsession");
 
+const gsLoginOpenBtn       = document.getElementById("gs-login-open-btn");
+const gsLoginModalOverlay  = document.getElementById("gs-login-modal-overlay");
+const gsLoginUsernameInput = document.getElementById("gs-login-username");
+const gsLoginPasswordInput = document.getElementById("gs-login-password");
+const gsLoginBtn           = document.getElementById("gs-login-btn");
+const gsLoginCancelBtn     = document.getElementById("gs-login-cancel-btn");
+const gsLoginMessage       = document.getElementById("gs-login-message");
+
 const gsStartDateInput = document.getElementById("gs-start-date");
 const gsEndDateInput   = document.getElementById("gs-end-date");
 const gsFetchBtn      = document.getElementById("gs-fetch-btn");
@@ -74,6 +82,9 @@ const agendaEndDateInput   = document.getElementById("agenda-end-date");
 const agendaFetchBtn       = document.getElementById("agenda-fetch-btn");
 const agendaMessage        = document.getElementById("agenda-message");
 const agendaPostList       = document.getElementById("agenda-post-list");
+const agendaSortDateBtn     = document.getElementById("agenda-sort-date-btn");
+const agendaSortUsernameBtn = document.getElementById("agenda-sort-username-btn");
+const agendaSortSourceBtn   = document.getElementById("agenda-sort-source-btn");
 const agendaPostDetail     = document.getElementById("agenda-post-detail");
 const agendaCreateBtn      = document.getElementById("agenda-create-btn");
 const agendaDetailMessage  = document.getElementById("agenda-detail-message");
@@ -83,6 +94,7 @@ const agendaPublishYearInput  = document.getElementById("agenda-publish-year");
 const agendaPublishMonthInput = document.getElementById("agenda-publish-month");
 const agendaPublishBtn        = document.getElementById("agenda-publish-btn");
 const agendaPublishMessage    = document.getElementById("agenda-publish-message");
+const agendaPublishGrantToggle = document.getElementById("agenda-publish-grant-toggle");
 
 // ============================================================
 // 状態管理
@@ -367,6 +379,83 @@ reminderBtn.addEventListener("click", async () => {
 });
 
 // ============================================================
+// GROUPSESSION: ログイン(モーダル)
+// ============================================================
+
+function openGroupsessionLoginModal() {
+  hideMessage(gsLoginMessage);
+  gsLoginPasswordInput.value = "";
+  gsLoginModalOverlay.classList.remove("hidden");
+  gsLoginUsernameInput.focus();
+}
+
+function closeGroupsessionLoginModal() {
+  gsLoginModalOverlay.classList.add("hidden");
+}
+
+/** GROUPSESSIONログイン状態を、ログインボタンの表示・新着記事取得ボタンの活性状態に反映する */
+function updateGroupsessionLoginUi(loggedIn) {
+  gsLoginOpenBtn.textContent = loggedIn ? "GROUPSESSIONログイン済" : "GROUPSESSIONログイン";
+  gsLoginOpenBtn.classList.toggle("logged-in", loggedIn);
+  gsFetchBtn.disabled = !loggedIn;
+  agendaFetchBtn.disabled = !loggedIn;
+}
+
+async function loadGroupsessionLoginStatus() {
+  try {
+    const res = await fetch("/api/groupsession/login-status");
+    const data = await res.json();
+    updateGroupsessionLoginUi(Boolean(data.logged_in));
+  } catch (err) {
+    updateGroupsessionLoginUi(false);
+  }
+}
+
+gsLoginOpenBtn.addEventListener("click", openGroupsessionLoginModal);
+gsLoginCancelBtn.addEventListener("click", closeGroupsessionLoginModal);
+
+gsLoginModalOverlay.addEventListener("click", (event) => {
+  if (event.target === gsLoginModalOverlay) {
+    closeGroupsessionLoginModal();
+  }
+});
+
+gsLoginBtn.addEventListener("click", async () => {
+  hideMessage(gsLoginMessage);
+
+  const username = gsLoginUsernameInput.value.trim();
+  const password = gsLoginPasswordInput.value;
+  if (!username || !password) {
+    showMessage(gsLoginMessage, "IDとパスワードを入力してください", "error");
+    return;
+  }
+
+  gsLoginBtn.disabled = true;
+  gsLoginBtn.textContent = "ログイン中...";
+
+  try {
+    const res = await fetch("/api/groupsession/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showMessage(gsLoginMessage, `エラー: ${data.detail}`, "error");
+      return;
+    }
+    gsLoginPasswordInput.value = "";
+    updateGroupsessionLoginUi(true);
+    closeGroupsessionLoginModal();
+  } catch (err) {
+    showMessage(gsLoginMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    gsLoginBtn.disabled = false;
+    gsLoginBtn.textContent = "ログイン";
+  }
+});
+
+// ============================================================
 // GROUPSESSION: 新着記事の取得
 // ============================================================
 
@@ -575,10 +664,17 @@ function selectAgendaPost(post, itemEl) {
 }
 
 function renderAgendaPostList() {
+  const checkedIds = new Set(
+    Array.from(agendaPostList.querySelectorAll(".agenda-item-checkbox:checked")).map(
+      (checkbox) => checkbox.closest(".agenda-list-item").dataset.postId
+    )
+  );
+
   agendaPostList.innerHTML = "";
 
   if (agendaFetchedPosts.length === 0) {
     agendaPostList.innerHTML = `<p class="post-list-placeholder">指定期間内の投稿・記事はありませんでした</p>`;
+    updateAgendaCreateBtnState();
     return;
   }
 
@@ -600,6 +696,9 @@ function renderAgendaPostList() {
       </div>
     `;
     item.querySelector(".post-list-item-body").textContent = truncateForPreview(post.message);
+    if (checkedIds.has(post.id)) {
+      item.querySelector(".agenda-item-checkbox").checked = true;
+    }
     item
       .querySelector(".post-list-item-main")
       .addEventListener("click", () => selectAgendaPost(post, item));
@@ -611,6 +710,25 @@ function renderAgendaPostList() {
 
   updateAgendaCreateBtnState();
 }
+
+/** agendaFetchedPosts を指定の比較関数で並び替えて再描画する */
+function sortAgendaPosts(compareFn) {
+  agendaFetchedPosts = [...agendaFetchedPosts].sort(compareFn);
+  renderAgendaPostList();
+}
+
+agendaSortDateBtn.addEventListener("click", () => {
+  sortAgendaPosts((a, b) => a.create_at - b.create_at);
+});
+
+agendaSortUsernameBtn.addEventListener("click", () => {
+  sortAgendaPosts((a, b) => a.username.localeCompare(b.username, "ja"));
+});
+
+agendaSortSourceBtn.addEventListener("click", () => {
+  // GROUPSESSION(web)を上、Mattermostを下にする(グループ内の順序は維持)
+  sortAgendaPosts((a, b) => (a.source === "web" ? 0 : 1) - (b.source === "web" ? 0 : 1));
+});
 
 async function fetchAndRenderAgendaPosts() {
   hideMessage(agendaMessage);
@@ -751,11 +869,13 @@ agendaPublishBtn.addEventListener("click", async () => {
   agendaPublishBtn.disabled = true;
   agendaPublishBtn.textContent = "公開中...";
 
+  const grant = agendaPublishGrantToggle.checked ? "only_me" : "public";
+
   try {
     const res = await fetch("/api/agenda/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agenda, year, month }),
+      body: JSON.stringify({ agenda, year, month, grant }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -954,6 +1074,58 @@ async function init() {
   await applySettings();
   await applyGroupsessionSettings();
   await applyAgendaSettings();
+  await loadGroupsessionLoginStatus();
 }
 
 init();
+
+// ============================================================
+// 右パネル上下エリアの高さ調整(ドラッグリサイズ)
+// ============================================================
+
+const V_RESIZER_MIN_HEIGHT = 80;
+
+function setupVerticalResizer(resizer) {
+  const prevEl = document.getElementById(resizer.dataset.prev);
+  const nextEl = document.getElementById(resizer.dataset.next);
+  if (!prevEl || !nextEl) return;
+
+  resizer.addEventListener("mousedown", (downEvent) => {
+    downEvent.preventDefault();
+
+    const startY = downEvent.clientY;
+    const startPrevHeight = prevEl.getBoundingClientRect().height;
+    const startNextHeight = nextEl.getBoundingClientRect().height;
+    const totalHeight = startPrevHeight + startNextHeight;
+
+    resizer.classList.add("resizing");
+    document.body.classList.add("resizing-vertical");
+
+    function onMouseMove(moveEvent) {
+      const delta = moveEvent.clientY - startY;
+      const newPrevHeight = Math.min(
+        totalHeight - V_RESIZER_MIN_HEIGHT,
+        Math.max(V_RESIZER_MIN_HEIGHT, startPrevHeight + delta)
+      );
+      const newNextHeight = totalHeight - newPrevHeight;
+
+      // flex-shrink/flex-growを有効にしておくことで、ドラッグ後にウィンドウサイズが
+      // 変わっても、指定した高さ(比率の基準)を保ちつつ利用可能な高さに追従できる
+      // (0 0 に固定すると、ウィンドウを縮めた際に親要素からはみ出してしまう)
+      prevEl.style.flex = `1 1 ${newPrevHeight}px`;
+      nextEl.style.flex = `1 1 ${newNextHeight}px`;
+    }
+
+    function onMouseUp() {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      resizer.classList.remove("resizing");
+      document.body.classList.remove("resizing-vertical");
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  });
+}
+
+document.querySelectorAll(".v-resizer").forEach(setupVerticalResizer);
