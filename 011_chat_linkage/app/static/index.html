@@ -11,6 +11,13 @@
     <div class="header-row">
       <h1>AIリマインダー</h1>
       <button type="button" id="gs-login-open-btn" class="btn gs-login-open-btn">GROUPSESSIONログイン</button>
+      <div class="filter-strength-group">
+        <label for="filter-strength-slider">フィルタ強度: <span id="filter-strength-value">0.9</span></label>
+        <input type="range" id="filter-strength-slider" min="0" max="1" step="0.1" value="0.9">
+        <span class="tooltip-icon" tabindex="0">?
+          <span class="tooltip-text">取得した投稿・記事からリマインドが必要な投稿を抽出する際の、絞り込みの強さを0(弱い)から1(強い)で設定します。</span>
+        </span>
+      </div>
     </div>
 
     <div class="tabs">

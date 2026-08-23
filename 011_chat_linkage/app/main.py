@@ -18,7 +18,8 @@ import requests
 from app import groupsession_service as gs
 from app import growi_service as growi
 from app import mattermost_service as mm
-from app.azure_ai_service import call_filter_reminder_posts, call_generate_agenda, call_generate_reminder
+from app.azure_ai_service import call_generate_agenda, call_generate_reminder
+from app.model.predict import predict_reminder_scores
 
 # リマインド作成時に、リアクション済みとみなす絵文字名
 REMINDER_DONE_EMOJI = "sumi"
@@ -115,6 +116,15 @@ def date_str_to_epoch_ms(date_str: str, end_of_day: bool = False) -> int:
     return int(dt.timestamp() * 1000)
 
 
+def filter_posts_by_reminder_score(posts: list[dict], threshold: float) -> list[dict]:
+    """学習済みモデルで各投稿のリマインド必要度をスコアリングし、
+    フィルタ強度(threshold)以上のスコアを持つ投稿のみを返す。"""
+    if not posts:
+        return []
+    scores = predict_reminder_scores([p["message"] for p in posts])
+    return [post for post, score in zip(posts, scores) if score >= threshold]
+
+
 @app.get("/")
 def index() -> FileResponse:
     """トップページを返す"""
@@ -177,7 +187,7 @@ def get_channels() -> list[dict]:
 
 
 @app.get("/api/channels/{channel_id}/posts")
-def get_channel_posts(channel_id: str, start: str, end: str) -> list[dict]:
+def get_channel_posts(channel_id: str, start: str, end: str, threshold: float = 0.9) -> list[dict]:
     try:
         start_ts = date_str_to_epoch_ms(start, end_of_day=False)
         end_ts = date_str_to_epoch_ms(end, end_of_day=True)
@@ -193,15 +203,13 @@ def get_channel_posts(channel_id: str, start: str, end: str) -> list[dict]:
         raise HTTPException(status_code=502, detail=f"Mattermost APIエラー: {exc}") from exc
 
     try:
-        target_ids = call_filter_reminder_posts(posts)
+        return filter_posts_by_reminder_score(posts, threshold)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"AIによる投稿の絞り込みに失敗しました: {exc}") from exc
-
-    return [p for p in posts if p["id"] in target_ids]
+        raise HTTPException(status_code=502, detail=f"モデルによる投稿の絞り込みに失敗しました: {exc}") from exc
 
 
 @app.get("/api/webpage/announcements")
-def get_webpage_announcements(start: str, end: str) -> list[dict]:
+def get_webpage_announcements(start: str, end: str, threshold: float = 0.9) -> list[dict]:
     if not gs.has_credentials():
         raise HTTPException(status_code=401, detail="GROUPSESSIONにログインしてください")
 
@@ -231,11 +239,9 @@ def get_webpage_announcements(start: str, end: str) -> list[dict]:
         raise HTTPException(status_code=502, detail=f"GROUPSESSIONへのアクセスに失敗しました: {exc}") from exc
 
     try:
-        target_ids = call_filter_reminder_posts(posts)
+        return filter_posts_by_reminder_score(posts, threshold)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"AIによる投稿の絞り込みに失敗しました: {exc}") from exc
-
-    return [p for p in posts if p["id"] in target_ids]
+        raise HTTPException(status_code=502, detail=f"モデルによる投稿の絞り込みに失敗しました: {exc}") from exc
 
 
 @app.get("/api/posts/{post_id}/reactions")

@@ -145,22 +145,6 @@ GROUPSESSION記事へのリンク先を表すプレースホルダー文字列�
 ```
 """
 
-FILTER_SYSTEM_PROMPT = """
-あなたはMattermostの投稿一覧から、リマインドが必要な投稿を判定するアシスタントです。
-以下のいずれかに該当する投稿のみを対象としてください。
-- 期日が設定されている提出物や申請
-- 回答する必要があるもの
-- 避難訓練、建物工事によるインターネット遮断、停電、システムメンテナンスなど、
-  読者が予定を調整したり注意する必要があるアナウンス
-それ以外の雑談・単なる情報共有・お礼・完了報告などは対象外としてください。
-
-入力は投稿のリスト(id, message)を含むJSONです。
-出力は次の形式のJSONオブジェクトのみを返してください。前置きや説明文は不要です。
-{"ids": ["対象となる投稿のidのリスト"]}
-該当する投稿がない場合は {"ids": []} を返してください。
-"""
-
-
 def call_generate_reminder(post_message: str, author_username: str, source_url: str | None = None) -> str:
     """
     投稿内容と投稿者名をもとに、Azure OpenAIでリマインド文章を生成する
@@ -242,37 +226,3 @@ def call_generate_agenda(items: list[dict]) -> str:
         agenda_body = agenda_body.replace(placeholder, url)
 
     return agenda_body
-
-
-def call_filter_reminder_posts(posts: list[dict]) -> set[str]:
-    """
-    投稿一覧から、期日のある提出物・申請や回答が必要な投稿のみをAIで判定し、
-    該当する投稿の id 集合を返す
-
-    Args
-    -----------------
-    - posts: list[dict],  判定対象の投稿一覧 (各要素は "id", "message" を持つ)
-
-    Returns
-    -----------------
-    - ids: set[str],      リマインド対象と判定された投稿idの集合
-
-    """
-    if not posts:
-        return set()
-
-    payload = json.dumps(
-        [{"id": p["id"], "message": p["message"]} for p in posts],
-        ensure_ascii=False,
-    )
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": FILTER_SYSTEM_PROMPT},
-            {"role": "user", "content": payload},
-        ],
-        response_format={"type": "json_object"},
-    )
-    content = response.choices[0].message.content
-    data = json.loads(content)
-    return set(data.get("ids", []))

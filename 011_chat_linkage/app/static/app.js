@@ -57,6 +57,9 @@ const tabBtnGroupsession = document.getElementById("tab-btn-groupsession");
 const tabMattermost      = document.getElementById("tab-mattermost");
 const tabGroupsession    = document.getElementById("tab-groupsession");
 
+const filterStrengthSlider = document.getElementById("filter-strength-slider");
+const filterStrengthValue  = document.getElementById("filter-strength-value");
+
 const gsLoginOpenBtn       = document.getElementById("gs-login-open-btn");
 const gsLoginModalOverlay  = document.getElementById("gs-login-modal-overlay");
 const gsLoginUsernameInput = document.getElementById("gs-login-username");
@@ -209,7 +212,7 @@ async function fetchAndRenderPosts() {
 
   try {
     const res = await fetch(
-      `/api/channels/${encodeURIComponent(channelId)}/posts?start=${start}&end=${end}`
+      `/api/channels/${encodeURIComponent(channelId)}/posts?start=${start}&end=${end}&threshold=${getFilterThreshold()}`
     );
     const data = await res.json();
     if (!res.ok) {
@@ -249,6 +252,15 @@ async function fetchAndRenderPosts() {
 }
 
 fetchPostsBtn.addEventListener("click", fetchAndRenderPosts);
+
+filterStrengthSlider.addEventListener("input", () => {
+  filterStrengthValue.textContent = filterStrengthSlider.value;
+});
+
+/** スライダーで設定されたフィルタ強度(0〜1)を返す */
+function getFilterThreshold() {
+  return filterStrengthSlider.value;
+}
 
 // ============================================================
 // 投稿の選択・詳細表示（リアクション含む）
@@ -523,7 +535,7 @@ async function fetchAndRenderGroupsessionPosts() {
 
   try {
     const res = await fetch(
-      `/api/webpage/announcements?start=${start}&end=${end}`
+      `/api/webpage/announcements?start=${start}&end=${end}&threshold=${getFilterThreshold()}`
     );
     const data = await res.json();
     if (!res.ok) {
@@ -753,10 +765,10 @@ async function fetchAndRenderAgendaPosts() {
     const [mattermostResults, groupsessionRes] = await Promise.all([
       Promise.all(
         agendaChannelIds.map((channelId) =>
-          fetch(`/api/channels/${encodeURIComponent(channelId)}/posts?start=${start}&end=${end}`)
+          fetch(`/api/channels/${encodeURIComponent(channelId)}/posts?start=${start}&end=${end}&threshold=${getFilterThreshold()}`)
         )
       ),
-      fetch(`/api/webpage/announcements?start=${start}&end=${end}`),
+      fetch(`/api/webpage/announcements?start=${start}&end=${end}&threshold=${getFilterThreshold()}`),
     ]);
 
     const mattermostData = [];
