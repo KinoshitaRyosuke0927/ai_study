@@ -169,12 +169,21 @@ DM投稿フォームはこのタブには存在しない。
 
 配布用に `chat_linkage.exe` を作成する手順です。エンドユーザー向けの利用方法は [manual.md](manual.md) を参照してください。
 
-### 1. PyInstaller のインストール
+### 1. 事前準備: 学習済みモデルの用意
+
+`app/model/reminder_classifier/`(投稿の絞り込みモデル)は大容量のため `.gitignore` でgit管理対象外にしている。そのため、リポジトリをcloneした直後はこのフォルダが存在しない。ビルド前に、以下のいずれかの方法でモデルを用意すること。
+
+- すでに学習済みのモデルフォルダを他の環境からコピーする
+- 「フィルタモデル(投稿の絞り込み)」章の手順で `python -m app.model.train_model` を実行し、ローカルで学習する
+
+`app/model/reminder_classifier/config.json` ・`model.safetensors` ・`tokenizer_config.json` ・`vocab.txt` の4ファイルが揃っていることを確認してからビルドに進む(`checkpoints/` は無くてよい)。
+
+### 2. PyInstaller のインストール
 ```bash
 pip install pyinstaller
 ```
 
-### 2. ビルド
+### 3. ビルド
 
 `011_chat_linkage` ディレクトリ直下(`app/` の一つ上の階層)で以下を実行します。
 
@@ -222,9 +231,9 @@ pyinstaller --name chat_linkage `
 
 `torch`・`transformers`本体および学習済みモデル(`model.safetensors`が約425MB)を同梱するため、ビルド成果物は以前(約70MB)より大幅に大きくなります(目安として1GB超)。この節のビルド手順は本ドキュメント更新時点で実機ビルド検証を行っていないため、実際に配布する前に `dist/chat_linkage/chat_linkage.exe` を起動してMattermost・GROUPSESSIONタブの投稿取得(絞り込み)が正常に動作することを必ず確認してください。
 
-### 3. 配布用ファイルの配置
+### 4. 配布用ファイルの配置
 
-`dist/chat_linkage/` フォルダに、exeと同じ階層で以下を追加してください(PyInstallerには同梱されません)。exe化時は `settings.ini` ・`.env` ともに **exeと同じフォルダ** を参照します(開発時は `011_chat_linkage` 直下・ワークスペースルートをそれぞれ参照)。
+ビルドすると `dist/chat_linkage/` フォルダに `chat_linkage.exe` 本体と `_internal/`(依存ライブラリ・学習済みモデルなど)が生成される。この `dist/chat_linkage/` フォルダに、exeと同じ階層で以下を追加する(PyInstallerには同梱されないため手動で配置する)。exe化時は `settings.ini` ・`.env` ともに **exeと同じフォルダ** を参照する(開発時は `011_chat_linkage` 直下・ワークスペースルートをそれぞれ参照)。
 
 - `.env` — Mattermost・GROUPSESSION・GROWIの接続情報に加え、Azure OpenAIの接続情報(`AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_KEY`)も1つのファイルにまとめて配置する
   ```
@@ -248,7 +257,21 @@ pyinstaller --name chat_linkage `
   chat_linkage.exe
   ```
 
-`dist/chat_linkage/` フォルダ一式をzip化して配布してください。エンドユーザー向けの利用手順は [manual.md](manual.md) を参照(または同梱)してください。
+### 5. zip化するフォルダ構成
+
+配布時は、フォルダ名を配布用の名称(例: `ai_reminder`)にリネームしたうえで、以下の構成一式をzip化する。エンドユーザー向けの利用手順は [manual.md](manual.md) を参照(または同梱)。
+
+```
+ai_reminder/                  ← このフォルダごとzip化して配布する(dist/chat_linkage/ をリネーム)
+├── chat_linkage.exe          ... アプリ本体(PyInstallerが生成)
+├── _internal/                ... 依存ライブラリ・学習済みモデル等(PyInstallerが生成。触らない)
+├── .env                      ... 接続情報(手動配置。2-1参照)
+├── settings.ini               ... 対象チャンネル・フォーラム・メンバー等の設定(手動配置。2-2参照)
+├── agenda_template.txt        ... アジェンダのひな形(手動配置)
+└── 起動.bat                   ... 起動用ショートカット(任意、手動配置)
+```
+
+manual.md 内の「1. フォルダ構成」もこの構成と対応しているため、フォルダ名を変更する場合は manual.md 側の記載も合わせて更新すること。
 
 ## 補足
 

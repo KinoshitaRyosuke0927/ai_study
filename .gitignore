@@ -49,5 +49,8 @@ docs/Qiita/appendix/crs_extend_01/project_codes.json
 **/*.pkl
 **/*.joblib
 
+# 011_chat_linkage 投稿絞り込みモデルの重み（大容量。app/model/train_model.py で再生成可能）
+011_chat_linkage/app/model/reminder_classifier/
+
 # CatBoost 学習ログ（自動生成される一時ファイル）
 catboost_info/
