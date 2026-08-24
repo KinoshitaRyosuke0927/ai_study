@@ -13,7 +13,15 @@ from pathlib import Path
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-MODEL_DIR = Path(__file__).resolve().parent / "reminder_classifier"
+# exe化(PyInstaller)時、__file__ は "app/model/" のパッケージ階層を保持したまま
+# _internal 配下に展開されるため、通常のimportモジュールと同じ扱いでは
+# --add-data で配置した "_internal/model/reminder_classifier" と場所がずれる。
+# そのため他のモジュール(mattermost_service.pyの.envパス等)と同様に、
+# frozen時は sys.executable(exeの場所)を基準にパスを組み立てる。
+if getattr(sys, "frozen", False):
+    MODEL_DIR = Path(sys.executable).resolve().parent / "_internal" / "model" / "reminder_classifier"
+else:
+    MODEL_DIR = Path(__file__).resolve().parent / "reminder_classifier"
 MAX_LENGTH = 256
 
 _tokenizer = None

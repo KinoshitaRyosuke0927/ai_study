@@ -1,16 +1,27 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
+
+datas = [('app/static', 'static'), ('app/model/reminder_classifier/config.json', 'model/reminder_classifier'), ('app/model/reminder_classifier/model.safetensors', 'model/reminder_classifier'), ('app/model/reminder_classifier/tokenizer_config.json', 'model/reminder_classifier'), ('app/model/reminder_classifier/vocab.txt', 'model/reminder_classifier')]
+binaries = []
+hiddenimports = ['uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.protocols', 'uvicorn.protocols.http', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets', 'uvicorn.protocols.websockets.auto', 'uvicorn.lifespan', 'uvicorn.lifespan.on']
+tmp_ret = collect_all('transformers')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('fugashi')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('unidic_lite')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
     ['app\\main.py'],
     pathex=['.'],
-    binaries=[],
-    datas=[('app/static', 'static')],
-    hiddenimports=['uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.protocols', 'uvicorn.protocols.http', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets', 'uvicorn.protocols.websockets.auto', 'uvicorn.lifespan', 'uvicorn.lifespan.on'],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['pandas', 'numpy', 'scipy', 'torch', 'torchvision', 'torchaudio', 'sklearn', 'cv2', 'transformers', 'matplotlib'],
+    excludes=['pandas', 'scipy', 'torchvision', 'torchaudio', 'sklearn', 'accelerate', 'cv2', 'matplotlib'],
     noarchive=False,
     optimize=0,
 )

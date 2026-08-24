@@ -224,12 +224,12 @@ pyinstaller --name chat_linkage `
 - `--onedir`(デフォルト): exeと依存ライブラリを同一フォルダに展開する形式でビルドします。`--onefile` は起動のたびに一時フォルダへ全ライブラリを展開するため使用しません。
 - `--paths .`: `app/main.py` が `from app import ...` のように `app` パッケージを絶対importしているため、その親ディレクトリ(カレントディレクトリ)をimport探索パスに追加します。
 - `--add-data "app/static;static"`: フロントエンドの静的ファイルを同梱します。frozen実行時、エントリスクリプト(`app/main.py`)はサブフォルダの階層を保持せずトップレベルスクリプトとして組み込まれるため、`STATIC_DIR`(`app/main.py` の `BASE_DIR / "static"`)と一致させるには同梱先を `app/static` ではなく `static` にする必要があります。
-- `--add-data "app/model/reminder_classifier/...;model/reminder_classifier"`: 投稿の絞り込みに使う学習済みモデルを同梱します(`app/model/predict.py` の `MODEL_DIR` は `app/model/reminder_classifier` を指すため、`app` プレフィックスを外して `model/reminder_classifier` に配置)。推論に不要な `checkpoints/` フォルダ(学習時のみ使用、詳細は「フィルタモデル」章を参照)は同梱しない。
+- `--add-data "app/model/reminder_classifier/...;model/reminder_classifier"`: 投稿の絞り込みに使う学習済みモデルを、`_internal/model/reminder_classifier` に配置します。`app/model/predict.py` の `MODEL_DIR` は、frozen実行時に `sys.executable`(exeの場所)を基準にこのパスを組み立てるようになっているため、`app` プレフィックスを外して `model/reminder_classifier` に配置する必要があります(importされる通常のモジュールは、エントリスクリプトと違い `__file__` が `app/model/predict.py` のようにパッケージ階層を保持したまま解決されるため、他の同梱パス解決処理〈`mattermost_service.py` の `.env` パス等〉と同様に `sys.frozen` 分岐が必要でした)。推論に不要な `checkpoints/` フォルダ(学習時のみ使用、詳細は「フィルタモデル」章を参照)は同梱しない。
 - `--hidden-import uvicorn.*`: uvicornは動的importが多く、PyInstallerの静的解析だけでは検出できないモジュールがあるため明示指定します。
 - `--collect-all transformers` / `fugashi` / `unidic_lite`: これらのパッケージは実行時に動的importするモジュールやデータファイル(`unidic_lite` の辞書データ等)を含み、通常の静的解析だけでは同梱漏れが起きやすいため、パッケージ全体を明示的に収集します。
 - `--exclude-module pandas` 等: `openai` パッケージが(未使用の)CLIファイル検証機能向けに `pandas` を遅延importしており、それを起点に `scipy` / `opencv` / `matplotlib` などPyInstallerの静的解析で不要に巻き込まれるライブラリを除外します。`torch` / `transformers` / `fugashi` / `unidic_lite` は投稿の絞り込みモデルの推論に実際に使用するため除外しません(以前のバージョンではAzure OpenAIのみで絞り込みを行っていたため除外していましたが、ローカルモデル導入に伴い必須の依存になりました)。`scikit-learn` (`sklearn`) と `accelerate` は学習スクリプト(`train_model.py`)専用で、アプリ本体(`main.py`)の実行には不要なため除外します。
 
-`torch`・`transformers`本体および学習済みモデル(`model.safetensors`が約425MB)を同梱するため、ビルド成果物は以前(約70MB)より大幅に大きくなります(目安として1GB超)。この節のビルド手順は本ドキュメント更新時点で実機ビルド検証を行っていないため、実際に配布する前に `dist/chat_linkage/chat_linkage.exe` を起動してMattermost・GROUPSESSIONタブの投稿取得(絞り込み)が正常に動作することを必ず確認してください。
+`torch`・`transformers`本体および学習済みモデル(`model.safetensors`が約425MB)を同梱するため、ビルド成果物は以前(約70MB)より大幅に大きくなります(目安として1GB超)。実際に配布する前に `dist/chat_linkage/chat_linkage.exe` を起動してMattermost・GROUPSESSIONタブの投稿取得(絞り込み)が正常に動作することを必ず確認してください。
 
 ### 4. 配布用ファイルの配置
 
