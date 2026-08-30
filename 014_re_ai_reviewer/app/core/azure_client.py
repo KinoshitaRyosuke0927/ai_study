@@ -28,6 +28,10 @@ AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY", "")
 # テキスト＋画像を扱う既定デプロイ（010_ai_reviewerのレビュー用モデルと共通）
 DEFAULT_MODEL = "gpt-5.4-mini"
 
+# 技術面レビュー（実装利用者・利用シーンを具体的に想像した上での実現可能性評価）は
+# より踏み込んだ推論が必要なため、010_ai_reviewerの想定質問生成と同じ上位モデルを使う
+TECHNICAL_MODEL = "gpt-5.4"
+
 # 画像編集用モデルは、レート制限（RPM）を分散させるため同一モデルを複数デプロイし、
 # リクエストごとに交互に振り分けて疑似的に並列度を上げる（010_ai_reviewerと同じ構成）
 MODEL_NAME_IMAGE_DEPLOYMENTS = ("gpt-image-2", "gpt-image-2-2")

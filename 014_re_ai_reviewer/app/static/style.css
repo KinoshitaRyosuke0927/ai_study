@@ -548,6 +548,32 @@ button:disabled {
   user-select: none;
 }
 
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s;
+  user-select: none;
+}
+
+.lightbox-nav:hover { background: rgba(255, 255, 255, 0.3); }
+.lightbox-nav.hidden { display: none; }
+.lightbox-nav-prev { left: 24px; }
+.lightbox-nav-next { right: 24px; }
+
 .image-spinner {
   position: absolute;
   inset: 0;

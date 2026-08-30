@@ -113,7 +113,9 @@ const downloadSuggestionBtn = document.getElementById("download-suggestion-btn")
 // 修正対象指摘事項選択モーダル
 const suggestSelectionModal      = document.getElementById("suggest-selection-modal");
 const suggestSelectionEmpty      = document.getElementById("suggest-selection-empty");
-const suggestSelectionList       = document.getElementById("suggest-selection-list");
+const suggestSelectionColumns    = document.getElementById("suggest-selection-columns");
+const suggestSelectionListContent = document.getElementById("suggest-selection-list-content");
+const suggestSelectionListDesign  = document.getElementById("suggest-selection-list-design");
 const suggestSelectionCancelBtn  = document.getElementById("suggest-selection-cancel-btn");
 const suggestSelectionRunBtn     = document.getElementById("suggest-selection-run-btn");
 const suggestSelectionMessage    = document.getElementById("suggest-selection-message");
@@ -121,14 +123,28 @@ const suggestSelectionMessage    = document.getElementById("suggest-selection-me
 const rightContent       = document.getElementById("right-content");
 const tabBtns               = document.querySelectorAll(".tab-btn");
 const tabInputEl            = document.getElementById("tab-input");
-const tabFindingsEl         = document.getElementById("tab-findings");
+const tabFindingsContentEl  = document.getElementById("tab-findings-content");
+const tabFindingsDesignEl   = document.getElementById("tab-findings-design");
 const tabSuggestionEl       = document.getElementById("tab-suggestion");
-const findingsPlaceholder   = document.getElementById("findings-placeholder");
-const findingsContent       = document.getElementById("findings-content");
-const findingsOverallSummaryEl = document.getElementById("findings-overall-summary");
-const findingsSlideLabel    = document.getElementById("findings-slide-label");
-const findingsSlideImg      = document.getElementById("findings-slide-img");
-const findingsSlideBody     = document.getElementById("findings-slide-body");
+// 指摘事項タブ（内容／デザイン）— aspect ("content" | "design") をキーにDOM参照をまとめる
+const findingsTabs = {
+  content: {
+    placeholder: document.getElementById("findings-content-placeholder"),
+    bodyWrap: document.getElementById("findings-content-body-wrap"),
+    overallSummary: document.getElementById("findings-content-overall-summary"),
+    slideLabel: document.getElementById("findings-content-slide-label"),
+    slideImg: document.getElementById("findings-content-slide-img"),
+    slideBody: document.getElementById("findings-content-slide-body"),
+  },
+  design: {
+    placeholder: document.getElementById("findings-design-placeholder"),
+    bodyWrap: document.getElementById("findings-design-body-wrap"),
+    overallSummary: document.getElementById("findings-design-overall-summary"),
+    slideLabel: document.getElementById("findings-design-slide-label"),
+    slideImg: document.getElementById("findings-design-slide-img"),
+    slideBody: document.getElementById("findings-design-slide-body"),
+  },
+};
 const suggestionPlaceholder = document.getElementById("suggestion-placeholder");
 const suggestionContent     = document.getElementById("suggestion-content");
 const suggestionSlideLabel  = document.getElementById("suggestion-slide-label");
@@ -156,7 +172,7 @@ let selectedSlide     = null;      // 現在選択中のスライド番号（1�
 let perSlideMessages  = {};        // slideNum -> string
 let findingsData             = null; // APIから返ってきた指摘事項（Finding[]）
 let suggestionBySlide        = {};   // slide_number -> 修正方針テキスト（またはエラー情報）
-let activeTab                = "input"; // "input" | "findings" | "suggestion"
+let activeTab                = "input"; // "input" | "findings-content" | "findings-design" | "suggestion"
 let suggestInProgress        = false; // 修正方針提案のストリーミング処理中かどうか
 
 // ============================================================
@@ -239,8 +255,10 @@ uploadBtn.addEventListener("click", async () => {
     overallSection.classList.remove("hidden");
     slideListSection.classList.remove("hidden");
     reviewAction.classList.remove("hidden");
-    if (findingsPlaceholder) findingsPlaceholder.classList.remove("hidden");
-    if (findingsContent) findingsContent.classList.add("hidden");
+    Object.values(findingsTabs).forEach((tab) => {
+      tab.placeholder.classList.remove("hidden");
+      tab.bodyWrap.classList.add("hidden");
+    });
     if (suggestionPlaceholder) suggestionPlaceholder.classList.remove("hidden");
     if (suggestionContent) suggestionContent.classList.add("hidden");
 
@@ -359,7 +377,8 @@ tabBtns.forEach((btn) => {
     tabBtns.forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     tabInputEl.classList.toggle("hidden", activeTab !== "input");
-    tabFindingsEl.classList.toggle("hidden", activeTab !== "findings");
+    tabFindingsContentEl.classList.toggle("hidden", activeTab !== "findings-content");
+    tabFindingsDesignEl.classList.toggle("hidden", activeTab !== "findings-design");
     tabSuggestionEl.classList.toggle("hidden", activeTab !== "suggestion");
     refreshRightPanel();
   });
@@ -372,8 +391,10 @@ tabBtns.forEach((btn) => {
 function refreshRightPanel() {
   if (activeTab === "input") {
     if (selectedSlide) renderInputTab(selectedSlide);
-  } else if (activeTab === "findings") {
-    if (selectedSlide) renderFindingsTab(selectedSlide);
+  } else if (activeTab === "findings-content") {
+    if (selectedSlide) renderFindingsTab("content", selectedSlide);
+  } else if (activeTab === "findings-design") {
+    if (selectedSlide) renderFindingsTab("design", selectedSlide);
   } else if (activeTab === "suggestion") {
     if (selectedSlide) renderSuggestionTab(selectedSlide);
   }
@@ -394,26 +415,32 @@ function renderInputTab(num) {
 }
 
 // ============================================================
-// 指摘事項タブ — スライドごとの指摘カード
+// 指摘事項タブ（内容／デザイン） — スライドごとの指摘カード
 // ============================================================
 
 const SEVERITY_LABELS = { blocker: "blocker", high: "high", medium: "medium", low: "low" };
+const ASPECT_LABELS = { content: "内容", design: "デザイン" };
 
-function renderFindingsTab(num) {
+function findingsByAspect(aspect) {
+  return (findingsData || []).filter((f) => f.aspect === aspect);
+}
+
+function renderFindingsTab(aspect, num) {
+  const dom = findingsTabs[aspect];
   const src  = slidePngs[num - 1] || thumbnails[num - 1];
   const mime = slidePngs[num - 1] ? "image/png" : thumbnailMime;
-  findingsSlideLabel.textContent = `スライド ${num}`;
-  findingsSlideImg.src = src ? `data:${mime};base64,${src}` : "";
-  findingsSlideImg.alt = `スライド ${num}`;
+  dom.slideLabel.textContent = `スライド ${num}`;
+  dom.slideImg.src = src ? `data:${mime};base64,${src}` : "";
+  dom.slideImg.alt = `スライド ${num}`;
 
-  const slideFindings = (findingsData || []).filter((f) => f.slide_number === num);
+  const slideFindings = findingsByAspect(aspect).filter((f) => f.slide_number === num);
 
   if (slideFindings.length === 0) {
-    findingsSlideBody.innerHTML = `<div class="good-point">このスライドに指摘事項はありませんでした。</div>`;
+    dom.slideBody.innerHTML = `<div class="good-point">このスライドに${ASPECT_LABELS[aspect]}面の指摘事項はありませんでした。</div>`;
     return;
   }
 
-  findingsSlideBody.innerHTML = `
+  dom.slideBody.innerHTML = `
     <div class="review-section-block">
       <div class="review-section-label">指摘事項（${slideFindings.length}件）</div>
       ${slideFindings.map(renderFindingCard).join("")}
@@ -422,13 +449,17 @@ function renderFindingsTab(num) {
 }
 
 function renderFindingCard(f) {
-  const likeness = Math.round((f.manager_likeness || 0) * 100);
+  // デザイン観点は上司嗜好スコアリングを行っていないため manager_likeness が null になる。
+  // その場合は「上司らしさ」バッジを表示せず、severity のみ表示する。
+  const likenessBadge = f.manager_likeness != null
+    ? `<span>上司らしさ ${Math.round(f.manager_likeness * 100)}%</span>`
+    : "";
   return `
     <div class="review-item severity-${f.severity}">
       <div class="review-item-title">
         <span class="tag severity-${f.severity}">${escHtml(SEVERITY_LABELS[f.severity] || f.severity)}</span>
         ${f.category ? `<span>${escHtml(f.category)}</span>` : ""}
-        <span>上司らしさ ${likeness}%</span>
+        ${likenessBadge}
       </div>
       <p>${escHtml(f.issue)}</p>
       <ul>
@@ -440,14 +471,16 @@ function renderFindingCard(f) {
   `;
 }
 
-function renderOverallFindingsSummary(findings) {
+function renderOverallFindingsSummary(aspect) {
+  const dom = findingsTabs[aspect];
+  const findings = findingsByAspect(aspect);
   const counts = { blocker: 0, high: 0, medium: 0, low: 0 };
   findings.forEach((f) => {
     if (f.severity in counts) counts[f.severity] += 1;
   });
 
-  findingsOverallSummaryEl.innerHTML = `
-    <p>資料全体で ${findings.length} 件の指摘事項が見つかりました。</p>
+  dom.overallSummary.innerHTML = `
+    <p>資料全体で ${findings.length} 件の${ASPECT_LABELS[aspect]}面の指摘事項が見つかりました。</p>
     <div class="tag-list">
       <span class="tag severity-blocker">blocker ${counts.blocker}</span>
       <span class="tag severity-high">high ${counts.high}</span>
@@ -456,8 +489,8 @@ function renderOverallFindingsSummary(findings) {
     </div>
   `;
 
-  findingsPlaceholder.classList.add("hidden");
-  findingsContent.classList.remove("hidden");
+  dom.placeholder.classList.add("hidden");
+  dom.bodyWrap.classList.remove("hidden");
 }
 
 // ============================================================
@@ -570,14 +603,16 @@ reviewBtn.addEventListener("click", async () => {
 
     showMessage(reviewMessage, `レビューが完了しました（${findingsData.length}件の指摘）`, "success");
 
-    // 指摘事項タブに切り替えて結果を表示
-    activeTab = "findings";
-    tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "findings"));
+    // 指摘事項タブ（内容）に切り替えて結果を表示
+    activeTab = "findings-content";
+    tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "findings-content"));
     tabInputEl.classList.add("hidden");
-    tabFindingsEl.classList.remove("hidden");
+    tabFindingsContentEl.classList.remove("hidden");
+    tabFindingsDesignEl.classList.add("hidden");
     tabSuggestionEl.classList.add("hidden");
 
-    renderOverallFindingsSummary(findingsData);
+    renderOverallFindingsSummary("content");
+    renderOverallFindingsSummary("design");
 
     selectSlide(1);
   } catch (err) {
@@ -648,7 +683,8 @@ async function runSuggestionProcess(findings) {
   activeTab = "suggestion";
   tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "suggestion"));
   tabInputEl.classList.add("hidden");
-  tabFindingsEl.classList.add("hidden");
+  tabFindingsContentEl.classList.add("hidden");
+  tabFindingsDesignEl.classList.add("hidden");
   tabSuggestionEl.classList.remove("hidden");
   suggestionPlaceholder.classList.add("hidden");
   suggestionContent.classList.remove("hidden");
@@ -727,7 +763,7 @@ async function runSuggestionProcess(findings) {
 // 修正対象指摘事項選択モーダル
 // ============================================================
 
-let suggestFindingItems = []; // { id, slide_number, text, checked, finding }
+let suggestFindingItems = []; // { id, slide_number, aspect, text, checked, finding }
 
 function groupFindingsBySlide(items) {
   const groups = [];
@@ -776,10 +812,11 @@ function wireCheckboxGroupToggles(containerEl, onItemToggle) {
   });
 }
 
-function renderSuggestSelectionList() {
-  const groups = groupFindingsBySlide(suggestFindingItems);
+// 1列分（内容 or デザイン）の指摘一覧を、スライドごとにグルーピングして描画する
+function renderSuggestSelectionColumn(containerEl, items) {
+  const groups = groupFindingsBySlide(items);
 
-  suggestSelectionList.innerHTML = groups.map((group) => {
+  containerEl.innerHTML = groups.map((group) => {
     const rows = group.items.map((item) => {
       const checkboxId = `suggest-finding-${item.id}`;
       return `
@@ -800,11 +837,17 @@ function renderSuggestSelectionList() {
     `;
   }).join("");
 
-  wireCheckboxGroupToggles(suggestSelectionList, (checkbox) => {
+  wireCheckboxGroupToggles(containerEl, (checkbox) => {
     const id = Number(checkbox.dataset.id);
     const item = suggestFindingItems.find((i) => i.id === id);
     if (item) item.checked = checkbox.checked;
   });
+}
+
+// 資料の内容に関する指摘・デザインに関する指摘を左右2列に分けて描画する
+function renderSuggestSelectionList() {
+  renderSuggestSelectionColumn(suggestSelectionListContent, suggestFindingItems.filter((i) => i.aspect === "content"));
+  renderSuggestSelectionColumn(suggestSelectionListDesign, suggestFindingItems.filter((i) => i.aspect === "design"));
 }
 
 function buildFilteredFindingsFromSelection() {
@@ -816,6 +859,7 @@ function openSuggestSelectionModal(findings) {
   suggestFindingItems = findings.map((f, i) => ({
     id: i,
     slide_number: f.slide_number,
+    aspect: f.aspect,
     text: f.issue,
     checked: true,
     finding: f,
@@ -823,11 +867,11 @@ function openSuggestSelectionModal(findings) {
   suggestSelectionModal.classList.remove("hidden");
 
   if (suggestFindingItems.length === 0) {
-    suggestSelectionList.classList.add("hidden");
+    suggestSelectionColumns.classList.add("hidden");
     suggestSelectionEmpty.classList.remove("hidden");
   } else {
     suggestSelectionEmpty.classList.add("hidden");
-    suggestSelectionList.classList.remove("hidden");
+    suggestSelectionColumns.classList.remove("hidden");
     renderSuggestSelectionList();
   }
 }
@@ -874,11 +918,12 @@ function markdownTableEscape(value) {
 downloadFindingsBtn.addEventListener("click", () => {
   if (!findingsData || findingsData.length === 0) return;
 
-  const lines = ["| No | スライド | カテゴリ | severity | 上司らしさ | 指摘事項 | 根拠 | 修正提案 |", "| --- | --- | --- | --- | --- | --- | --- | --- |"];
+  const lines = ["| No | 観点 | スライド | カテゴリ | severity | 上司らしさ | 指摘事項 | 根拠 | 修正提案 |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"];
   findingsData.forEach((f, i) => {
+    const likeness = f.manager_likeness != null ? `${Math.round(f.manager_likeness * 100)}%` : "-";
     lines.push(
-      `| ${i + 1} | ${f.slide_number} | ${markdownTableEscape(f.category)} | ${markdownTableEscape(f.severity)} | ` +
-      `${Math.round((f.manager_likeness || 0) * 100)}% | ${markdownTableEscape(f.issue)} | ${markdownTableEscape(f.evidence)} | ${markdownTableEscape(f.suggestion)} |`
+      `| ${i + 1} | ${escHtml(ASPECT_LABELS[f.aspect] || f.aspect)} | ${f.slide_number} | ${markdownTableEscape(f.category)} | ${markdownTableEscape(f.severity)} | ` +
+      `${likeness} | ${markdownTableEscape(f.issue)} | ${markdownTableEscape(f.evidence)} | ${markdownTableEscape(f.suggestion)} |`
     );
   });
 
@@ -946,37 +991,119 @@ downloadSuggestionBtn.addEventListener("click", async () => {
 });
 
 // ============================================================
-// スライド画像拡大表示（ライトボックス）
+// スライド画像拡大表示（ライトボックス） — 010_ai_reviewerと同様、拡大表示のまま前後スライドに移動できる
 // ============================================================
 
 const imageLightboxModal = document.getElementById("image-lightbox-modal");
 const imageLightboxImg   = document.getElementById("image-lightbox-img");
 const imageLightboxClose = document.getElementById("image-lightbox-close");
+const imageLightboxPrev  = document.getElementById("image-lightbox-prev");
+const imageLightboxNext  = document.getElementById("image-lightbox-next");
 
-function openImageLightbox(src, alt) {
-  if (!src) return;
-  imageLightboxImg.src = src;
-  imageLightboxImg.alt = alt || "";
+let lightboxSequence = [];  // { slideNum, variant, src, alt } の配列（開いた時点のタブに応じて構築）
+let lightboxIndex    = -1;
+
+// kind: "slide"（伝えたいこと・指摘事項タブ用、スライド1枚のみ） / "suggestion"（修正方針タブ用、修正前後を含む）
+function buildLightboxSequence(kind) {
+  const seq = [];
+  if (kind === "slide") {
+    for (let i = 1; i <= slideCount; i++) {
+      const src  = slidePngs[i - 1] || thumbnails[i - 1];
+      const mime = slidePngs[i - 1] ? "image/png" : thumbnailMime;
+      if (!src) continue;
+      seq.push({ slideNum: i, variant: "single", src: `data:${mime};base64,${src}`, alt: `スライド ${i}` });
+    }
+  } else if (kind === "suggestion") {
+    for (let i = 1; i <= slideCount; i++) {
+      const beforeSrc  = slidePngs[i - 1] || thumbnails[i - 1];
+      const beforeMime = slidePngs[i - 1] ? "image/png" : thumbnailMime;
+      if (beforeSrc) {
+        seq.push({ slideNum: i, variant: "before", src: `data:${beforeMime};base64,${beforeSrc}`, alt: `スライド ${i} 修正前` });
+      }
+      const data = suggestionBySlide[i];
+      if (data && data.edited_image_b64) {
+        seq.push({ slideNum: i, variant: "after", src: `data:image/png;base64,${data.edited_image_b64}`, alt: `スライド ${i} 修正後` });
+      }
+    }
+  }
+  return seq;
+}
+
+function showLightboxFrame() {
+  const item = lightboxSequence[lightboxIndex];
+  if (!item) return;
+  imageLightboxImg.src = item.src;
+  imageLightboxImg.alt = item.alt;
+  imageLightboxPrev.classList.toggle("hidden", lightboxIndex <= 0);
+  imageLightboxNext.classList.toggle("hidden", lightboxIndex >= lightboxSequence.length - 1);
+  // 背後の画面も、拡大表示で移動した先のスライドに連動させる
+  if (item.slideNum !== selectedSlide) selectSlide(item.slideNum);
+}
+
+function lightboxPrev() {
+  if (lightboxIndex > 0) {
+    lightboxIndex -= 1;
+    showLightboxFrame();
+  }
+}
+
+function lightboxNext() {
+  if (lightboxIndex < lightboxSequence.length - 1) {
+    lightboxIndex += 1;
+    showLightboxFrame();
+  }
+}
+
+// kind/slideNum/variant から該当する画像を探して拡大表示する
+function openImageLightbox(kind, slideNum, variant) {
+  const seq = buildLightboxSequence(kind);
+  const idx = seq.findIndex((item) => item.slideNum === slideNum && item.variant === variant);
+  if (idx === -1) return;
+  lightboxSequence = seq;
+  lightboxIndex = idx;
+  showLightboxFrame();
   imageLightboxModal.classList.remove("hidden");
 }
 
 function closeImageLightbox() {
   imageLightboxModal.classList.add("hidden");
   imageLightboxImg.src = "";
+  lightboxSequence = [];
+  lightboxIndex = -1;
 }
 
-document.querySelectorAll(".slide-image-wrap img").forEach((img) => {
-  img.addEventListener("click", () => {
-    if (!img.getAttribute("src") || img.classList.contains("hidden")) return;
-    openImageLightbox(img.src, img.alt);
-  });
+// スライド画像エリア（伝えたいこと / 指摘事項（内容・デザイン） / 修正方針の各タブ）のクリックで拡大表示
+slidePreviewImg.addEventListener("click", () => {
+  if (!slidePreviewImg.getAttribute("src")) return;
+  openImageLightbox("slide", selectedSlide, "single");
+});
+findingsTabs.content.slideImg.addEventListener("click", () => {
+  if (!findingsTabs.content.slideImg.getAttribute("src")) return;
+  openImageLightbox("slide", selectedSlide, "single");
+});
+findingsTabs.design.slideImg.addEventListener("click", () => {
+  if (!findingsTabs.design.slideImg.getAttribute("src")) return;
+  openImageLightbox("slide", selectedSlide, "single");
+});
+suggestionBeforeImg.addEventListener("click", () => {
+  if (!suggestionBeforeImg.getAttribute("src")) return;
+  openImageLightbox("suggestion", selectedSlide, "before");
+});
+suggestionAfterImg.addEventListener("click", () => {
+  if (!suggestionAfterImg.getAttribute("src") || suggestionAfterImg.classList.contains("hidden")) return;
+  openImageLightbox("suggestion", selectedSlide, "after");
 });
 
-imageLightboxModal.addEventListener("click", closeImageLightbox);
+imageLightboxModal.addEventListener("click", (e) => {
+  if (e.target === imageLightboxModal) closeImageLightbox();
+});
 imageLightboxClose.addEventListener("click", closeImageLightbox);
+imageLightboxPrev.addEventListener("click", lightboxPrev);
+imageLightboxNext.addEventListener("click", lightboxNext);
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !imageLightboxModal.classList.contains("hidden")) {
-    closeImageLightbox();
-  }
+  if (imageLightboxModal.classList.contains("hidden")) return;
+  if (e.key === "Escape") closeImageLightbox();
+  else if (e.key === "ArrowLeft") lightboxPrev();
+  else if (e.key === "ArrowRight") lightboxNext();
 });

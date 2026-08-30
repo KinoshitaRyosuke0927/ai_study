@@ -31,8 +31,10 @@ class Finding(BaseModel):
     issue: str
     evidence: str = ""
     category: str = ""
+    aspect: str = "content"  # "content"（資料の内容）または "design"（資料のデザイン）
     severity: str = "medium"
-    manager_likeness: float = 0.5
+    # デザイン観点は上司嗜好スコアリングを行わないため manager_likeness は None になる
+    manager_likeness: float | None = None
     confidence: float = 0.5
     verdict: str = "keep"  # keep / drop
     critic_comment: str = ""

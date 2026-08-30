@@ -69,7 +69,8 @@
           <!-- タブバー -->
           <div class="tab-bar">
             <button class="tab-btn active" data-tab="input">伝えたいこと</button>
-            <button class="tab-btn" data-tab="findings">指摘事項</button>
+            <button class="tab-btn" data-tab="findings-content">指摘事項（内容）</button>
+            <button class="tab-btn" data-tab="findings-design">指摘事項（デザイン）</button>
             <button class="tab-btn" data-tab="suggestion">修正方針</button>
           </div>
 
@@ -90,18 +91,33 @@
             </div>
           </div>
 
-          <!-- 指摘事項タブ -->
-          <div id="tab-findings" class="tab-content hidden">
-            <div id="findings-placeholder" class="placeholder-text">
+          <!-- 指摘事項タブ（内容） -->
+          <div id="tab-findings-content" class="tab-content hidden">
+            <div id="findings-content-placeholder" class="placeholder-text">
               「AIレビューを実行」すると結果が表示されます
             </div>
-            <div id="findings-content" class="hidden">
-              <div class="summary-alignment" id="findings-overall-summary"></div>
-              <div class="slide-panel-label" id="findings-slide-label">スライド 1</div>
+            <div id="findings-content-body-wrap" class="hidden">
+              <div class="summary-alignment" id="findings-content-overall-summary"></div>
+              <div class="slide-panel-label" id="findings-content-slide-label">スライド 1</div>
               <div class="slide-image-wrap">
-                <img id="findings-slide-img" src="" alt="">
+                <img id="findings-content-slide-img" src="" alt="">
               </div>
-              <div id="findings-slide-body"></div>
+              <div id="findings-content-slide-body"></div>
+            </div>
+          </div>
+
+          <!-- 指摘事項タブ（デザイン） -->
+          <div id="tab-findings-design" class="tab-content hidden">
+            <div id="findings-design-placeholder" class="placeholder-text">
+              「AIレビューを実行」すると結果が表示されます
+            </div>
+            <div id="findings-design-body-wrap" class="hidden">
+              <div class="summary-alignment" id="findings-design-overall-summary"></div>
+              <div class="slide-panel-label" id="findings-design-slide-label">スライド 1</div>
+              <div class="slide-image-wrap">
+                <img id="findings-design-slide-img" src="" alt="">
+              </div>
+              <div id="findings-design-slide-body"></div>
             </div>
           </div>
 
@@ -149,7 +165,16 @@
       </div>
       <p class="hint-text">チェックを入れた指摘事項のみ、修正方針の提案に反映されます。</p>
       <div id="suggest-selection-empty" class="placeholder-text hidden">指摘事項がありません。</div>
-      <div id="suggest-selection-list" class="review-point-list review-point-list-standalone"></div>
+      <div id="suggest-selection-columns" class="review-point-columns">
+        <div class="review-point-column">
+          <div class="review-point-column-title">資料の内容に関する指摘</div>
+          <div id="suggest-selection-list-content" class="review-point-list"></div>
+        </div>
+        <div class="review-point-column">
+          <div class="review-point-column-title">資料のデザインに関する指摘</div>
+          <div id="suggest-selection-list-design" class="review-point-list"></div>
+        </div>
+      </div>
       <div class="modal-footer">
         <div id="suggest-selection-message" class="message hidden"></div>
         <div class="modal-footer-buttons">
@@ -163,7 +188,9 @@
   <!-- ========== スライド画像拡大表示モーダル ========== -->
   <div id="image-lightbox-modal" class="modal-overlay lightbox-overlay hidden">
     <span id="image-lightbox-close" class="lightbox-close">&times;</span>
+    <button id="image-lightbox-prev" class="lightbox-nav lightbox-nav-prev" aria-label="前のスライド">&#10094;</button>
     <img id="image-lightbox-img" class="lightbox-img" src="" alt="">
+    <button id="image-lightbox-next" class="lightbox-nav lightbox-nav-next" aria-label="次のスライド">&#10095;</button>
   </div>
 
   <script src="/static/app.js"></script>

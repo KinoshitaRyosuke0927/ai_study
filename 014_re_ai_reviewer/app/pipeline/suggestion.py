@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from app.core.azure_client import call_image_edit, call_structured
 from app.prompts.suggestion_prompts import (
     LAYOUT_GUIDANCE_SUFFIX,
+    NATURALNESS_GUIDANCE_SUFFIX,
     build_change_description_prompt_package,
     build_findings_text_by_slide,
     build_slide_edit_plan_prompt_package,
@@ -57,7 +58,7 @@ def _suggest_revision_for_slide(slide: dict, edit_instruction: str) -> dict:
     slide_number = slide["slide_number"]
     original_image_b64 = slide["image_png_b64"]
 
-    edit_instruction = f"{edit_instruction}\n{LAYOUT_GUIDANCE_SUFFIX}"
+    edit_instruction = f"{edit_instruction}\n{LAYOUT_GUIDANCE_SUFFIX}\n{NATURALNESS_GUIDANCE_SUFFIX}"
 
     edited_image_bytes = call_image_edit(edit_instruction, base64.b64decode(original_image_b64))
     edited_image_b64 = base64.b64encode(edited_image_bytes).decode()
