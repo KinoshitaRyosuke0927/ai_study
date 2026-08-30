@@ -1,0 +1,16 @@
+# Azure Functions dependencies only.
+# Not included in PyInstaller's requirements.txt (011_chat_linkage/requirements.txt) on purpose.
+# The web UI (fastapi/pydantic) is intentionally excluded; it is exe-distribution only.
+# Note: keep this file plain ASCII -- pip's requirements parser can fail to decode
+# non-ASCII comments on some locales (observed UnicodeDecodeError with cp932).
+azure-functions
+azure-storage-blob
+requests
+python-dotenv
+openai>=1.0.0
+transformers>=4.40.0
+accelerate>=1.1.0
+scikit-learn>=1.4.0
+fugashi>=1.3.0
+unidic-lite>=1.0.8
+sentencepiece>=0.2.0

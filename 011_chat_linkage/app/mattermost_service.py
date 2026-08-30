@@ -60,11 +60,27 @@ def post_message(channel_id: str, message: str, root_id: str | None = None) -> N
     _post("/api/v4/posts", body)
 
 
+def get_direct_channel_id_by_username(username: str) -> str:
+    """
+    自分と指定ユーザーとのDMチャンネルIDを取得する(未作成の場合はMattermost側が自動作成する)
+
+    Args
+    -----------------
+    - username: str,   DM相手のユーザー名
+
+    Returns
+    -----------------
+    - channel_id: str, DMチャンネルのID
+
+    """
+    my_id = get_my_user_id()
+    target_id = get_user_id_by_username(username)
+    return get_or_create_direct_channel(my_id, target_id)
+
+
 def post_dm_to_target(message: str, target_username: str) -> None:
     """DM送信先(target_username)にメッセージを投稿する。"""
-    my_id = get_my_user_id()
-    target_id = get_user_id_by_username(target_username)
-    channel_id = get_or_create_direct_channel(my_id, target_id)
+    channel_id = get_direct_channel_id_by_username(target_username)
     post_message(channel_id, message)
 
 
@@ -150,11 +166,18 @@ def get_channel_posts_in_range(channel_id: str, start_ts_ms: int, end_ts_ms: int
     usernames = get_usernames_by_ids([p["user_id"] for p in collected])
 
     channel = get_channel(channel_id)
-    team_name = get_team(channel["team_id"])["name"]
+    # DM・グループDMチャンネルは team_id が空文字になり get_team() が404になるため、
+    # パーマリンク構築用に自分が参加している(どれか1つの)チームの名前で代用する
+    if channel.get("team_id"):
+        team_name = get_team(channel["team_id"])["name"]
+    else:
+        my_teams = get_my_teams()
+        team_name = my_teams[0]["name"] if my_teams else ""
 
     return [
         {
             "id": p["id"],
+            "channel_id": channel_id,
             "username": usernames.get(p["user_id"], p["user_id"]),
             "message": p["message"],
             "create_at": p["create_at"],

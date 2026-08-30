@@ -4,8 +4,6 @@
 
 from __future__ import annotations
 
-import configparser
-import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -15,54 +13,16 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import requests
 
+from app import agenda_service
 from app import groupsession_service as gs
 from app import growi_service as growi
 from app import mattermost_service as mm
-from app.azure_ai_service import call_generate_agenda, call_generate_reminder
-from app.model.predict import predict_reminder_scores
-
-# リマインド作成時に、リアクション済みとみなす絵文字名
-REMINDER_DONE_EMOJI = "sumi"
+from app import reminder_service
+from app.azure_ai_service import call_generate_reminder
+from app.settings_loader import load_settings
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
-# settings.ini・agenda_template.txt はユーザーが編集する運用のため、
-# exe化(frozen)時はexeと同じ階層を参照する
-if getattr(sys, "frozen", False):
-    SETTINGS_PATH = Path(sys.executable).resolve().parent / "settings.ini"
-    AGENDA_TEMPLATE_PATH = Path(sys.executable).resolve().parent / "agenda_template.txt"
-else:
-    SETTINGS_PATH = BASE_DIR.parent / "settings.ini"
-    AGENDA_TEMPLATE_PATH = BASE_DIR.parent / "agenda_template.txt"
-
-
-def load_settings() -> dict:
-    """settings.ini を読み込んで辞書で返す。ファイルがない場合は空辞書"""
-    config = configparser.ConfigParser()
-    if not SETTINGS_PATH.exists():
-        print("[警告] settings.ini が見つかりません。画面からの手動選択が必要です。")
-        return {}
-    config.read(SETTINGS_PATH, encoding="utf-8")
-    members_raw = config.get("channel_users", "members", fallback="")
-    members = [m.strip() for m in members_raw.split(",") if m.strip()]
-    remind_channels_raw = config.get("groupsession", "remind_channel", fallback="")
-    remind_channels = [c.strip() for c in remind_channels_raw.split(",") if c.strip()]
-    agenda_channels_raw = config.get("growi", "channel_list", fallback="")
-    agenda_channels = [c.strip() for c in agenda_channels_raw.split(",") if c.strip()]
-    forum_sids_raw = config.get("groupsession", "forum_sid", fallback="")
-    forum_sids = [int(s.strip()) for s in forum_sids_raw.split(",") if s.strip()]
-    return {
-        "channel": config.get("history", "channel", fallback=""),
-        "read_date": config.getint("history", "read_date", fallback=30),
-        "members": members,
-        "groupsession_forum_sids": forum_sids,
-        "groupsession_read_date": config.getint("groupsession", "read_date", fallback=30),
-        "groupsession_remind_channels": remind_channels,
-        "agenda_mattermost_channels": agenda_channels,
-        "growi_root_path": config.get("growi", "root_path", fallback=""),
-        "mattermost_target_username": config.get("mattermost", "target_username", fallback=""),
-    }
-
 
 SETTINGS = load_settings()
 
@@ -114,15 +74,6 @@ def date_str_to_epoch_ms(date_str: str, end_of_day: bool = False) -> int:
     if end_of_day:
         dt = dt + timedelta(days=1) - timedelta(milliseconds=1)
     return int(dt.timestamp() * 1000)
-
-
-def filter_posts_by_reminder_score(posts: list[dict], threshold: float) -> list[dict]:
-    """学習済みモデルで各投稿のリマインド必要度をスコアリングし、
-    フィルタ強度(threshold)以上のスコアを持つ投稿のみを返す。"""
-    if not posts:
-        return []
-    scores = predict_reminder_scores([p["message"] for p in posts])
-    return [post for post, score in zip(posts, scores) if score >= threshold]
 
 
 @app.get("/")
@@ -203,7 +154,7 @@ def get_channel_posts(channel_id: str, start: str, end: str, threshold: float = 
         raise HTTPException(status_code=502, detail=f"Mattermost APIエラー: {exc}") from exc
 
     try:
-        return filter_posts_by_reminder_score(posts, threshold)
+        return agenda_service.filter_posts_by_reminder_score(posts, threshold)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"モデルによる投稿の絞り込みに失敗しました: {exc}") from exc
 
@@ -239,7 +190,7 @@ def get_webpage_announcements(start: str, end: str, threshold: float = 0.9) -> l
         raise HTTPException(status_code=502, detail=f"GROUPSESSIONへのアクセスに失敗しました: {exc}") from exc
 
     try:
-        return filter_posts_by_reminder_score(posts, threshold)
+        return agenda_service.filter_posts_by_reminder_score(posts, threshold)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"モデルによる投稿の絞り込みに失敗しました: {exc}") from exc
 
@@ -268,15 +219,9 @@ def post_reminder(request: ReminderRequest) -> dict:
     members = SETTINGS.get("members", [])
     if request.source == "mattermost" and request.post_id:
         try:
-            reactions = mm.get_post_reactions(request.post_id)
+            mention_line = reminder_service.build_mention_line(request.post_id, members)
         except requests.HTTPError as exc:
             raise HTTPException(status_code=502, detail=f"Mattermost APIエラー: {exc}") from exc
-
-        reacted_usernames = {
-            r["username"] for r in reactions if r["emoji_name"] == REMINDER_DONE_EMOJI
-        }
-        mention_targets = [m for m in members if m not in reacted_usernames]
-        mention_line = " ".join(f"@{m}" for m in mention_targets)
     else:
         # Web記事にはリアクションの概念がないため、メンバー全員をメンション対象とする
         mention_line = "@channel"
@@ -292,23 +237,11 @@ def post_agenda(request: AgendaRequest) -> dict:
         raise HTTPException(status_code=400, detail="アジェンダに含める投稿・記事が選択されていません")
 
     try:
-        agenda_body = call_generate_agenda([item.model_dump() for item in request.items])
+        agenda = agenda_service.render_agenda_document([item.model_dump() for item in request.items])
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AIによるアジェンダ生成に失敗しました: {exc}") from exc
-
-    if not AGENDA_TEMPLATE_PATH.exists():
-        raise HTTPException(
-            status_code=400,
-            detail=f"アジェンダのひな形ファイルが見つかりません({AGENDA_TEMPLATE_PATH.name})",
-        )
-
-    now = datetime.now()
-    template = AGENDA_TEMPLATE_PATH.read_text(encoding="utf-8")
-    agenda = (
-        template.replace("{{YEAR}}", str(now.year))
-        .replace("{{MONTH}}", str(now.month))
-        .replace("{{AGENDA_BODY}}", agenda_body)
-    )
 
     return {"agenda": agenda}
 
@@ -319,14 +252,12 @@ def publish_agenda(request: AgendaPublishRequest) -> dict:
     if not agenda:
         raise HTTPException(status_code=400, detail="公開するアジェンダがありません")
 
-    root_path = SETTINGS.get("growi_root_path", "")
-    if not root_path:
-        raise HTTPException(status_code=400, detail="settings.iniにgrowiのroot_pathが設定されていません")
-
     grant = growi.PAGE_GRANT_ONLY_ME if request.grant == "only_me" else growi.PAGE_GRANT_PUBLIC
 
     try:
-        result = growi.publish_agenda(root_path, request.year, request.month, agenda, grant)
+        result = agenda_service.publish_agenda_document(SETTINGS, agenda, request.year, request.month, grant)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except requests.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"GROWIへの公開に失敗しました: {exc}") from exc
 

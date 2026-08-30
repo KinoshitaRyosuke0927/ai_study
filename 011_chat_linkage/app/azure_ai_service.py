@@ -145,6 +145,36 @@ GROUPSESSION記事へのリンク先を表すプレースホルダー文字列�
 ```
 """
 
+REMINDER_SUMMARY_SYSTEM_PROMPT = """
+あなたはMattermostの投稿内容を、リマインド一覧表に載せるための要約を作成するアシスタントです。
+与えられた投稿内容を読み、締め切り・提出先など重要な情報は省略せず、1文程度で簡潔に要約して
+ください。前置きや説明文、記号による装飾は付けず、要約文のみを出力してください。
+"""
+
+
+def call_summarize_post_for_reminder(post_message: str) -> str:
+    """
+    投稿内容を、リマインド一覧表用に1文程度で簡潔に要約する
+
+    Args
+    -----------------
+    - post_message: str,  要約対象の投稿内容
+
+    Returns
+    -----------------
+    - summary: str,  簡潔に要約した文章
+
+    """
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": REMINDER_SUMMARY_SYSTEM_PROMPT},
+            {"role": "user", "content": post_message},
+        ],
+    )
+    return response.choices[0].message.content.strip()
+
+
 def call_generate_reminder(post_message: str, author_username: str, source_url: str | None = None) -> str:
     """
     投稿内容と投稿者名をもとに、Azure OpenAIでリマインド文章を生成する
