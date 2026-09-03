@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Frontier ダッシュボード</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  /* ライトモードの配色。ヘッダのみ濃色。 */
+  :root {
+    --bg: #f4f6fa;
+    --panel: #ffffff;
+    --panel-2: #eef1f6;
+    --border: #dde2ea;
+    --fg: #1f2733;
+    --muted: #6b7787;
+    --accent: #2563eb;
+    --accent-soft: #eaf1ff;
+    --header-bg: #1f2733;
+    --keep: #16a34a;
+    --problem: #dc2626;
+    --try: #d97706;
+    --done: #2563eb;
+    --learned: #7c3aed;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+    font-size: 14px;
+  }
+
+  /* --- 全体シェル: ヘッダ(上) + ボディ(サイドメニュー + コンテンツ) --- */
+  .app-shell { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  .app-header {
+    flex: 0 0 auto; height: 56px; background: var(--header-bg); color: #fff;
+    display: flex; align-items: center; gap: 18px; padding: 0 24px;
+  }
+  .app-header .brand { font-size: 20px; font-weight: 800; letter-spacing: .06em; }
+  .app-header .spacer { flex: 1 1 auto; }
+  .app-header .hbadge {
+    font-size: 12px; color: #cdd5e2; border: 1px solid rgba(255,255,255,.25);
+    padding: 3px 9px; border-radius: 999px;
+  }
+
+  .app-body { flex: 1 1 auto; display: flex; overflow: hidden; }
+
+  /* --- サイドメニュー --- */
+  .app-side {
+    flex: 0 0 auto; width: 220px; background: var(--panel);
+    border-right: 1px solid var(--border); padding: 14px 0; overflow-y: auto;
+  }
+  .side-title {
+    font-size: 11px; letter-spacing: .08em; color: var(--muted);
+    padding: 6px 22px 10px; text-transform: uppercase;
+  }
+  .side-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 22px; cursor: pointer; color: var(--muted);
+    font-weight: 600; font-size: 13px; border-left: 3px solid transparent;
+  }
+  .side-item::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: currentColor; opacity: .55; flex: 0 0 auto;
+  }
+  .side-item:hover { background: var(--panel-2); color: var(--fg); }
+  .side-item.active {
+    background: var(--accent-soft); color: var(--accent);
+    border-left-color: var(--accent);
+  }
+
+  /* --- メインコンテンツ --- */
+  .app-content { flex: 1 1 auto; overflow-y: auto; padding: 24px; }
+  .app-content > .inner { max-width: 1200px; margin: 0 auto; }
+
+  .tab { display: none; }
+  .tab.active { display: block; }
+  .row { display: flex; flex-wrap: wrap; gap: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .metric-card { flex: 1 1 150px; min-width: 150px; }
+  .metric-card .v { font-size: 26px; font-weight: 700; margin-top: 4px; color: var(--fg); }
+  .metric-card .l { font-size: 12px; color: var(--muted); }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; margin-top: 16px; box-shadow: 0 1px 2px rgba(16,24,40,.04);
+  }
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  h3 { font-size: 13px; margin: 16px 0 8px; color: var(--muted); }
+  select, input[type=text], button.act {
+    background: var(--panel); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; font-size: 13px;
+  }
+  button.act { cursor: pointer; }
+  button.act.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.act:disabled { opacity: .5; cursor: not-allowed; }
+  .kpt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .kpt-col h3 { border-bottom: 2px solid var(--border); padding-bottom: 6px; }
+  .kpt-col.keep h3 { border-color: var(--keep); }
+  .kpt-col.problem h3 { border-color: var(--problem); }
+  .kpt-col.try h3 { border-color: var(--try); }
+  .kpt-col.done h3 { border-color: var(--done); }
+  .kpt-col.learned h3 { border-color: var(--learned); }
+  .kpt-item { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+  .kpt-item .t { font-weight: 600; }
+  .kpt-item .d { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .kpt-item .e { margin-top: 6px; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); margin: 2px 4px 0 0; background: var(--panel); }
+  .sev-high { background: #fdecec; color: #b91c1c; border-color: #f2b8b8; }
+  .sev-mid { background: #fdf1e0; color: #b45309; border-color: #f0d3a6; }
+  .sev-low { background: #e9f1ff; color: #1d4ed8; border-color: #c3d6fb; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .muted { color: var(--muted); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  pre.summary { white-space: pre-wrap; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-family: inherit; }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- ヘッダ: アプリ名称 + 稼働状態バッジ -->
+  <header class="app-header">
+    <span class="brand">Frontier</span>
+    <span class="spacer"></span>
+    <span class="hbadge" id="modeBadge">mode: ...</span>
+    <span class="hbadge" id="aiBadge">AI: ...</span>
+  </header>
+
+  <div class="app-body">
+    <!-- サイドメニュー: 各機能への切り替え -->
+    <nav class="app-side" id="side">
+      <div class="side-title">メニュー</div>
+      <div class="side-item active" data-tab="dashboard">ダッシュボード</div>
+      <div class="side-item" data-tab="report">週次レポート</div>
+      <div class="side-item" data-tab="diff">差分</div>
+      <div class="side-item" data-tab="search">暗黙知検索</div>
+      <div class="side-item" data-tab="run">実行・設定</div>
+    </nav>
+
+    <main class="app-content">
+      <div class="inner">
+        <!-- ダッシュボード -->
+        <section class="tab active" id="tab-dashboard">
+          <div class="row" id="metricCards"><span class="muted">読み込み中...</span></div>
+          <div class="panel">
+            <h2>指標の推移</h2>
+            <canvas id="trendChart" height="110"></canvas>
+          </div>
+        </section>
+
+        <!-- 週次レポート -->
+        <section class="tab" id="tab-report">
+          <div class="panel">
+            <h2>週を選択</h2>
+            <select id="reportWeek"></select>
+          </div>
+          <div class="panel" id="reportBody"><span class="muted">週を選択してください</span></div>
+        </section>
+
+        <!-- 差分 -->
+        <section class="tab" id="tab-diff">
+          <div class="panel">
+            <h2>週を選択</h2>
+            <select id="diffWeek"></select>
+          </div>
+          <div class="panel" id="diffBody"><span class="muted">週を選択してください</span></div>
+        </section>
+
+        <!-- 暗黙知検索 -->
+        <section class="tab" id="tab-search">
+          <div class="panel">
+            <h2>自然文で検索</h2>
+            <div class="row">
+              <input type="text" id="searchQuery" placeholder="例: MySQL の文字コードはどう決めた?" style="flex:1 1 400px" />
+              <button class="act primary" id="searchBtn">検索</button>
+            </div>
+          </div>
+          <div class="panel" id="searchBody"><span class="muted">クエリを入力してください</span></div>
+        </section>
+
+        <!-- 実行・設定 -->
+        <section class="tab" id="tab-run">
+          <div class="panel">
+            <h2>パイプライン実行</h2>
+            <button class="act primary" id="runBtn">今すぐ実行</button>
+            <span id="runStatus" class="muted"></span>
+          </div>
+          <div class="panel">
+            <h2>実行履歴</h2>
+            <table id="runsTable"><thead><tr><th>ID</th><th>モード</th><th>状態</th><th>開始</th><th>終了</th></tr></thead><tbody></tbody></table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const api = async (path, opts) => {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+};
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// --- サイドメニューでのタブ切り替え ---
+$$("#side .side-item").forEach((b) => b.addEventListener("click", () => {
+  $$("#side .side-item").forEach((x) => x.classList.remove("active"));
+  $$(".tab").forEach((x) => x.classList.remove("active"));
+  b.classList.add("active");
+  $("#tab-" + b.dataset.tab).classList.add("active");
+}));
+
+// --- ヘルス ---
+async function loadHealth() {
+  try {
+    const h = await api("/api/health");
+    $("#modeBadge").textContent = "mode: " + h.run_mode + (h.status === "ok" ? "" : " (DB NG)");
+    $("#aiBadge").textContent = "AI: " + (h.ai_enabled ? "接続" : "フォールバック");
+  } catch (e) { $("#modeBadge").textContent = "health error"; }
+}
+
+// --- ダッシュボード ---
+const METRIC_LABELS = {
+  mattermost_posts: "MM投稿数", mattermost_active_users: "MMアクティブ人数",
+  trello_cards_created: "カード作成", trello_cards_done: "カード完了", trello_wip: "WIP",
+  github_commits: "コミット", github_prs_merged: "PRマージ", github_prs_opened: "PRオープン",
+  github_stale_prs: "滞留PR", github_issues_reopened: "issue再オープン",
+  growi_pages_created: "Wiki作成", growi_pages_updated: "Wiki更新",
+};
+let trendChart = null;
+async function loadDashboard() {
+  const m = await api("/api/metrics");
+  const cont = $("#metricCards");
+  if (!m.weeks.length) { cont.innerHTML = '<span class="muted">データがありません。「実行・設定」タブから実行してください。</span>'; return; }
+  const last = m.weeks[m.weeks.length - 1];
+  const lastData = m.data[last] || {};
+  cont.innerHTML = m.metric_names.map((n) =>
+    `<div class="card metric-card"><div class="l">${esc(METRIC_LABELS[n] || n)}</div><div class="v">${(lastData[n] ?? 0)}</div></div>`
+  ).join("");
+
+  const palette = ["#2563eb", "#16a34a", "#dc2626", "#d97706", "#7c3aed", "#0891b2", "#db2777", "#65a30d"];
+  const shown = ["mattermost_posts", "github_commits", "github_prs_merged", "github_stale_prs", "trello_wip", "trello_cards_done"];
+  const datasets = shown.map((n, i) => ({
+    label: METRIC_LABELS[n] || n,
+    data: m.weeks.map((w) => (m.data[w] || {})[n] ?? 0),
+    borderColor: palette[i % palette.length],
+    backgroundColor: palette[i % palette.length] + "22",
+    tension: 0.25,
+  }));
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart($("#trendChart"), {
+    type: "line",
+    data: { labels: m.weeks, datasets },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: "#6b7787" } } },
+      scales: { x: { ticks: { color: "#6b7787" }, grid: { color: "#e5e9f0" } }, y: { ticks: { color: "#6b7787" }, grid: { color: "#e5e9f0" } } },
+    },
+  });
+}
+
+// --- 週セレクタ ---
+async function fillWeekSelectors() {
+  const weeks = await api("/api/weeks");
+  for (const id of ["#reportWeek", "#diffWeek"]) {
+    const sel = $(id);
+    sel.innerHTML = weeks.map((w) => `<option value="${w}">${w}</option>`).join("");
+    if (weeks.length) sel.value = weeks[weeks.length - 1];
+  }
+}
+
+// --- 週次レポート ---
+function renderKptCol(cls, title, items) {
+  const rows = (items || []).map((it) => `
+    <div class="kpt-item">
+      <div class="t">${esc(it.title)}</div>
+      <div class="d">${esc(it.detail || "")}</div>
+      <div class="e">${(it.evidence || []).map((e) => `<span class="badge">${esc(e)}</span>`).join("")}
+        ${it.followup_of ? `<span class="badge">↺ ${esc(it.followup_of)}</span>` : ""}</div>
+    </div>`).join("");
+  return `<div class="kpt-col ${cls}"><h3>${title} (${(items || []).length})</h3>${rows || '<span class="muted">なし</span>'}</div>`;
+}
+async function loadReport() {
+  const week = $("#reportWeek").value;
+  if (!week) return;
+  const body = $("#reportBody");
+  body.innerHTML = '<span class="muted">読み込み中...</span>';
+  try {
+    const r = await api("/api/report/" + week);
+    const k = r.kpt || {};
+    const risks = (r.risks || []).map((x) => `
+      <div class="kpt-item">
+        <span class="badge sev-${esc(x.severity)}">${esc(x.severity)}</span>
+        <span class="badge">${esc(x.category)}</span>
+        <div class="t" style="margin-top:6px">${esc(x.title)}</div>
+        <div class="d">${esc(x.detail || "")}</div>
+        <div class="e">${(x.evidence || []).map((e) => `<span class="badge">${esc(e)}</span>`).join("")}</div>
+      </div>`).join("");
+    body.innerHTML = `
+      <h2>KPT / Fun-Done-Learn — ${esc(week)}</h2>
+      <div class="kpt-grid">
+        ${renderKptCol("keep", "Keep", k.keep)}
+        ${renderKptCol("problem", "Problem", k.problem)}
+        ${renderKptCol("try", "Try", k.try)}
+        ${renderKptCol("done", "Done", k.done)}
+        ${renderKptCol("learned", "Learned", k.learned)}
+      </div>
+      <h2 style="margin-top:20px">潜在問題 (${(r.risks || []).length})</h2>
+      ${risks || '<span class="muted">検出なし</span>'}
+      <h2 style="margin-top:20px">サマリ</h2>
+      <pre class="summary">${esc(r.summary_md || "")}</pre>`;
+  } catch (e) {
+    body.innerHTML = `<span class="muted">${esc(e.message)}</span>`;
+  }
+}
+
+// --- 差分 ---
+function renderDiffBucket(title, rows) {
+  const bySource = {};
+  (rows || []).forEach((r) => { (bySource[r.source] = bySource[r.source] || []).push(r); });
+  const inner = Object.keys(bySource).map((src) => `
+    <h3>${esc(src)} (${bySource[src].length})</h3>
+    <table><thead><tr><th>種別</th><th>タイトル</th><th>状態</th></tr></thead><tbody>
+      ${bySource[src].map((r) => `<tr><td>${esc(r.type)}</td><td>${esc(r.title)}</td><td>${esc(r.prev_status ? r.prev_status + " → " : "")}${esc(r.status)}</td></tr>`).join("")}
+    </tbody></table>`).join("");
+  return `<h2>${title} (${(rows || []).length})</h2>${inner || '<span class="muted">なし</span>'}`;
+}
+async function loadDiff() {
+  const week = $("#diffWeek").value;
+  if (!week) return;
+  const body = $("#diffBody");
+  body.innerHTML = '<span class="muted">読み込み中...</span>';
+  try {
+    const d = await api("/api/diff/" + week);
+    body.innerHTML = renderDiffBucket("追加 (added)", d.added) +
+      "<hr>" + renderDiffBucket("変更 (changed)", d.changed) +
+      "<hr>" + renderDiffBucket("消滅 (removed)", d.removed);
+  } catch (e) { body.innerHTML = `<span class="muted">${esc(e.message)}</span>`; }
+}
+
+// --- 検索 ---
+async function doSearch() {
+  const q = $("#searchQuery").value.trim();
+  if (!q) return;
+  const body = $("#searchBody");
+  body.innerHTML = '<span class="spinner"></span> 検索中...';
+  try {
+    const r = await api("/api/search", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q }),
+    });
+    const sources = (r.sources || []).map((s) => `
+      <div class="kpt-item">
+        <span class="badge">${esc(s.source)}:${esc(s.ref)}</span>
+        <span class="badge">${esc(s.week)}</span>
+        <span class="badge">score ${esc(s.score)}</span>
+        <div class="d" style="margin-top:6px">${esc(s.text)}</div>
+      </div>`).join("");
+    body.innerHTML = `<h2>回答</h2><pre class="summary">${esc(r.answer)}</pre>
+      <h2 style="margin-top:18px">出典チャンク (${(r.sources || []).length})</h2>${sources || '<span class="muted">なし</span>'}`;
+  } catch (e) { body.innerHTML = `<span class="muted">${esc(e.message)}</span>`; }
+}
+
+// --- 実行 ---
+let polling = null;
+async function loadRuns() {
+  const runs = await api("/api/runs");
+  $("#runsTable tbody").innerHTML = runs.map((r) =>
+    `<tr><td>${r.id}</td><td>${esc(r.mode)}</td><td>${esc(r.status)}</td><td>${esc((r.started_at || "").replace("T", " ").slice(0, 19))}</td><td>${esc((r.finished_at || "").replace("T", " ").slice(0, 19))}</td></tr>`
+  ).join("");
+  return runs;
+}
+async function doRun() {
+  $("#runBtn").disabled = true;
+  $("#runStatus").innerHTML = '<span class="spinner"></span> 実行中...';
+  try {
+    const res = await api("/api/run?analyze=true", { method: "POST" });
+    const rid = res.run_id;
+    polling = setInterval(async () => {
+      const runs = await loadRuns();
+      const me = runs.find((r) => r.id === rid);
+      if (me && me.status !== "running") {
+        clearInterval(polling);
+        $("#runBtn").disabled = false;
+        $("#runStatus").textContent = me.status === "success" ? "完了しました" : "エラー: " + (me.detail || "").slice(0, 200);
+        await refreshAll();
+      }
+    }, 2000);
+  } catch (e) {
+    $("#runBtn").disabled = false;
+    $("#runStatus").textContent = "エラー: " + e.message;
+  }
+}
+
+async function refreshAll() {
+  await Promise.all([loadHealth(), loadDashboard().catch(() => {}), fillWeekSelectors().catch(() => {}), loadRuns().catch(() => {})]);
+  await loadReport().catch(() => {});
+  await loadDiff().catch(() => {});
+}
+
+$("#reportWeek").addEventListener("change", loadReport);
+$("#diffWeek").addEventListener("change", loadDiff);
+$("#searchBtn").addEventListener("click", doSearch);
+$("#searchQuery").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
+$("#runBtn").addEventListener("click", doRun);
+
+refreshAll();
+</script>
+</body>
+</html>
