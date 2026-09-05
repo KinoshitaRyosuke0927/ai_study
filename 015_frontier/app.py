@@ -24,7 +24,21 @@ from sqlalchemy import text
 import weekly
 from ai import AiAnalyzer
 from db import apply_schema, get_session_factory, ping
+from provider_options import (
+    check_github_path,
+    check_github_repo,
+    check_growi_path,
+    list_mattermost_channels,
+    list_trello_boards,
+)
 from rag import search as rag_search
+from runtime_config import (
+    SCHEDULE_KINDS,
+    WEEKDAY_LABELS_JA,
+    RuntimeConfig,
+    load_runtime_config,
+    save_runtime_config,
+)
 from settings import get_settings
 
 logging.basicConfig(
@@ -51,10 +65,16 @@ def _run_pipeline_async(mode: str, analyze: bool) -> int:
     return run_id
 
 
-def _scheduled_job() -> None:
-    """APScheduler から呼ばれる週次ジョブ。"""
-    logger.info("スケジュール実行を開始します")
-    _run_pipeline_async(mode="scheduled", analyze=True)
+def _scheduler_tick() -> None:
+    """毎日 0:00 に APScheduler から呼ばれるディスパッチャ。
+
+    実際の実行間隔判定(日次 N 日 / 週次 曜日)は weekly.scheduled_tick が
+    acquisition_settings.json を「実行時に」読み込んで行う。
+    """
+    try:
+        weekly.scheduled_tick()
+    except Exception:  # pragma: no cover - スケジューラスレッドの防波堤
+        logger.exception("定期実行チェックで未捕捉例外")
 
 
 @asynccontextmanager
@@ -72,13 +92,15 @@ async def lifespan(app: FastAPI):
     global _scheduler
     if settings.app_schedule_enabled:
         _scheduler = BackgroundScheduler(timezone=settings.app_tz)
-        # crontab 形式("m h dom mon dow")を CronTrigger へ
-        trigger = CronTrigger.from_crontab(
-            settings.app_schedule_cron, timezone=settings.app_tz
+        # 毎日 0:00 に起動判定。間隔・曜日の設定は tick 実行時に acquisition_settings.json から読む
+        _scheduler.add_job(
+            _scheduler_tick,
+            CronTrigger(hour=0, minute=0, timezone=settings.app_tz),
+            id="daily-tick",
+            replace_existing=True,
         )
-        _scheduler.add_job(_scheduled_job, trigger, id="weekly", replace_existing=True)
         _scheduler.start()
-        logger.info("APScheduler 開始: cron='%s' tz=%s", settings.app_schedule_cron, settings.app_tz)
+        logger.info("APScheduler 開始: 毎日 0:00 に定期実行を判定 tz=%s", settings.app_tz)
 
     yield
 
@@ -313,6 +335,276 @@ def api_search(body: SearchBody) -> dict[str, Any]:
     with _session() as s:
         result = rag_search(s, analyzer, body.query)
     return result
+
+
+# ----------------------------------------------------------------------
+# 設定(データ取得に関する実行時設定 / acquisition_settings.json)
+# ----------------------------------------------------------------------
+class ScheduleBody(BaseModel):
+    """定期実行間隔。"""
+
+    kind: str  # "daily" | "weekly"
+    interval_days: int = 7  # daily: N 日ごと
+    weekday: int = 0  # weekly: 0=月 .. 6=日
+
+
+class SettingsBody(BaseModel):
+    """/api/settings (POST) のリクエストボディ。"""
+
+    since_date: str | None = None  # "YYYY-MM-DD" または null
+    schedule: ScheduleBody
+    mattermost_channel_ids: list[str] = []
+    trello_board_ids: list[str] = []
+    github_repo: str = ""          # "owner/repo" またはリポジトリ名。空可
+    github_design_path: str = ""   # リポジトリからの相対パス(設計書フォルダ)。空可
+    growi_page_path: str = ""      # "/projects/foo"。空可
+
+
+@app.get("/api/settings")
+def api_get_settings() -> dict[str, Any]:
+    """現在の実行時設定 + 選択肢(Mattermost チャンネル / Trello ボード)を返す。
+
+    選択肢は設定画面の表示時に `.env` のトークンで都度取得する。
+    """
+    settings = get_settings()
+    rc = load_runtime_config()
+    channels, mm_err = list_mattermost_channels(settings)
+    boards, trello_err = list_trello_boards(settings)
+    return {
+        "config": rc.to_api_dict(),
+        "schedule_kinds": list(SCHEDULE_KINDS),
+        "weekday_labels": WEEKDAY_LABELS_JA,
+        "is_sample_mode": settings.is_sample_mode,
+        "options": {
+            "mattermost": {"channels": channels, "error": mm_err},
+            "trello": {"boards": boards, "error": trello_err},
+        },
+    }
+
+
+@app.post("/api/settings")
+def api_save_settings(body: SettingsBody) -> dict[str, Any]:
+    """実行時設定を acquisition_settings.json へ保存する。
+
+    GitHub のリポジトリ名称 / 設計書パス、参照する Wiki のページは、保存時に
+    `.env` の Git アカウント情報・GROWI トークンで実際にアクセスできるか確認する。
+    確認に失敗した場合はエラーを返し、保存しない(422)。
+    """
+    from datetime import date as _date
+
+    settings = get_settings()
+
+    # --- 形式バリデーション ---
+    if body.schedule.kind not in SCHEDULE_KINDS:
+        raise HTTPException(status_code=422, detail=f"kind は {SCHEDULE_KINDS} のいずれか")
+    if not (1 <= body.schedule.interval_days <= 31):
+        raise HTTPException(status_code=422, detail="interval_days は 1〜31")
+    if not (0 <= body.schedule.weekday <= 6):
+        raise HTTPException(status_code=422, detail="weekday は 0(月)〜6(日)")
+
+    since_date = None
+    if body.since_date:
+        try:
+            since_date = _date.fromisoformat(body.since_date)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="since_date は YYYY-MM-DD 形式")
+
+    # --- アクセス確認(GitHub リポジトリ / 設計書パス / GROWI パス)---
+    field_errors: dict[str, str] = {}
+    github_repo = body.github_repo.strip()
+    github_design_path = body.github_design_path.strip().strip("/")
+    growi_page_path = body.growi_page_path.strip()
+
+    if github_repo:
+        resolved, err = check_github_repo(settings, github_repo)
+        if err:
+            field_errors["github_repo"] = err
+        else:
+            github_repo = resolved  # 解決した owner/repo を保存する
+
+    # 設計書パスはリポジトリが有効なときだけ、その配下に存在するか確認する
+    if github_design_path and "github_repo" not in field_errors:
+        err = check_github_path(settings, github_repo, github_design_path)
+        if err:
+            field_errors["github_design_path"] = err
+
+    if growi_page_path:
+        _count, err = check_growi_path(settings, growi_page_path)
+        if err:
+            field_errors["growi_page_path"] = err
+
+    if field_errors:
+        # 保存は行わず、どの項目でアクセスできなかったかを返す
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "アクセス確認に失敗したため保存しませんでした", "errors": field_errors},
+        )
+
+    rc = RuntimeConfig(
+        since_date=since_date,
+        schedule_kind=body.schedule.kind,
+        schedule_interval_days=body.schedule.interval_days,
+        schedule_weekday=body.schedule.weekday,
+        mattermost_channel_ids=[c for c in body.mattermost_channel_ids if c],
+        trello_board_ids=[b for b in body.trello_board_ids if b],
+        github_repo=github_repo,
+        github_design_path=github_design_path,
+        growi_page_path=growi_page_path,
+    )
+    save_runtime_config(rc)
+    return {"status": "saved", "config": rc.to_api_dict()}
+
+
+# ----------------------------------------------------------------------
+# Mattermost 情報取得(画面表示用。DB へは保存しない)
+# ----------------------------------------------------------------------
+class MattermostFetchBody(BaseModel):
+    """/api/mattermost/fetch のリクエストボディ。"""
+
+    mode: str  # "current"(取得開始日〜最新日)/ "range"(開始日〜終了日)
+    latest_date: str | None = None  # mode=current の最新日 "YYYY-MM-DD"
+    start_date: str | None = None   # mode=range の開始日
+    end_date: str | None = None     # mode=range の終了日
+
+
+@app.post("/api/mattermost/fetch")
+def api_mattermost_fetch(body: MattermostFetchBody) -> dict[str, Any]:
+    """設定チャンネルの投稿を、指定期間ぶんチャンネル別・スレッド構造で返す。"""
+    from datetime import date as _date
+
+    import mattermost_view
+
+    settings = get_settings()
+    rc = load_runtime_config()
+
+    def _parse(label: str, value: str | None) -> _date:
+        if not value:
+            raise HTTPException(status_code=422, detail=f"{label} を指定してください")
+        try:
+            return _date.fromisoformat(value)
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"{label} は YYYY-MM-DD 形式で指定してください")
+
+    if body.mode == "current":
+        if rc.since_date is None:
+            raise HTTPException(
+                status_code=422,
+                detail="設定画面で「データ取得開始日時」を設定してください",
+            )
+        start_d = rc.since_date
+        end_d = _parse("最新日", body.latest_date)
+    elif body.mode == "range":
+        start_d = _parse("開始日", body.start_date)
+        end_d = _parse("終了日", body.end_date)
+    else:
+        raise HTTPException(status_code=422, detail="mode は current / range のいずれか")
+
+    try:
+        result = mattermost_view.fetch_posts(
+            settings, rc.mattermost_channel_ids, start_d, end_d
+        )
+    except mattermost_view.MattermostViewError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    result["mode"] = body.mode
+    return result
+
+
+# ----------------------------------------------------------------------
+# Trello 情報取得(画面表示用。DB へは保存しない)
+# ----------------------------------------------------------------------
+class TrelloFetchBody(BaseModel):
+    """/api/trello/fetch のリクエストボディ。"""
+
+    board_id: str
+
+
+@app.get("/api/trello/boards")
+def api_trello_boards() -> dict[str, Any]:
+    """取得対象ボード設定のプルダウン用: 設定済みボードを名前付きで返す。"""
+    import trello_view
+
+    settings = get_settings()
+    rc = load_runtime_config()
+    boards, err = trello_view.list_configured_boards(settings, rc.trello_board_ids)
+    return {"boards": boards, "error": err}
+
+
+@app.post("/api/trello/fetch")
+def api_trello_fetch(body: TrelloFetchBody) -> dict[str, Any]:
+    """指定ボードの現在の状況(リスト / カード / 詳細 / 活動)を返す。"""
+    import trello_view
+
+    settings = get_settings()
+    try:
+        return trello_view.fetch_board(settings, body.board_id.strip())
+    except trello_view.TrelloViewError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+# ----------------------------------------------------------------------
+# wiki(GROWI)情報取得(画面表示用。DB へは保存しない)
+# ----------------------------------------------------------------------
+class GrowiFetchBody(BaseModel):
+    """/api/growi/fetch のリクエストボディ。"""
+
+    page_id: str
+
+
+@app.get("/api/growi/pages")
+def api_growi_pages() -> dict[str, Any]:
+    """設定の「参照する Wiki のページ」配下のページ一覧(プルダウン用)。"""
+    import growi_view
+
+    settings = get_settings()
+    rc = load_runtime_config()
+    try:
+        return growi_view.list_pages(settings, rc.growi_page_path)
+    except growi_view.GrowiViewError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.post("/api/growi/fetch")
+def api_growi_fetch(body: GrowiFetchBody) -> dict[str, Any]:
+    """選択ページの記事内容・更新履歴・コメントを返す。"""
+    import growi_view
+
+    settings = get_settings()
+    try:
+        return growi_view.fetch_page(settings, body.page_id.strip())
+    except growi_view.GrowiViewError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+# ----------------------------------------------------------------------
+# GitHub 情報取得(画面表示用。DB へは保存しない)
+# ----------------------------------------------------------------------
+@app.post("/api/github/fetch")
+def api_github_fetch() -> dict[str, Any]:
+    """設定リポジトリのブランチ活動と PR(作成者・マージ実行者・コメント)を返す。"""
+    import github_view
+
+    settings = get_settings()
+    rc = load_runtime_config()
+    try:
+        return github_view.fetch_repo_activity(settings, rc.github_repo)
+    except github_view.GitHubViewError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+# ----------------------------------------------------------------------
+# 設計書情報取得(画面表示用。DB へは保存しない)
+# ----------------------------------------------------------------------
+@app.post("/api/design/fetch")
+def api_design_fetch() -> dict[str, Any]:
+    """設定「設計書パス」配下の全ファイル内容をファイルごとに返す。"""
+    import design_view
+
+    settings = get_settings()
+    rc = load_runtime_config()
+    try:
+        return design_view.fetch_design_files(settings, rc.github_repo, rc.github_design_path)
+    except design_view.DesignViewError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @app.exception_handler(Exception)

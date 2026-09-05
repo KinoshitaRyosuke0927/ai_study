@@ -84,7 +84,7 @@ az containerapp create -g $RG -n $APP \
   --system-assigned \
   --env-vars \
      APP_TZ=Asia/Tokyo APP_RUN_MODE=real \
-     APP_SCHEDULE_ENABLED=true "APP_SCHEDULE_CRON=0 9 * * 1" \
+     APP_SCHEDULE_ENABLED=true \
      MYSQL_HOST=$MYSQL.mysql.database.azure.com MYSQL_PORT=3306 \
      MYSQL_USER=frontieradmin MYSQL_DATABASE=frontier
 ```
@@ -136,8 +136,7 @@ az containerapp auth update -g $RG -n $APP --action RedirectToLoginPage --requir
 |---|---|---|
 | `APP_TZ` | Container Apps env-var | `Asia/Tokyo` |
 | `APP_RUN_MODE` | Container Apps env-var | 本番は `real` |
-| `APP_SCHEDULE_ENABLED` | Container Apps env-var | `true` |
-| `APP_SCHEDULE_CRON` | Container Apps env-var | `0 9 * * 1` |
+| `APP_SCHEDULE_ENABLED` | Container Apps env-var | `true`(実行間隔・曜日・取得開始日は `acquisition_settings.json`)|
 | `MYSQL_HOST` | Container Apps env-var | `<server>.mysql.database.azure.com` |
 | `MYSQL_PORT` | Container Apps env-var | `3306` |
 | `MYSQL_USER` | Container Apps env-var | Flexible Server の管理ユーザー |
@@ -160,12 +159,16 @@ az containerapp auth update -g $RG -n $APP --action RedirectToLoginPage --requir
 | `AZURE_OPENAI_CHAT_DEPLOYMENT` | Container Apps env-var | 既存デプロイ名 |
 | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | Container Apps env-var | 既存デプロイ名 |
 
+> **`acquisition_settings.json`(画面「設定」の保存先)について**: コンテナの
+> ファイルシステムはリビジョン更新で消えるため、本番では **Azure Files を
+> `/app` 配下にマウント** して永続化するか、この設定値も App Settings 化する。
+
 ## 8. 起動後の確認
 
 1. `https://<app>.<region>.azurecontainerapps.io/api/health` が `{"status":"ok", ...}` を返す。
 2. ダッシュボードの「今すぐ実行」で `real` モードのパイプラインが完走する。
 3. `runs` テーブルに `status=success` が記録される。
-4. スケジュール実行(月曜 09:00 JST)がログに出る。
+4. 毎日 0:00(JST)の定期実行判定がログに出る(対象日ならパイプラインが走る)。
 
 ## 9. 将来の拡張(本プロトタイプ対象外)
 

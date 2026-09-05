@@ -24,9 +24,17 @@ class MattermostCollector:
 
     source = "mattermost"
 
-    def __init__(self, settings: Settings, http: HttpClient | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        http: HttpClient | None = None,
+        channel_ids: list[str] | None = None,
+    ) -> None:
         self._url = settings.mattermost_url.rstrip("/")
-        self._channel_id = settings.mattermost_channel_id
+        # 取得対象チャンネル。指定が無ければ .env の単一チャンネルにフォールバック
+        self._channel_ids = channel_ids or (
+            [settings.mattermost_channel_id] if settings.mattermost_channel_id else []
+        )
         # 認証ヘッダをセッションに載せる
         self._http = http or HttpClient(
             {"Authorization": f"Bearer {settings.mattermost_token}"}
@@ -34,8 +42,22 @@ class MattermostCollector:
 
     def fetch_since(self, since: datetime) -> list[Event]:
         """since 以降の投稿を取得し `post` イベントの時系列リストで返す。"""
-        since_ms = int(since.replace(tzinfo=timezone.utc).timestamp() * 1000) if since.tzinfo is None else int(since.timestamp() * 1000)
-        endpoint = f"{self._url}/api/v4/channels/{self._channel_id}/posts"
+        since_ms = (
+            int(since.replace(tzinfo=timezone.utc).timestamp() * 1000)
+            if since.tzinfo is None
+            else int(since.timestamp() * 1000)
+        )
+        events: list[Event] = []
+        # 取得対象チャンネルを 1 つずつページングして取得する
+        for channel_id in self._channel_ids:
+            events.extend(self._fetch_channel(channel_id, since_ms))
+        # 古い順へ整列
+        events.sort(key=lambda e: e.ts)
+        return events
+
+    def _fetch_channel(self, channel_id: str, since_ms: int) -> list[Event]:
+        """1 チャンネル分の投稿をページングで取得する。"""
+        endpoint = f"{self._url}/api/v4/channels/{channel_id}/posts"
         events: list[Event] = []
         page = 0
         # order が空になるか、per_page 未満になるまでページング
@@ -52,19 +74,17 @@ class MattermostCollector:
                 post = posts.get(post_id)
                 if not post:
                     continue
-                events.append(self._to_event(post))
+                events.append(self._to_event(post, channel_id))
             if len(order) < PER_PAGE:
                 break
             page += 1
-        # 古い順へ整列
-        events.sort(key=lambda e: e.ts)
         return events
 
     def fetch_items(self) -> list[ItemRecord]:
         """Mattermost はカード的なアイテムを持たないため空を返す。"""
         return []
 
-    def _to_event(self, post: dict) -> Event:
+    def _to_event(self, post: dict, channel_id: str) -> Event:
         """Mattermost の投稿 JSON を Event へ正規化する。"""
         create_ms = int(post.get("create_at", 0))
         ts = datetime.fromtimestamp(create_ms / 1000, tz=timezone.utc).replace(tzinfo=None)
@@ -78,7 +98,7 @@ class MattermostCollector:
             payload={
                 "text": post.get("message", ""),
                 "thread_root": root_id,
-                "channel_id": post.get("channel_id", self._channel_id),
+                "channel_id": post.get("channel_id", channel_id),
                 "origin": "mattermost",
             },
         )

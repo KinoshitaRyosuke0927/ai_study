@@ -79,31 +79,46 @@ class HttpClient:
         if base_headers:
             self._session.headers.update(base_headers)
 
-    def get(
+    def _request(
         self,
+        method: str,
         url: str,
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        json_body: Any | None = None,
     ) -> requests.Response:
-        """GET リクエストを送り、リトライ後も失敗したら例外を送出する。"""
+        """共通リクエスト処理。リトライ後も失敗したら例外を送出する。
+
+        リトライ対象は 429 / 5xx / 接続エラー / タイムアウトのみ。
+        400〜499(429 を除く)はリトライせず即座に送出する。
+        """
         last_exc: Exception | None = None
         for attempt in range(1, HTTP_MAX_RETRY + 1):
             try:
-                resp = self._session.get(
-                    url, params=params, headers=headers, timeout=HTTP_TIMEOUT
+                resp = self._session.request(
+                    method,
+                    url,
+                    params=params,
+                    headers=headers,
+                    json=json_body,
+                    timeout=HTTP_TIMEOUT,
                 )
                 # 429 / 5xx はリトライ対象
                 if resp.status_code == 429 or resp.status_code >= 500:
                     raise _RetryableStatus(resp.status_code)
+                # 4xx(429 以外)は即エラー(リトライしない)
                 resp.raise_for_status()
                 return resp
+            except requests.HTTPError:
+                raise
             except (_RetryableStatus, requests.RequestException) as exc:
                 last_exc = exc
                 if attempt >= HTTP_MAX_RETRY:
                     break
                 wait = HTTP_BACKOFF_BASE ** attempt
                 logger.warning(
-                    "HTTP GET 失敗 (%s) attempt=%d/%d %.1fs 後に再試行: %s",
+                    "HTTP %s 失敗 (%s) attempt=%d/%d %.1fs 後に再試行: %s",
+                    method,
                     url,
                     attempt,
                     HTTP_MAX_RETRY,
@@ -114,6 +129,15 @@ class HttpClient:
         assert last_exc is not None
         raise last_exc
 
+    def get(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> requests.Response:
+        """GET リクエストを送る。"""
+        return self._request("GET", url, params=params, headers=headers)
+
     def get_json(
         self,
         url: str,
@@ -122,6 +146,18 @@ class HttpClient:
     ) -> Any:
         """GET してレスポンス JSON を返す。"""
         return self.get(url, params=params, headers=headers).json()
+
+    def post_json(
+        self,
+        url: str,
+        json_body: Any,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> Any:
+        """JSON ボディを POST してレスポンス JSON を返す。"""
+        return self._request(
+            "POST", url, params=params, headers=headers, json_body=json_body
+        ).json()
 
 
 class _RetryableStatus(Exception):

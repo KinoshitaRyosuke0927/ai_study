@@ -34,10 +34,16 @@ class GrowiCollector:
 
     source = "growi"
 
-    def __init__(self, settings: Settings, http: HttpClient | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        http: HttpClient | None = None,
+        paths: list[str] | None = None,
+    ) -> None:
         self._url = settings.growi_url.rstrip("/")
         self._token = settings.growi_api_token
-        self._paths = settings.growi_path_list or ["/"]
+        # 取得対象パス。指定が無ければ .env の GROWI_TARGET_PATHS を使う
+        self._paths = (paths if paths is not None else settings.growi_path_list) or ["/"]
         self._http = http or HttpClient()
         # 直近取得したページ一覧を fetch_items で再利用するためのキャッシュ
         self._last_pages: list[dict] = []

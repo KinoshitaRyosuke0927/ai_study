@@ -1,0 +1,5 @@
+# 実行時設定(画面の「設定」で生成される環境固有ファイル)
+acquisition_settings.json
+
+# ローカル venv
+.venv/

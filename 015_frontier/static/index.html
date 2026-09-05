@@ -38,7 +38,7 @@
     flex: 0 0 auto; height: 56px; background: var(--header-bg); color: #fff;
     display: flex; align-items: center; gap: 18px; padding: 0 24px;
   }
-  .app-header .brand { font-size: 20px; font-weight: 800; letter-spacing: .06em; }
+  .app-header .brand { font-size: 20px; font-weight: 800; letter-spacing: .06em; cursor: pointer; }
   .app-header .spacer { flex: 1 1 auto; }
   .app-header .hbadge {
     font-size: 12px; color: #cdd5e2; border: 1px solid rgba(255,255,255,.25);
@@ -51,10 +51,6 @@
   .app-side {
     flex: 0 0 auto; width: 220px; background: var(--panel);
     border-right: 1px solid var(--border); padding: 14px 0; overflow-y: auto;
-  }
-  .side-title {
-    font-size: 11px; letter-spacing: .08em; color: var(--muted);
-    padding: 6px 22px 10px; text-transform: uppercase;
   }
   .side-item {
     display: flex; align-items: center; gap: 10px;
@@ -71,9 +67,9 @@
     border-left-color: var(--accent);
   }
 
-  /* --- メインコンテンツ --- */
-  .app-content { flex: 1 1 auto; overflow-y: auto; padding: 24px; }
-  .app-content > .inner { max-width: 1200px; margin: 0 auto; }
+  /* --- メインコンテンツ(左右の余白は合計で画面の 10% = 各 5vw)--- */
+  .app-content { flex: 1 1 auto; overflow-y: auto; padding: 24px 5vw; }
+  .app-content > .inner { max-width: none; margin: 0; }
 
   .tab { display: none; }
   .tab.active { display: block; }
@@ -91,10 +87,117 @@
   }
   h2 { font-size: 15px; margin: 0 0 12px; }
   h3 { font-size: 13px; margin: 16px 0 8px; color: var(--muted); }
-  select, input[type=text], button.act {
+  select, input[type=text], input[type=date], input[type=number], button.act {
     background: var(--panel); color: var(--fg); border: 1px solid var(--border);
     border-radius: 8px; padding: 8px 12px; font-size: 13px;
   }
+  .radio-row label { margin-right: 18px; cursor: pointer; }
+  /* 設定画面(カードをやめて直接ページ表示) */
+  .settings-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 4px; }
+  .set-item { margin: 26px 0; }
+  .set-item:first-of-type { margin-top: 14px; }
+  .set-item > h2 { border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 12px; }
+  .set-sub { margin: 16px 0 16px 2px; }
+  .set-sub > h3 { margin: 0 0 6px; color: var(--fg); }
+  .set-input { width: 100%; max-width: 520px; }
+  .set-input.wide { max-width: 900px; }
+  .check-group { margin-top: 14px; }
+  .check-group > .grp-title { font-weight: 700; font-size: 12px; color: var(--muted); margin-bottom: 6px; border-left: 3px solid var(--accent); padding-left: 8px; }
+  .check-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px 18px; }
+  .check-grid label { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; font-size: 13px; min-width: 0; }
+  .check-grid label input { margin: 0; flex: 0 0 auto; }
+  .check-grid label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 760px) { .check-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .field-hint { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+  .field-error { color: var(--problem); font-size: 12px; margin-top: 6px; min-height: 1em; }
+  /* Mattermost 情報取得 */
+  .mm-channel { margin-top: 18px; }
+  .mm-channel > h3 { color: var(--fg); font-size: 14px; margin: 0 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--accent); }
+  .mm-post { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin: 8px 0; background: var(--panel); }
+  .mm-post.reply { margin-left: 28px; border-left: 3px solid var(--accent); background: var(--panel-2); }
+  .mm-post-head { font-size: 12px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+  .mm-post-user { font-weight: 700; color: var(--fg); }
+  .mm-thread-tag { color: var(--accent); font-weight: 600; }
+  .mm-body { margin-top: 5px; white-space: pre-wrap; word-break: break-word; }
+  .mm-reactions { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .mm-reaction { font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; background: var(--panel-2); color: var(--muted); }
+  .mm-root-ref { font-size: 11px; color: var(--muted); font-style: italic; margin-bottom: 4px; }
+  /* Trello 情報取得 */
+  .tr-list { margin-top: 18px; }
+  .tr-list > h3 { color: var(--fg); font-size: 14px; margin: 0 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--accent); }
+  .tr-card { border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; background: var(--panel); }
+  .tr-card > summary { list-style: none; cursor: pointer; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  .tr-card > summary::-webkit-details-marker { display: none; }
+  .tr-card > summary::before { content: "▸"; color: var(--muted); margin-right: 2px; }
+  .tr-card[open] > summary::before { content: "▾"; }
+  .tr-card[open] > summary { border-bottom: 1px solid var(--border); }
+  .tr-card-name { font-weight: 700; }
+  .tr-card-body { padding: 10px 12px; }
+  .tr-row { font-size: 13px; margin-top: 6px; }
+  .tr-row .k { color: var(--muted); }
+  .tr-chip { font-size: 11px; padding: 1px 8px; border-radius: 999px; color: #fff; display: inline-flex; align-items: center; gap: 4px; }
+  .tr-chip .kind { font-size: 9px; opacity: .85; border: 1px solid rgba(255,255,255,.6); border-radius: 3px; padding: 0 3px; }
+  .tr-lc-green{background:#4caf50}.tr-lc-yellow{background:#e0b000;color:#3a2f00}.tr-lc-orange{background:#ef7b00}.tr-lc-red{background:#e2483d}.tr-lc-purple{background:#8e44c4}.tr-lc-blue{background:#2f80ed}.tr-lc-sky{background:#00a3c7}.tr-lc-lime{background:#7bc62d;color:#1f2f00}.tr-lc-pink{background:#e363b3}.tr-lc-black{background:#3a3f47}.tr-lc-none{background:#9aa4b2}
+  .tr-due { border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; font-size: 11px; }
+  .tr-due.done { color: var(--keep); border-color: var(--keep); }
+  .tr-desc { white-space: pre-wrap; word-break: break-word; margin-top: 6px; font-size: 13px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+  .tr-checklist { margin-top: 6px; font-size: 13px; }
+  .tr-checklist .cl-name { font-weight: 600; color: var(--muted); }
+  .tr-check-item { margin-left: 8px; }
+  .tr-check-item.done { color: var(--muted); text-decoration: line-through; }
+  .tr-activity { margin-top: 6px; }
+  .tr-activity summary { cursor: pointer; font-size: 12px; color: var(--accent); }
+  .tr-act-row { font-size: 12px; margin: 4px 0 0 8px; }
+  .tr-act-row .who { font-weight: 600; }
+  .tr-act-row .when { color: var(--muted); }
+  .tr-act-row.comment { background: var(--panel-2); border-left: 3px solid var(--accent); border-radius: 4px; padding: 4px 8px; white-space: pre-wrap; }
+  /* wiki 情報取得 */
+  .gw-head { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .gw-head .p { color: var(--fg); font-weight: 600; word-break: break-all; }
+  .gw-section { margin-top: 16px; }
+  .gw-section > h3 { font-size: 13px; margin: 0 0 8px; color: var(--fg); border-bottom: 2px solid var(--accent); padding-bottom: 5px; }
+  .gw-body { white-space: pre-wrap; word-break: break-word; font-family: "Consolas", "Courier New", monospace; font-size: 12.5px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; max-height: 480px; overflow: auto; }
+  .gw-row { font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+  .gw-row .who { font-weight: 600; }
+  .gw-row .when { color: var(--muted); margin-left: 8px; }
+  .gw-comment { border-left: 3px solid var(--accent); background: var(--panel-2); border-radius: 4px; padding: 6px 10px; margin: 6px 0; font-size: 13px; }
+  .gw-comment.reply { margin-left: 24px; }
+  .gw-comment .text { white-space: pre-wrap; word-break: break-word; margin-top: 4px; }
+  /* GitHub 情報取得 */
+  .gh-section { margin-top: 18px; }
+  .gh-section > h3 { font-size: 14px; margin: 0 0 8px; color: var(--fg); border-bottom: 2px solid var(--accent); padding-bottom: 5px; }
+  .gh-item { border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; background: var(--panel); }
+  .gh-item > summary { list-style: none; cursor: pointer; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+  .gh-item > summary::-webkit-details-marker { display: none; }
+  .gh-item > summary::before { content: "▸"; color: var(--muted); }
+  .gh-item[open] > summary::before { content: "▾"; }
+  .gh-item[open] > summary { border-bottom: 1px solid var(--border); }
+  .gh-name { font-weight: 700; }
+  .gh-sub { font-size: 12px; color: var(--muted); }
+  .gh-badge { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); }
+  .gh-badge.open { color: #1a7f37; border-color: #1a7f37; background: #eaf6ec; }
+  .gh-badge.merged { color: #6639ba; border-color: #6639ba; background: #f2ecfb; }
+  .gh-badge.closed { color: #6b7787; }
+  .gh-badge.prot { color: #b45309; border-color: #f0d3a6; background: #fdf1e0; }
+  .gh-body { padding: 8px 12px 12px; }
+  .gh-row { font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--border); display: flex; gap: 10px; flex-wrap: wrap; }
+  .gh-row .who { font-weight: 600; }
+  .gh-row .when { color: var(--muted); }
+  .gh-row .msg { flex: 1 1 260px; word-break: break-word; }
+  .gh-meta { font-size: 12px; margin: 4px 0 8px; }
+  .gh-comment { border-left: 3px solid var(--accent); background: var(--panel-2); border-radius: 4px; padding: 6px 10px; margin: 6px 0; font-size: 13px; }
+  .gh-comment.review { border-left-color: var(--learned); }
+  .gh-comment .text { white-space: pre-wrap; word-break: break-word; margin-top: 4px; }
+  /* 設計書情報取得 */
+  .dsg-file { border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; background: var(--panel); }
+  .dsg-file > summary { list-style: none; cursor: pointer; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+  .dsg-file > summary::-webkit-details-marker { display: none; }
+  .dsg-file > summary::before { content: "▸"; color: var(--muted); }
+  .dsg-file[open] > summary::before { content: "▾"; }
+  .dsg-file[open] > summary { border-bottom: 1px solid var(--border); }
+  .dsg-name { font-weight: 700; word-break: break-all; }
+  .dsg-size { font-size: 11px; color: var(--muted); }
+  .dsg-file .gw-body { margin: 10px 12px 12px; }
   button.act { cursor: pointer; }
   button.act.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   button.act:disabled { opacity: .5; cursor: not-allowed; }
@@ -128,7 +231,7 @@
 <div class="app-shell">
   <!-- ヘッダ: アプリ名称 + 稼働状態バッジ -->
   <header class="app-header">
-    <span class="brand">Frontier</span>
+    <span class="brand" id="brand" title="ダッシュボードへ">Frontier</span>
     <span class="spacer"></span>
     <span class="hbadge" id="modeBadge">mode: ...</span>
     <span class="hbadge" id="aiBadge">AI: ...</span>
@@ -137,12 +240,17 @@
   <div class="app-body">
     <!-- サイドメニュー: 各機能への切り替え -->
     <nav class="app-side" id="side">
-      <div class="side-title">メニュー</div>
       <div class="side-item active" data-tab="dashboard">ダッシュボード</div>
       <div class="side-item" data-tab="report">週次レポート</div>
       <div class="side-item" data-tab="diff">差分</div>
       <div class="side-item" data-tab="search">暗黙知検索</div>
-      <div class="side-item" data-tab="run">実行・設定</div>
+      <div class="side-item" data-tab="mattermost">Mattermost情報取得</div>
+      <div class="side-item" data-tab="trello">Trello情報取得</div>
+      <div class="side-item" data-tab="growi">wiki情報取得</div>
+      <div class="side-item" data-tab="github">GitHub情報取得</div>
+      <div class="side-item" data-tab="design">設計書情報取得</div>
+      <div class="side-item" data-tab="run">定期実行</div>
+      <div class="side-item" data-tab="settings">設定</div>
     </nav>
 
     <main class="app-content">
@@ -186,7 +294,110 @@
           <div class="panel" id="searchBody"><span class="muted">クエリを入力してください</span></div>
         </section>
 
-        <!-- 実行・設定 -->
+        <!-- Mattermost 情報取得 -->
+        <section class="tab" id="tab-mattermost">
+          <div class="panel">
+            <h2>取得条件設定</h2>
+            <p class="field-hint" id="mmMeta">対象チャンネル: 読み込み中...</p>
+
+            <h3>現在情報取得</h3>
+            <p class="field-hint">設定画面の「データ取得開始日」<span id="mmSince">(未設定)</span> から、指定した最新日までの投稿をすべて取得します。</p>
+            <div class="row" style="align-items:center">
+              最新日 <input type="date" id="mmCurrentLatest" />
+              <button class="act primary" id="mmCurrentBtn">取得</button>
+            </div>
+
+            <hr />
+
+            <h3>指定期間情報取得</h3>
+            <p class="field-hint">開始日から終了日までの投稿をすべて取得します。</p>
+            <div class="row" style="align-items:center">
+              開始日 <input type="date" id="mmRangeStart" />
+              終了日 <input type="date" id="mmRangeEnd" />
+              <button class="act primary" id="mmRangeBtn">取得</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>取得結果 <span id="mmResultSummary" class="muted"></span></h2>
+            <div id="mmStatus" class="muted"></div>
+            <div id="mmResults"></div>
+          </div>
+        </section>
+
+        <!-- Trello 情報取得 -->
+        <section class="tab" id="tab-trello">
+          <div class="panel">
+            <h2>取得対象ボード設定</h2>
+            <p class="field-hint" id="trelloMeta">対象は設定画面の「Trello 取得ボード」で選択したボードです。</p>
+            <div class="row" style="align-items:center">
+              <select id="trelloBoardSelect"><option value="">読み込み中...</option></select>
+              <button class="act primary" id="trelloFetchBtn">取得</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>取得結果 <span id="trelloResultSummary" class="muted"></span></h2>
+            <div id="trelloStatus" class="muted"></div>
+            <div id="trelloResults"></div>
+          </div>
+        </section>
+
+        <!-- wiki(GROWI)情報取得 -->
+        <section class="tab" id="tab-growi">
+          <div class="panel">
+            <h2>取得対象ページ設定</h2>
+            <p class="field-hint" id="growiMeta">参照する Wiki のページ: 読み込み中...</p>
+            <div class="row" style="align-items:center">
+              <button class="act" id="growiListBtn">ページ一覧取得</button>
+              <select id="growiPageSelect"><option value="">(先に「ページ一覧取得」)</option></select>
+              <button class="act primary" id="growiFetchBtn">取得</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>取得結果 <span id="growiResultSummary" class="muted"></span></h2>
+            <div id="growiStatus" class="muted"></div>
+            <div id="growiResults"></div>
+          </div>
+        </section>
+
+        <!-- GitHub 情報取得 -->
+        <section class="tab" id="tab-github">
+          <div class="panel">
+            <h2>取得</h2>
+            <p class="field-hint" id="ghMeta">対象リポジトリ: 読み込み中...</p>
+            <button class="act primary" id="ghFetchBtn">取得</button>
+            <p class="field-hint" style="margin-top:10px">
+              ※ ブランチの「操作」は、そのブランチへのコミット履歴(直近15件)で表します。
+              GitHub にはリポジトリ単位のブランチ操作ログ API が無いため、ブランチ作成/削除の記録は取得できません。
+              PR のマージ実行者・コメントは処理量の都合で直近30件のみ取得します。
+            </p>
+          </div>
+
+          <div class="panel">
+            <h2>取得結果 <span id="ghResultSummary" class="muted"></span></h2>
+            <div id="ghStatus" class="muted"></div>
+            <div id="ghResults"></div>
+          </div>
+        </section>
+
+        <!-- 設計書情報取得 -->
+        <section class="tab" id="tab-design">
+          <div class="panel">
+            <h2>取得</h2>
+            <p class="field-hint" id="dsgMeta">対象: 読み込み中...</p>
+            <button class="act primary" id="dsgFetchBtn">取得</button>
+          </div>
+
+          <div class="panel">
+            <h2>取得結果 <span id="dsgResultSummary" class="muted"></span></h2>
+            <div id="dsgStatus" class="muted"></div>
+            <div id="dsgResults"></div>
+          </div>
+        </section>
+
+        <!-- 定期実行 -->
         <section class="tab" id="tab-run">
           <div class="panel">
             <h2>パイプライン実行</h2>
@@ -196,6 +407,75 @@
           <div class="panel">
             <h2>実行履歴</h2>
             <table id="runsTable"><thead><tr><th>ID</th><th>モード</th><th>状態</th><th>開始</th><th>終了</th></tr></thead><tbody></tbody></table>
+          </div>
+        </section>
+
+        <!-- 設定: 実行時に取得するデータに関する設定 -->
+        <section class="tab" id="tab-settings">
+          <div class="settings-head">
+            <h2 style="margin:0">設定</h2>
+            <div style="text-align:right">
+              <button class="act primary" id="saveSettingsBtn">保存</button>
+              <div id="saveSettingsStatus" class="muted" style="margin-top:6px;font-size:12px"></div>
+            </div>
+          </div>
+
+          <div class="set-item">
+            <h2>日付設定</h2>
+            <div class="set-sub">
+              <h3>データ取得開始日時</h3>
+              <p class="field-hint">選択した日付の 0:00 以降のデータのみが取得対象になります。</p>
+              <input type="date" id="setSinceDate" />
+            </div>
+            <div class="set-sub">
+              <h3>定期実行間隔</h3>
+              <p class="field-hint">断面の取得と分析を行う間隔です。いずれも 0:00 に実行されます。</p>
+              <div class="radio-row">
+                <label><input type="radio" name="schedKind" value="daily" /> 日次</label>
+                <label><input type="radio" name="schedKind" value="weekly" /> 週次</label>
+              </div>
+              <div id="schedDaily" style="margin-top:12px">
+                <input type="number" id="setIntervalDays" min="1" max="31" style="width:80px" /> 日ごとに実行
+              </div>
+              <div id="schedWeekly" style="margin-top:12px">
+                毎週 <select id="setWeekday"></select> 曜日に実行
+              </div>
+            </div>
+          </div>
+
+          <div class="set-item">
+            <h2>GitHub</h2>
+            <div class="set-sub">
+              <h3>リポジトリ名称</h3>
+              <p class="field-hint">作業状況を取得するリポジトリ名(<code>owner/repo</code> またはリポジトリ名)。ブランチ作成・コミット・マージなどの操作とコード変更の履歴を取得します。保存時にアクセスできるか確認します。</p>
+              <input type="text" id="setGithubRepo" placeholder="owner/repo" class="set-input" />
+              <div class="field-error" id="githubRepoError"></div>
+            </div>
+            <div class="set-sub">
+              <h3>設計書パス</h3>
+              <p class="field-hint">上の「リポジトリ名称」からの相対パスで、設計書が置かれているフォルダを指定します(例: <code>docs/design</code>)。保存時に存在を確認します。</p>
+              <input type="text" id="setGithubDesignPath" placeholder="docs/design" class="set-input" />
+              <div class="field-error" id="githubDesignPathError"></div>
+            </div>
+          </div>
+
+          <div class="set-item">
+            <h2>参照する Wiki のページ</h2>
+            <p class="field-hint">作業状況を取得する GROWI のパス。配下のドキュメントの編集履歴と作業者を取得します。保存時にアクセスできるか確認します。</p>
+            <input type="text" id="setGrowiPath" placeholder="/projects/foo" class="set-input wide" />
+            <div class="field-error" id="growiPathError"></div>
+          </div>
+
+          <div class="set-item">
+            <h2>Mattermost 取得チャンネル</h2>
+            <p class="field-hint">チェックしたチャンネルのみ取得します。1 つもチェックしない場合は Mattermost の取得を行いません。</p>
+            <div id="mmChannels"><span class="muted">読み込み中...</span></div>
+          </div>
+
+          <div class="set-item">
+            <h2>Trello 取得ボード</h2>
+            <p class="field-hint">チェックしたボードのみ取得します。1 つもチェックしない場合は Trello の取得を行いません。</p>
+            <div id="trelloBoards"><span class="muted">読み込み中...</span></div>
           </div>
         </section>
       </div>
@@ -212,13 +492,26 @@ const api = async (path, opts) => {
 };
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-// --- サイドメニューでのタブ切り替え ---
-$$("#side .side-item").forEach((b) => b.addEventListener("click", () => {
-  $$("#side .side-item").forEach((x) => x.classList.remove("active"));
-  $$(".tab").forEach((x) => x.classList.remove("active"));
-  b.classList.add("active");
-  $("#tab-" + b.dataset.tab).classList.add("active");
-}));
+// --- タブ切り替え(サイドメニュー / ヘッダのブランド共通) ---
+function selectTab(name) {
+  $$("#side .side-item").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
+  $$(".tab").forEach((x) => x.classList.toggle("active", x.id === "tab-" + name));
+  // 設定画面は表示のたびに最新の選択肢(チャンネル/ボード)を取得する
+  if (name === "settings") loadSettings().catch(() => {});
+  // Mattermost 情報取得は条件欄のヒントだけ更新(取得結果はそのまま残す)
+  if (name === "mattermost") loadMattermostMeta().catch(() => {});
+  // Trello 情報取得はボード選択肢だけ更新(取得結果はそのまま残す)
+  if (name === "trello") loadTrelloBoards().catch(() => {});
+  // wiki 情報取得は設定パスのヒントだけ更新(一覧・取得結果はそのまま残す)
+  if (name === "growi") loadGrowiMeta().catch(() => {});
+  // GitHub 情報取得は対象リポジトリのヒントだけ更新(取得結果はそのまま残す)
+  if (name === "github") loadGithubMeta().catch(() => {});
+  // 設計書情報取得は対象フォルダのヒントだけ更新(取得結果はそのまま残す)
+  if (name === "design") loadDesignMeta().catch(() => {});
+}
+$$("#side .side-item").forEach((b) => b.addEventListener("click", () => selectTab(b.dataset.tab)));
+// ヘッダの「Frontier」クリックでダッシュボードへ
+$("#brand").addEventListener("click", () => selectTab("dashboard"));
 
 // --- ヘルス ---
 async function loadHealth() {
@@ -241,7 +534,7 @@ let trendChart = null;
 async function loadDashboard() {
   const m = await api("/api/metrics");
   const cont = $("#metricCards");
-  if (!m.weeks.length) { cont.innerHTML = '<span class="muted">データがありません。「実行・設定」タブから実行してください。</span>'; return; }
+  if (!m.weeks.length) { cont.innerHTML = '<span class="muted">データがありません。「定期実行」タブから実行してください。</span>'; return; }
   const last = m.weeks[m.weeks.length - 1];
   const lastData = m.data[last] || {};
   cont.innerHTML = m.metric_names.map((n) =>
@@ -401,6 +694,476 @@ async function doRun() {
   }
 }
 
+// --- 設定 ---
+function applySchedKindVisibility() {
+  const kind = (document.querySelector("input[name=schedKind]:checked") || {}).value || "weekly";
+  $("#schedDaily").style.display = kind === "daily" ? "" : "none";
+  $("#schedWeekly").style.display = kind === "weekly" ? "" : "none";
+}
+// 親項目(チーム / ワークスペース)ごとにグループ化。1 行 3 列のグリッドで表示する。
+function _groupBy(list, keyFn, labelFn) {
+  const m = new Map();
+  (list || []).forEach((x) => {
+    const k = keyFn(x) || "(その他)";
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push({ id: x.id, label: labelFn(x) });
+  });
+  return [...m.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0], "ja"))
+    .map(([title, items]) => ({ title, items: items.sort((a, b) => a.label.localeCompare(b.label, "ja")) }));
+}
+function renderGroupedCheckList(sel, error, groups, checkedIds, grp) {
+  const el = $(sel);
+  if (error) { el.innerHTML = `<span class="muted">${esc(error)}</span>`; return; }
+  const total = groups.reduce((n, g) => n + g.items.length, 0);
+  if (!total) { el.innerHTML = '<span class="muted">選択できる項目がありません。</span>'; return; }
+  const set = new Set(checkedIds || []);
+  el.innerHTML = groups.map((g) => `
+    <div class="check-group">
+      <div class="grp-title">${esc(g.title)}(${g.items.length})</div>
+      <div class="check-grid">
+        ${g.items.map((it) => `<label><input type="checkbox" data-grp="${grp}" value="${esc(it.id)}" ${set.has(it.id) ? "checked" : ""} /><span title="${esc(it.label)}">${esc(it.label)}</span></label>`).join("")}
+      </div>
+    </div>`).join("");
+}
+async function loadSettings() {
+  const d = await api("/api/settings");
+  const c = d.config;
+  $("#setSinceDate").value = c.since_date || "";
+  const kindRadio = document.querySelector(`input[name=schedKind][value="${c.schedule.kind}"]`);
+  if (kindRadio) kindRadio.checked = true;
+  $("#setIntervalDays").value = c.schedule.interval_days;
+  $("#setWeekday").innerHTML = (d.weekday_labels || []).map((l, i) => `<option value="${i}">${esc(l)}</option>`).join("");
+  $("#setWeekday").value = c.schedule.weekday;
+  applySchedKindVisibility();
+  $("#setGithubRepo").value = c.github_repo || "";
+  $("#setGithubDesignPath").value = c.github_design_path || "";
+  $("#setGrowiPath").value = c.growi_page_path || "";
+  $("#githubRepoError").textContent = "";
+  $("#githubDesignPathError").textContent = "";
+  $("#growiPathError").textContent = "";
+  renderGroupedCheckList(
+    "#mmChannels", d.options.mattermost.error,
+    _groupBy(d.options.mattermost.channels, (ch) => ch.team, (ch) => ch.name),
+    c.mattermost_channel_ids, "mm",
+  );
+  renderGroupedCheckList(
+    "#trelloBoards", d.options.trello.error,
+    _groupBy(d.options.trello.boards, (b) => b.workspace, (b) => b.name),
+    c.trello_board_ids, "tr",
+  );
+  $("#saveSettingsStatus").textContent = "";
+}
+async function saveSettings() {
+  const kind = (document.querySelector("input[name=schedKind]:checked") || {}).value || "weekly";
+  const body = {
+    since_date: $("#setSinceDate").value || null,
+    schedule: {
+      kind,
+      interval_days: Number($("#setIntervalDays").value) || 7,
+      weekday: Number($("#setWeekday").value) || 0,
+    },
+    mattermost_channel_ids: $$('input[data-grp="mm"]:checked').map((x) => x.value),
+    trello_board_ids: $$('input[data-grp="tr"]:checked').map((x) => x.value),
+    github_repo: $("#setGithubRepo").value.trim(),
+    github_design_path: $("#setGithubDesignPath").value.trim(),
+    growi_page_path: $("#setGrowiPath").value.trim(),
+  };
+  // 前回のフィールドエラー表示をクリア
+  $("#githubRepoError").textContent = "";
+  $("#githubDesignPathError").textContent = "";
+  $("#growiPathError").textContent = "";
+  $("#saveSettingsStatus").textContent = "保存中...(GitHub / GROWI へのアクセスを確認しています)";
+  let r, j;
+  try {
+    r = await fetch("/api/settings", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    j = await r.json().catch(() => ({}));
+  } catch (e) {
+    $("#saveSettingsStatus").textContent = "エラー: " + e.message;
+    return;
+  }
+  if (r.ok) {
+    // 解決後の値(owner/repo 等)を反映
+    if (j.config) {
+      $("#setGithubRepo").value = j.config.github_repo || "";
+      $("#setGithubDesignPath").value = j.config.github_design_path || "";
+      $("#setGrowiPath").value = j.config.growi_page_path || "";
+    }
+    $("#saveSettingsStatus").textContent = "保存しました";
+    return;
+  }
+  // 422: アクセス確認エラー。項目ごとにエラーを表示し、保存はされていない
+  const detail = j.detail;
+  const fieldErrors = (detail && typeof detail === "object" && detail.errors) || {};
+  if (fieldErrors.github_repo) $("#githubRepoError").textContent = fieldErrors.github_repo;
+  if (fieldErrors.github_design_path) $("#githubDesignPathError").textContent = fieldErrors.github_design_path;
+  if (fieldErrors.growi_page_path) $("#growiPathError").textContent = fieldErrors.growi_page_path;
+  const msg = (detail && typeof detail === "object" && detail.message) || (typeof detail === "string" ? detail : "保存できませんでした");
+  $("#saveSettingsStatus").textContent = "保存されていません: " + msg;
+}
+
+// --- Mattermost 情報取得 ---
+// 取得結果はページを離れても消さない(タブ切替は表示切替のみ。アプリ停止で消えるのは仕様どおり)
+let mmResult = null;
+function _today() { return new Date().toISOString().slice(0, 10); }
+async function loadMattermostMeta() {
+  const d = await api("/api/settings");
+  const since = d.config.since_date;
+  const nCh = (d.config.mattermost_channel_ids || []).length;
+  $("#mmMeta").textContent = `対象チャンネル: ${nCh} 件(設定画面の「Mattermost 取得チャンネル」)`;
+  $("#mmSince").textContent = since ? `(${since})` : "(未設定)";
+  // 日付欄の初期値(未入力のときだけ補完する)
+  if (!$("#mmCurrentLatest").value) $("#mmCurrentLatest").value = _today();
+  if (!$("#mmRangeEnd").value) $("#mmRangeEnd").value = _today();
+  if (!$("#mmRangeStart").value) $("#mmRangeStart").value = since || _today();
+}
+async function fetchMattermost(mode) {
+  const body = { mode };
+  if (mode === "current") {
+    body.latest_date = $("#mmCurrentLatest").value || null;
+  } else {
+    body.start_date = $("#mmRangeStart").value || null;
+    body.end_date = $("#mmRangeEnd").value || null;
+  }
+  $("#mmStatus").innerHTML = '<span class="spinner"></span> 取得中...';
+  $("#mmResultSummary").textContent = "";
+  try {
+    const r = await api("/api/mattermost/fetch", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    mmResult = r;
+    renderMattermost(r);
+  } catch (e) {
+    $("#mmStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#mmResults").innerHTML = "";
+    mmResult = null;
+  }
+}
+function renderMattermostPost(p, isReply) {
+  const reactions = (p.reactions || []).map((x) => `<span class="mm-reaction">:${esc(x.emoji)}: ×${x.count}</span>`).join("");
+  const rootRef = p.root_excerpt ? `<div class="mm-root-ref">↳ スレッド元: ${esc(p.root_excerpt)}${p.root_excerpt.length >= 60 ? "…" : ""}</div>` : "";
+  return `
+    <div class="mm-post${isReply ? " reply" : ""}">
+      ${rootRef}
+      <div class="mm-post-head">
+        <span class="mm-post-user">${esc(p.user)}</span>
+        <span>${esc(p.created)}</span>
+        ${isReply ? '<span class="mm-thread-tag">返信</span>' : ""}
+      </div>
+      <div class="mm-body">${esc(p.message) || '<span class="muted">(本文なし)</span>'}</div>
+      ${reactions ? `<div class="mm-reactions">${reactions}</div>` : ""}
+    </div>`;
+}
+function renderMattermost(r) {
+  $("#mmStatus").textContent = "";
+  $("#mmResultSummary").textContent = `期間 ${r.start} 〜 ${r.end} / ${r.channel_count} チャンネル / ${r.post_count} 投稿`;
+  if (!r.channels.length || !r.post_count) {
+    $("#mmResults").innerHTML = '<span class="muted">対象期間の投稿はありませんでした。</span>';
+    return;
+  }
+  $("#mmResults").innerHTML = r.channels.map((ch) => {
+    const rows = (ch.posts || []).map((p) => {
+      const root = renderMattermostPost(p, false);
+      const replies = (p.replies || []).map((rp) => renderMattermostPost(rp, true)).join("");
+      return root + replies;
+    }).join("");
+    return `<div class="mm-channel"><h3>${esc(ch.channel_name)}(${ch.post_count})</h3>${rows || '<span class="muted">投稿なし</span>'}</div>`;
+  }).join("");
+}
+
+// --- Trello 情報取得 ---
+// 取得結果はタブを切り替えても保持(アプリ停止で消えるのは仕様どおり)
+let trelloResult = null;
+async function loadTrelloBoards() {
+  const sel = $("#trelloBoardSelect");
+  const keep = sel.value;
+  let d;
+  try {
+    d = await api("/api/trello/boards");
+  } catch (e) {
+    $("#trelloMeta").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    return;
+  }
+  const boards = d.boards || [];
+  sel.innerHTML = boards.length
+    ? boards.map((b) => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join("")
+    : '<option value="">(設定画面でボードを選択してください)</option>';
+  if (keep && boards.some((b) => b.id === keep)) sel.value = keep;
+  $("#trelloMeta").textContent = d.error
+    ? d.error
+    : `対象は設定画面の「Trello 取得ボード」で選択したボード(${boards.length} 件)です。`;
+}
+async function fetchTrello() {
+  const boardId = $("#trelloBoardSelect").value;
+  if (!boardId) { $("#trelloStatus").innerHTML = '<span style="color:var(--problem)">ボードを選択してください</span>'; return; }
+  $("#trelloStatus").innerHTML = '<span class="spinner"></span> 取得中...';
+  $("#trelloResultSummary").textContent = "";
+  try {
+    const r = await api("/api/trello/fetch", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ board_id: boardId }),
+    });
+    trelloResult = r;
+    renderTrello(r);
+  } catch (e) {
+    $("#trelloStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#trelloResults").innerHTML = "";
+    trelloResult = null;
+  }
+}
+function renderTrelloCard(c) {
+  // ラベル・カバーはどちらも色チップだが、チップ内の種別タグ(ラベル/カバー)で区別する
+  const labels = (c.labels || []).map((l) =>
+    `<span class="tr-chip tr-lc-${esc(l.color || "none")}"><span class="kind">ラベル</span>${esc(l.name || "(名称なし)")}</span>`).join("");
+  const cover = c.cover
+    ? `<span class="tr-chip tr-lc-${esc(c.cover)}"><span class="kind">カバー</span>${esc(c.cover)}</span>`
+    : "";
+  const due = c.due ? `<span class="tr-due${c.due_complete ? " done" : ""}">期限 ${esc(c.due)}${c.due_complete ? " ✓" : ""}</span>` : "";
+  const summaryChips = [labels, cover, due].filter(Boolean).join(" ");
+
+  const members = (c.members || []).length
+    ? `<div class="tr-row"><span class="k">メンバー:</span> ${(c.members || []).map(esc).join("、 ")}</div>` : "";
+  const desc = c.desc ? `<div class="tr-desc">${esc(c.desc)}</div>` : "";
+  const checklists = (c.checklists || []).map((cl) => `
+    <div class="tr-checklist">
+      <span class="cl-name">${esc(cl.name || "チェックリスト")}(${cl.done}/${cl.total})</span>
+      ${(cl.items || []).map((it) => `<div class="tr-check-item${it.checked ? " done" : ""}">${it.checked ? "☑" : "☐"} ${esc(it.name)}</div>`).join("")}
+    </div>`).join("");
+  const acts = (c.activity || []).map((a) => {
+    if (a.kind === "comment") {
+      return `<div class="tr-act-row comment"><span class="who">${esc(a.user)}</span> <span class="when">${esc(a.date || "")}</span>\n${esc(a.text)}</div>`;
+    }
+    return `<div class="tr-act-row"><span class="who">${esc(a.user)}</span> <span class="when">${esc(a.date || "")}</span> ${esc(a.summary)}</div>`;
+  }).join("");
+  const activity = (c.activity || []).length
+    ? `<details class="tr-activity"><summary>コメントとアクティビティ(${c.activity.length}件)</summary>${acts}</details>`
+    : "";
+  const body = `${members}${desc}${checklists}${activity}` || '<div class="muted">詳細情報なし</div>';
+  return `<details class="tr-card">
+    <summary><span class="tr-card-name">${esc(c.name)}</span>${summaryChips}</summary>
+    <div class="tr-card-body">${body}</div>
+  </details>`;
+}
+function renderTrello(r) {
+  $("#trelloStatus").textContent = "";
+  $("#trelloResultSummary").textContent = `${esc(r.board_name)} / ${r.list_count} リスト / ${r.card_count} カード`;
+  if (!r.lists.length) {
+    $("#trelloResults").innerHTML = '<span class="muted">リストがありません。</span>';
+    return;
+  }
+  $("#trelloResults").innerHTML = r.lists.map((lst) => `
+    <div class="tr-list">
+      <h3>${esc(lst.name)}(${lst.card_count})</h3>
+      ${(lst.cards || []).map(renderTrelloCard).join("") || '<span class="muted">カードなし</span>'}
+    </div>`).join("");
+}
+
+// --- wiki(GROWI)情報取得 ---
+// 取得結果はタブを切り替えても保持(アプリ停止で消えるのは仕様どおり)
+let growiResult = null;
+async function loadGrowiMeta() {
+  try {
+    const d = await api("/api/settings");
+    const p = d.config.growi_page_path;
+    $("#growiMeta").textContent = p
+      ? `参照する Wiki のページ: ${p}(設定画面)`
+      : "設定画面で「参照する Wiki のページ」を設定してください。";
+  } catch (e) { /* ヒントのみなので無視 */ }
+}
+async function loadGrowiPages() {
+  $("#growiStatus").innerHTML = '<span class="spinner"></span> ページ一覧を取得中...';
+  try {
+    const d = await api("/api/growi/pages");
+    const sel = $("#growiPageSelect");
+    const keep = sel.value;
+    sel.innerHTML = (d.pages || []).length
+      ? d.pages.map((p) => `<option value="${esc(p.id)}">${esc(p.name || p.path)}</option>`).join("")
+      : '<option value="">(配下にページがありません)</option>';
+    if (keep && (d.pages || []).some((p) => p.id === keep)) sel.value = keep;
+    $("#growiStatus").textContent = `${d.base_path} 配下: ${d.page_count} ページ`;
+  } catch (e) {
+    $("#growiStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+  }
+}
+async function fetchGrowi() {
+  const pageId = $("#growiPageSelect").value;
+  if (!pageId) { $("#growiStatus").innerHTML = '<span style="color:var(--problem)">ページを選択してください</span>'; return; }
+  $("#growiStatus").innerHTML = '<span class="spinner"></span> 取得中...';
+  $("#growiResultSummary").textContent = "";
+  try {
+    const r = await api("/api/growi/fetch", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ page_id: pageId }),
+    });
+    growiResult = r;
+    renderGrowi(r);
+  } catch (e) {
+    $("#growiStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#growiResults").innerHTML = "";
+    growiResult = null;
+  }
+}
+function renderGrowi(r) {
+  $("#growiStatus").textContent = "";
+  $("#growiResultSummary").textContent = `更新履歴 ${r.revision_count} 件 / コメント ${r.comment_count} 件`;
+  const revs = (r.revisions || []).map((v) =>
+    `<div class="gw-row"><span class="who">${esc(v.author)}</span><span class="when">${esc(v.date || "")}</span></div>`).join("");
+  const comments = (r.comments || []).map((c) =>
+    `<div class="gw-comment${c.reply ? " reply" : ""}"><span class="who">${esc(c.author)}</span><span class="when">${esc(c.date || "")}</span><div class="text">${esc(c.text)}</div></div>`).join("");
+  $("#growiResults").innerHTML = `
+    <div class="gw-head">
+      <div class="p">${esc(r.path)}</div>
+      作成: ${esc(r.creator)} (${esc(r.created_at || "-")}) / 最終更新: ${esc(r.last_updater)} (${esc(r.updated_at || "-")})
+    </div>
+    <div class="gw-section">
+      <h3>記事内容</h3>
+      <div class="gw-body">${esc(r.body) || '<span class="muted">(本文なし)</span>'}</div>
+    </div>
+    <div class="gw-section">
+      <h3>更新履歴(${r.revision_count} 件)</h3>
+      ${revs || '<span class="muted">なし</span>'}
+    </div>
+    <div class="gw-section">
+      <h3>コメント(${r.comment_count} 件)</h3>
+      ${comments || '<span class="muted">なし</span>'}
+    </div>`;
+}
+
+// --- GitHub 情報取得 ---
+// 取得結果はタブを切り替えても保持(アプリ停止で消えるのは仕様どおり)
+let githubResult = null;
+async function loadGithubMeta() {
+  try {
+    const d = await api("/api/settings");
+    const repo = d.config.github_repo;
+    $("#ghMeta").textContent = repo
+      ? `対象リポジトリ: ${repo}(設定画面)`
+      : "設定画面で「GitHub リポジトリ名称」を設定してください。";
+  } catch (e) { /* ヒントのみ */ }
+}
+async function fetchGithub() {
+  $("#ghFetchBtn").disabled = true;
+  $("#ghStatus").innerHTML = '<span class="spinner"></span> 取得中...(PR のコメント取得に時間がかかる場合があります)';
+  $("#ghResultSummary").textContent = "";
+  try {
+    const r = await api("/api/github/fetch", { method: "POST" });
+    githubResult = r;
+    renderGithub(r);
+  } catch (e) {
+    $("#ghStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#ghResults").innerHTML = "";
+    githubResult = null;
+  } finally {
+    $("#ghFetchBtn").disabled = false;
+  }
+}
+function renderGithubBranch(b) {
+  const rows = (b.commits || []).map((c) =>
+    `<div class="gh-row"><span class="when">${esc(c.date || "")}</span><span class="who">${esc(c.author)}</span><span class="msg">${esc(c.message)} <span class="gh-sub">(${esc(c.sha)})</span></span></div>`).join("");
+  return `<details class="gh-item">
+    <summary>
+      <span class="gh-name">${esc(b.name)}</span>
+      ${b.protected ? '<span class="gh-badge prot">protected</span>' : ""}
+      <span class="gh-sub">最終更新 ${esc(b.last_activity || "-")} / ${esc(b.last_author || "-")} ・ コミット ${b.commit_count} 件</span>
+    </summary>
+    <div class="gh-body">${rows || '<span class="muted">コミットなし</span>'}</div>
+  </details>`;
+}
+function renderGithubPr(p) {
+  const badge = p.state === "open"
+    ? '<span class="gh-badge open">OPEN</span>'
+    : (p.merged ? '<span class="gh-badge merged">MERGED</span>' : '<span class="gh-badge closed">CLOSED</span>');
+  const comments = (p.comments || []).map((c) =>
+    `<div class="gh-comment${c.kind === "review" ? " review" : ""}"><span class="who">${esc(c.author)}</span> <span class="when">${esc(c.date || "")}</span><div class="text">${esc(c.text) || '<span class="muted">(本文なし)</span>'}</div></div>`).join("");
+  const meta = `
+    <div class="gh-meta">
+      状態: ${p.state === "open" ? "open" : "close"}${p.merged ? "(マージ済み)" : ""}
+      ・ 作成者: ${esc(p.author || "-")} (${esc(p.created || "-")})
+      ${p.merged ? ` ・ マージ実行者: ${esc(p.merged_by || (p.detail_loaded ? "不明" : "未取得"))} (${esc(p.merged_at || "-")})` : ""}
+      ${!p.merged && p.closed ? ` ・ クローズ: ${esc(p.closed)}` : ""}
+    </div>`;
+  const body = p.detail_loaded
+    ? meta + (comments || '<span class="muted">コメントなし</span>')
+    : meta + '<span class="muted">この PR のコメント / マージ実行者は未取得です(直近30件のみ取得)。</span>';
+  return `<details class="gh-item">
+    <summary>
+      <span class="gh-name">#${p.number} ${esc(p.title)}</span>
+      ${badge}
+      <span class="gh-sub">${esc(p.author || "")}</span>
+    </summary>
+    <div class="gh-body">${body}</div>
+  </details>`;
+}
+function renderGithub(r) {
+  $("#ghStatus").textContent = "";
+  $("#ghResultSummary").textContent = `${esc(r.repo)} / ブランチ ${r.branch_count} / PR ${r.pr_count}(詳細取得 ${r.pr_detail_count} 件)`;
+  const branchNote = r.branches_truncated ? `(上限 ${r.branch_count} 件で打ち切り)` : "";
+  const prNote = r.prs_truncated ? `(上限 ${r.pr_count} 件で打ち切り)` : "";
+  $("#ghResults").innerHTML = `
+    <div class="gh-section">
+      <h3>ブランチ(${r.branch_count})${branchNote}</h3>
+      ${(r.branches || []).map(renderGithubBranch).join("") || '<span class="muted">ブランチなし</span>'}
+    </div>
+    <div class="gh-section">
+      <h3>プルリクエスト(${r.pr_count})${prNote}</h3>
+      ${(r.pull_requests || []).map(renderGithubPr).join("") || '<span class="muted">PR なし</span>'}
+    </div>`;
+}
+
+// --- 設計書情報取得 ---
+// 取得結果はタブを切り替えても保持(アプリ停止で消えるのは仕様どおり)
+let designResult = null;
+async function loadDesignMeta() {
+  try {
+    const d = await api("/api/settings");
+    const repo = d.config.github_repo;
+    const path = d.config.github_design_path;
+    $("#dsgMeta").textContent = (repo && path)
+      ? `対象: ${repo} の ${path}(設定画面)`
+      : "設定画面で「GitHub リポジトリ名称」と「設計書パス」を設定してください。";
+  } catch (e) { /* ヒントのみ */ }
+}
+async function fetchDesign() {
+  $("#dsgFetchBtn").disabled = true;
+  $("#dsgStatus").innerHTML = '<span class="spinner"></span> 取得中...';
+  $("#dsgResultSummary").textContent = "";
+  try {
+    const r = await api("/api/design/fetch", { method: "POST" });
+    designResult = r;
+    renderDesign(r);
+  } catch (e) {
+    $("#dsgStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#dsgResults").innerHTML = "";
+    designResult = null;
+  } finally {
+    $("#dsgFetchBtn").disabled = false;
+  }
+}
+function renderDesignFile(f) {
+  let body;
+  if (f.binary) {
+    body = '<span class="muted">(バイナリまたはデコードできないため表示を省略しました)</span>';
+  } else {
+    body = `<pre class="gw-body">${esc(f.content) || '<span class="muted">(空ファイル)</span>'}</pre>`;
+    if (f.truncated) body += '<div class="muted" style="margin:0 12px 10px">※ 大きいファイルのため先頭のみ表示しています。</div>';
+  }
+  return `<details class="dsg-file">
+    <summary>
+      <span class="dsg-name">${esc(f.name)}</span>
+      <span class="dsg-size">${f.size} bytes</span>
+    </summary>
+    ${body}
+  </details>`;
+}
+function renderDesign(r) {
+  $("#dsgStatus").textContent = "";
+  const note = r.truncated ? `(上限 ${r.file_count} 件で打ち切り)` : "";
+  $("#dsgResultSummary").textContent = `${esc(r.repo)}@${esc(r.branch)} / ${esc(r.path)} / ${r.file_count} ファイル${note}`;
+  $("#dsgResults").innerHTML = (r.files || []).length
+    ? r.files.map(renderDesignFile).join("")
+    : '<span class="muted">ファイルがありません。</span>';
+}
+
 async function refreshAll() {
   await Promise.all([loadHealth(), loadDashboard().catch(() => {}), fillWeekSelectors().catch(() => {}), loadRuns().catch(() => {})]);
   await loadReport().catch(() => {});
@@ -412,6 +1175,15 @@ $("#diffWeek").addEventListener("change", loadDiff);
 $("#searchBtn").addEventListener("click", doSearch);
 $("#searchQuery").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
 $("#runBtn").addEventListener("click", doRun);
+$("#saveSettingsBtn").addEventListener("click", saveSettings);
+$$("input[name=schedKind]").forEach((r) => r.addEventListener("change", applySchedKindVisibility));
+$("#mmCurrentBtn").addEventListener("click", () => fetchMattermost("current"));
+$("#mmRangeBtn").addEventListener("click", () => fetchMattermost("range"));
+$("#trelloFetchBtn").addEventListener("click", fetchTrello);
+$("#growiListBtn").addEventListener("click", loadGrowiPages);
+$("#growiFetchBtn").addEventListener("click", fetchGrowi);
+$("#ghFetchBtn").addEventListener("click", fetchGithub);
+$("#dsgFetchBtn").addEventListener("click", fetchDesign);
 
 refreshAll();
 </script>

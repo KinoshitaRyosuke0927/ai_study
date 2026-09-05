@@ -1,0 +1,14 @@
+{
+  "_comment": "データ取得に関する実行時設定のサンプル。実ファイル acquisition_settings.json は画面の「設定」から編集・保存されます(git 管理対象外)。無い場合は下記デフォルトで動作します。",
+  "since_date": null,
+  "schedule": {
+    "kind": "weekly",
+    "interval_days": 7,
+    "weekday": 0
+  },
+  "mattermost_channel_ids": [],
+  "trello_board_ids": [],
+  "github_repo": "",
+  "github_design_path": "",
+  "growi_page_path": ""
+}

@@ -2,12 +2,12 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 
-# DB (MySQL 8 / caching_sha2_password 対応のため cryptography 必須)
+# DB (MySQL 8: cryptography is required for caching_sha2_password)
 SQLAlchemy==2.0.36
 PyMySQL==1.1.1
 cryptography==44.0.0
 
-# スケジューラ
+# Scheduler
 APScheduler==3.11.0
 
 # AI
@@ -16,11 +16,11 @@ openai==1.59.6
 # HTTP
 requests==2.32.3
 
-# 設定
+# Settings
 pydantic==2.10.4
 pydantic-settings==2.7.1
 python-dotenv==1.0.1
 
-# テスト
+# Tests
 pytest==8.3.4
 responses==0.25.3

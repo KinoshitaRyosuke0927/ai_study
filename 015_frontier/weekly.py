@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import traceback
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import text
@@ -24,6 +24,7 @@ from collectors.base import Collector, Event, ItemRecord
 from db import get_session_factory
 from metrics import compute_metrics, load_metrics_trend, save_metrics
 from rag import build_and_store_embeddings
+from runtime_config import RuntimeConfig, load_runtime_config
 from settings import Settings, get_settings
 from store import (
     compute_diff,
@@ -40,29 +41,61 @@ logger = logging.getLogger(__name__)
 INITIAL_LOOKBACK_DAYS = 45
 
 
-def _build_collectors(settings: Settings) -> list[Collector]:
-    """実行モードに応じてコレクタ一覧を組み立てる。"""
+def _build_collectors(settings: Settings, rc: RuntimeConfig) -> list[Collector]:
+    """実行モードと実行時設定に応じてコレクタ一覧を組み立てる。"""
     if settings.is_sample_mode:
         from collectors.sample import SampleCollector
 
         return [SampleCollector()]
 
-    # real モード: 4 ソースを順に
+    # real モード。GitHub / GROWI は常に対象。
     from collectors.github import GitHubCollector
     from collectors.growi import GrowiCollector
     from collectors.mattermost import MattermostCollector
     from collectors.trello import TrelloCollector
 
-    return [
-        MattermostCollector(settings),
-        GitHubCollector(settings),
-        GrowiCollector(settings),
-        TrelloCollector(settings),
-    ]
+    collectors: list[Collector] = []
+
+    # Mattermost: 設定画面で選んだチャンネルのみ。1 件も無ければ取得しない。
+    channel_ids = rc.mattermost_channel_ids or (
+        [settings.mattermost_channel_id]
+        if settings.mattermost_channel_id and settings.mattermost_channel_id != "changeme"
+        else []
+    )
+    if channel_ids:
+        collectors.append(MattermostCollector(settings, channel_ids=channel_ids))
+    else:
+        logger.info("Mattermost: 取得対象チャンネルが未設定のためスキップ")
+
+    # GitHub: 設定画面のリポジトリ名称を優先(空なら .env の GITHUB_REPOS)
+    repos = [rc.github_repo] if rc.github_repo else settings.github_repo_list
+    collectors.append(GitHubCollector(settings, repos=repos))
+
+    # GROWI: 設定画面の Wiki パスを優先(空なら .env の GROWI_TARGET_PATHS)
+    paths = [rc.growi_page_path] if rc.growi_page_path else settings.growi_path_list
+    collectors.append(GrowiCollector(settings, paths=paths))
+
+    # Trello: 設定画面で選んだボードのみ。1 件も無ければ取得しない。
+    board_ids = rc.trello_board_ids or (
+        [settings.trello_board_id]
+        if settings.trello_board_id and settings.trello_board_id != "changeme"
+        else []
+    )
+    if board_ids:
+        collectors.append(TrelloCollector(settings, board_ids=board_ids))
+    else:
+        logger.info("Trello: 取得対象ボードが未設定のためスキップ")
+
+    return collectors
 
 
-def _since_from_runs(session: Session) -> datetime:
-    """前回成功実行の完了時刻を取得。無ければ INITIAL_LOOKBACK_DAYS 前。"""
+def _determine_since(session: Session, rc: RuntimeConfig) -> datetime:
+    """差分取得の起点 since を決める。
+
+    - 前回成功実行があればその完了時刻(増分取得)
+    - 無ければ「データ取得開始日 0:00」、それも未設定なら INITIAL_LOOKBACK_DAYS 前
+    - いずれの場合も「データ取得開始日 0:00」より前には遡らない
+    """
     row = session.execute(
         text(
             """
@@ -72,11 +105,21 @@ def _since_from_runs(session: Session) -> datetime:
             """
         )
     ).first()
+    cfg_since = rc.since_datetime()
+
     if row and row[0]:
-        return row[0]
-    return datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
-        days=INITIAL_LOOKBACK_DAYS
-    )
+        since = row[0]
+    elif cfg_since is not None:
+        since = cfg_since
+    else:
+        since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+            days=INITIAL_LOOKBACK_DAYS
+        )
+
+    # 取得開始日より前は対象外
+    if cfg_since is not None and since < cfg_since:
+        since = cfg_since
+    return since
 
 
 def _actor_commit_load(session: Session, week: str) -> dict[str, int]:
@@ -241,14 +284,17 @@ def run(
     }
 
     try:
-        # 2. since 決定
-        since = _since_from_runs(session)
-        logger.info("差分取得の起点 since=%s", since)
+        # 2. 実行時設定を「使用する処理の実行時」に読み込む
+        rc = load_runtime_config()
+        since = _determine_since(session, rc)
+        logger.info(
+            "差分取得の起点 since=%s / 取得開始日=%s", since, rc.since_date
+        )
 
         # 3. コレクタ実行(ソース単位で失敗を許容)
         all_events: list[Event] = []
         all_items: list[ItemRecord] = []
-        for collector in _build_collectors(settings):
+        for collector in _build_collectors(settings, rc):
             try:
                 events = collector.fetch_since(since)
                 all_events.extend(events)
@@ -339,3 +385,59 @@ def run(
         session.close()
 
     return summary
+
+
+# ----------------------------------------------------------------------
+# 定期実行(スケジューラから毎日 0:00 に呼ばれるディスパッチャ)
+# ----------------------------------------------------------------------
+def _last_scheduled_success_date(session: Session) -> date | None:
+    """最後に成功した定期実行の日付(started_at ベース)。"""
+    row = session.execute(
+        text(
+            """
+            SELECT MAX(started_at) FROM runs
+            WHERE mode = 'scheduled' AND status = 'success'
+            """
+        )
+    ).scalar()
+    return row.date() if row else None
+
+
+def _is_schedule_due(rc: RuntimeConfig, today: date, last_success: date | None) -> bool:
+    """本日が定期実行の対象日かどうかを実行時設定から判定する。"""
+    if rc.schedule_kind == "weekly":
+        # 指定曜日なら実行(0=月 .. 6=日)
+        return today.weekday() == rc.schedule_weekday
+    # daily: 前回成功から interval_days 日以上経過していれば実行
+    if last_success is None:
+        return True
+    return (today - last_success).days >= rc.schedule_interval_days
+
+
+def scheduled_tick(now: datetime | None = None) -> bool:
+    """スケジューラから毎日 0:00 に呼ばれる。設定を読み、対象日ならパイプラインを実行する。
+
+    設定(acquisition_settings.json)はこの実行時に読み込む(起動時にはキャッシュしない)。
+
+    Returns:
+        パイプラインを開始したかどうか。
+    """
+    rc = load_runtime_config()
+    today = (now or datetime.now(timezone.utc).replace(tzinfo=None)).date()
+
+    factory = get_session_factory(get_settings())
+    session: Session = factory()
+    try:
+        last_success = _last_scheduled_success_date(session)
+    finally:
+        session.close()
+
+    if not _is_schedule_due(rc, today, last_success):
+        logger.info(
+            "定期実行チェック: 本日(%s)は対象外(kind=%s)", today, rc.schedule_kind
+        )
+        return False
+
+    logger.info("定期実行チェック: 本日(%s)は対象。パイプラインを開始します", today)
+    run(mode="scheduled", analyze=True)
+    return True

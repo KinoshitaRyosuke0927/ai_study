@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     # --- アプリ ---
     app_tz: str = Field(default="Asia/Tokyo", alias="APP_TZ")
     app_run_mode: str = Field(default="sample", alias="APP_RUN_MODE")  # sample / real
+    # 定期実行の有効化(実行間隔・曜日は acquisition_settings.json で設定する)
     app_schedule_enabled: bool = Field(default=True, alias="APP_SCHEDULE_ENABLED")
-    app_schedule_cron: str = Field(default="0 9 * * 1", alias="APP_SCHEDULE_CRON")
 
     # --- MySQL ---
     mysql_host: str = Field(default="localhost", alias="MYSQL_HOST")
@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     growi_url: str = Field(default="", alias="GROWI_URL")
     growi_api_token: str = Field(default="", alias="GROWI_API_TOKEN")
     growi_target_paths: str = Field(default="", alias="GROWI_TARGET_PATHS")  # カンマ区切り
+    # ID/パスワード: API トークンが使えない構成でフォームログインする場合の予備
+    growi_id: str = Field(default="", alias="GROWI_ID")
+    growi_password: str = Field(default="", alias="GROWI_PASSWORD")
 
     # --- Trello ---
     trello_api_key: str = Field(default="", alias="TRELLO_API_KEY")

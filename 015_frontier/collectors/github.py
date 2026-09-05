@@ -38,8 +38,14 @@ class GitHubCollector:
 
     source = "github"
 
-    def __init__(self, settings: Settings, http: HttpClient | None = None) -> None:
-        self._repos = settings.github_repo_list
+    def __init__(
+        self,
+        settings: Settings,
+        http: HttpClient | None = None,
+        repos: list[str] | None = None,
+    ) -> None:
+        # 取得対象リポジトリ。指定が無ければ .env の GITHUB_REPOS を使う
+        self._repos = repos if repos is not None else settings.github_repo_list
         self._http = http or HttpClient(
             {
                 "Authorization": f"Bearer {settings.github_token}",

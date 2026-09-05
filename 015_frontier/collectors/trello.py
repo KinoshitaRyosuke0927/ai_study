@@ -35,14 +35,30 @@ class TrelloCollector:
 
     source = "trello"
 
-    def __init__(self, settings: Settings, http: HttpClient | None = None) -> None:
-        self._board_id = settings.trello_board_id
+    def __init__(
+        self,
+        settings: Settings,
+        http: HttpClient | None = None,
+        board_ids: list[str] | None = None,
+    ) -> None:
+        # 取得対象ボード。指定が無ければ .env の単一ボードにフォールバック
+        self._board_ids = board_ids or (
+            [settings.trello_board_id] if settings.trello_board_id else []
+        )
         self._auth = {"key": settings.trello_api_key, "token": settings.trello_token}
         self._http = http or HttpClient()
 
     def fetch_since(self, since: datetime) -> list[Event]:
         """since 以降のボードアクションをカードイベントへ正規化して返す。"""
         since_date = since.strftime("%Y-%m-%d")
+        events: list[Event] = []
+        for board_id in self._board_ids:
+            events.extend(self._fetch_board_actions(board_id, since_date))
+        events.sort(key=lambda e: e.ts)
+        return events
+
+    def _fetch_board_actions(self, board_id: str, since_date: str) -> list[Event]:
+        """1 ボード分のアクションを before ページングで取得する。"""
         events: list[Event] = []
         before: str | None = None
         while True:
@@ -55,7 +71,7 @@ class TrelloCollector:
             if before:
                 params["before"] = before
             actions = self._http.get_json(
-                f"{API_ROOT}/boards/{self._board_id}/actions", params=params
+                f"{API_ROOT}/boards/{board_id}/actions", params=params
             )
             if not actions:
                 break
@@ -67,18 +83,24 @@ class TrelloCollector:
                 break
             # 最古アクションの id を次ページの before に使う
             before = actions[-1].get("id")
-        events.sort(key=lambda e: e.ts)
         return events
 
     def fetch_items(self) -> list[ItemRecord]:
-        """ボード上のカード現在状態を返す(リスト名で done 判定)。"""
+        """取得対象ボード上のカード現在状態を返す(リスト名で done 判定)。"""
+        items: list[ItemRecord] = []
+        for board_id in self._board_ids:
+            items.extend(self._fetch_board_items(board_id))
+        return items
+
+    def _fetch_board_items(self, board_id: str) -> list[ItemRecord]:
+        """1 ボード分のカード現在状態を返す。"""
         lists = self._http.get_json(
-            f"{API_ROOT}/boards/{self._board_id}/lists",
+            f"{API_ROOT}/boards/{board_id}/lists",
             params={**self._auth, "fields": "name"},
         )
         list_name_by_id = {lst["id"]: lst.get("name", "") for lst in lists}
         cards = self._http.get_json(
-            f"{API_ROOT}/boards/{self._board_id}/cards",
+            f"{API_ROOT}/boards/{board_id}/cards",
             params={**self._auth, "fields": "name,closed,idList,idMembers"},
         )
         items: list[ItemRecord] = []
