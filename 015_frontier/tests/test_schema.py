@@ -11,7 +11,7 @@ from datetime import datetime
 from sqlalchemy import text
 
 from collectors.base import Event
-from store import save_events
+from pipeline.store import save_events
 
 WEEK_TS = datetime(2026, 5, 11, 12, 0, 0)
 
@@ -49,7 +49,7 @@ def test_event_uid_generated_column(db_session):
 
 def test_apply_schema_twice_ok(settings):
     """schema.sql の再適用でエラーにならないこと(CREATE TABLE IF NOT EXISTS)。"""
-    from db import apply_schema
+    from infra.db import apply_schema
 
     apply_schema(settings)
     apply_schema(settings)

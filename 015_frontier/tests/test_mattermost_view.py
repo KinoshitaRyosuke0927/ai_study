@@ -7,9 +7,9 @@ from datetime import date
 import pytest
 import responses
 
-import mattermost_view as mv
-from mattermost_view import MattermostViewError, fetch_posts
-from settings import Settings
+from viewers import mattermost as mv
+from viewers.mattermost import MattermostViewError, fetch_posts
+from config.settings import Settings
 
 MM = "https://mm.internal.test"
 

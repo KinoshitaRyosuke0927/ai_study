@@ -6,8 +6,8 @@ import pytest
 import responses
 from responses import matchers
 
-from github_view import GitHubViewError, fetch_repo_activity
-from settings import Settings
+from viewers.github import GitHubViewError, fetch_repo_activity
+from config.settings import Settings
 
 REPO = "acme/app"
 BASE = f"https://api.github.com/repos/{REPO}"

@@ -16,8 +16,8 @@ except ImportError:  # pragma: no cover - Python 3.8 以前
     ZoneInfo = None  # type: ignore
 
 from collectors.base import HttpClient
-from provider_options import is_placeholder_url
-from settings import Settings
+from viewers.options import is_placeholder_url
+from config.settings import Settings
 
 logger = logging.getLogger(__name__)
 

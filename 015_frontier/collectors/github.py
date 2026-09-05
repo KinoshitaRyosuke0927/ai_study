@@ -14,7 +14,7 @@ import logging
 import re
 from datetime import datetime, timezone
 
-from settings import Settings
+from config.settings import Settings
 
 from .base import Event, HttpClient, ItemRecord
 

@@ -7,8 +7,8 @@ import base64
 import pytest
 import responses
 
-from design_view import DesignViewError, fetch_design_files
-from settings import Settings
+from viewers.design import DesignViewError, fetch_design_files
+from config.settings import Settings
 
 REPO = "acme/app"
 BASE = f"https://api.github.com/repos/{REPO}"

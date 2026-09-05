@@ -15,8 +15,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ai import AiAnalyzer
-from vectors import cosine, from_blob, to_blob
+from pipeline.ai import AiAnalyzer
+from common.vectors import cosine, from_blob, to_blob
 
 logger = logging.getLogger(__name__)
 

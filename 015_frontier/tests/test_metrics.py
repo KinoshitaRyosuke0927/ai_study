@@ -5,9 +5,9 @@ from __future__ import annotations
 from datetime import timedelta
 
 from collectors.base import Event
-from metrics import compute_metrics
-from store import save_events, snapshot_week_items
-from weeks import week_start
+from pipeline.metrics import compute_metrics
+from pipeline.store import save_events, snapshot_week_items
+from common.weeks import week_start
 
 WEEK = "2026-W20"
 
@@ -59,7 +59,7 @@ def test_compute_metrics_counts(db_session):
 
 
 def test_metrics_saved_and_reloaded(db_session):
-    from metrics import load_metrics_trend, save_metrics
+    from pipeline.metrics import load_metrics_trend, save_metrics
 
     save_metrics(db_session, WEEK, {"mattermost_posts": 5.0, "github_commits": 9.0})
     db_session.commit()

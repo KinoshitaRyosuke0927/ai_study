@@ -16,8 +16,8 @@ except ImportError:  # pragma: no cover
     ZoneInfo = None  # type: ignore
 
 from collectors.base import HttpClient
-from provider_options import trello_board_label
-from settings import Settings
+from viewers.options import trello_board_label
+from config.settings import Settings
 
 logger = logging.getLogger(__name__)
 

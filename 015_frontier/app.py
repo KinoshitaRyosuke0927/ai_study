@@ -21,25 +21,25 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import text
 
-import weekly
-from ai import AiAnalyzer
-from db import apply_schema, get_session_factory, ping
-from provider_options import (
+from pipeline import weekly
+from pipeline.ai import AiAnalyzer
+from infra.db import apply_schema, get_session_factory, ping
+from viewers.options import (
     check_github_path,
     check_github_repo,
     check_growi_path,
     list_mattermost_channels,
     list_trello_boards,
 )
-from rag import search as rag_search
-from runtime_config import (
+from pipeline.rag import search as rag_search
+from config.runtime import (
     SCHEDULE_KINDS,
     WEEKDAY_LABELS_JA,
     RuntimeConfig,
     load_runtime_config,
     save_runtime_config,
 )
-from settings import get_settings
+from config.settings import get_settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -204,7 +204,7 @@ def api_weeks() -> list[str]:
 @app.get("/api/metrics")
 def api_metrics() -> dict[str, Any]:
     """週ごとの指標(推移グラフ用)。"""
-    from metrics import METRIC_NAMES
+    from pipeline.metrics import METRIC_NAMES
 
     with _session() as s:
         weeks = s.execute(
@@ -239,7 +239,7 @@ def api_report(week: str) -> dict[str, Any]:
 @app.get("/api/diff/{week}")
 def api_diff(week: str) -> dict[str, Any]:
     """指定週の added / changed / removed 一覧。"""
-    from store import compute_diff
+    from pipeline.store import compute_diff
 
     with _session() as s:
         diff = compute_diff(s, week)
@@ -472,7 +472,7 @@ def api_mattermost_fetch(body: MattermostFetchBody) -> dict[str, Any]:
     """設定チャンネルの投稿を、指定期間ぶんチャンネル別・スレッド構造で返す。"""
     from datetime import date as _date
 
-    import mattermost_view
+    from viewers import mattermost as mattermost_view
 
     settings = get_settings()
     rc = load_runtime_config()
@@ -521,7 +521,7 @@ class TrelloFetchBody(BaseModel):
 @app.get("/api/trello/boards")
 def api_trello_boards() -> dict[str, Any]:
     """取得対象ボード設定のプルダウン用: 設定済みボードを名前付きで返す。"""
-    import trello_view
+    from viewers import trello as trello_view
 
     settings = get_settings()
     rc = load_runtime_config()
@@ -532,7 +532,7 @@ def api_trello_boards() -> dict[str, Any]:
 @app.post("/api/trello/fetch")
 def api_trello_fetch(body: TrelloFetchBody) -> dict[str, Any]:
     """指定ボードの現在の状況(リスト / カード / 詳細 / 活動)を返す。"""
-    import trello_view
+    from viewers import trello as trello_view
 
     settings = get_settings()
     try:
@@ -553,7 +553,7 @@ class GrowiFetchBody(BaseModel):
 @app.get("/api/growi/pages")
 def api_growi_pages() -> dict[str, Any]:
     """設定の「参照する Wiki のページ」配下のページ一覧(プルダウン用)。"""
-    import growi_view
+    from viewers import growi as growi_view
 
     settings = get_settings()
     rc = load_runtime_config()
@@ -566,7 +566,7 @@ def api_growi_pages() -> dict[str, Any]:
 @app.post("/api/growi/fetch")
 def api_growi_fetch(body: GrowiFetchBody) -> dict[str, Any]:
     """選択ページの記事内容・更新履歴・コメントを返す。"""
-    import growi_view
+    from viewers import growi as growi_view
 
     settings = get_settings()
     try:
@@ -581,7 +581,7 @@ def api_growi_fetch(body: GrowiFetchBody) -> dict[str, Any]:
 @app.post("/api/github/fetch")
 def api_github_fetch() -> dict[str, Any]:
     """設定リポジトリのブランチ活動と PR(作成者・マージ実行者・コメント)を返す。"""
-    import github_view
+    from viewers import github as github_view
 
     settings = get_settings()
     rc = load_runtime_config()
@@ -597,7 +597,7 @@ def api_github_fetch() -> dict[str, Any]:
 @app.post("/api/design/fetch")
 def api_design_fetch() -> dict[str, Any]:
     """設定「設計書パス」配下の全ファイル内容をファイルごとに返す。"""
-    import design_view
+    from viewers import design as design_view
 
     settings = get_settings()
     rc = load_runtime_config()

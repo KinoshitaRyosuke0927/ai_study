@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlparse
 import responses
 
 from collectors.base import HttpClient
-from settings import Settings
+from config.settings import Settings
 
 SINCE = datetime(2026, 8, 1, 0, 0, 0)
 SINCE_MS = int(SINCE.replace(tzinfo=timezone.utc).timestamp() * 1000)

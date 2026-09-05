@@ -15,11 +15,11 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from settings import Settings, get_settings
+from config.settings import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
-_SCHEMA_PATH = Path(__file__).parent / "schema.sql"
+_SCHEMA_PATH = Path(__file__).resolve().parents[1] / "schema.sql"
 
 # プロセス内でエンジンを使い回すためのキャッシュ(接続文字列ごと)
 _engines: dict[str, Engine] = {}

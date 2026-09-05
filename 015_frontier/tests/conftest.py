@@ -28,8 +28,8 @@ os.environ["AZURE_OPENAI_API_KEY"] = "changeme"
 
 import pytest  # noqa: E402
 
-from db import apply_schema, get_engine, get_session_factory  # noqa: E402
-from settings import get_settings  # noqa: E402
+from infra.db import apply_schema, get_engine, get_session_factory  # noqa: E402
+from config.settings import get_settings  # noqa: E402
 
 
 @pytest.fixture(scope="session")

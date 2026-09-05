@@ -21,7 +21,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # ユーザーが手書きする settings.ini とは別のファイルに保存する
-CONFIG_PATH = Path(__file__).parent / "acquisition_settings.json"
+CONFIG_PATH = Path(__file__).resolve().parents[1] / "acquisition_settings.json"
 
 # 0=月曜 .. 6=日曜(datetime.weekday() と同じ並び)
 WEEKDAY_LABELS_JA = ["月", "火", "水", "木", "金", "土", "日"]

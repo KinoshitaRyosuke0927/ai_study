@@ -19,21 +19,21 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ai import AiAnalyzer
+from pipeline.ai import AiAnalyzer
 from collectors.base import Collector, Event, ItemRecord
-from db import get_session_factory
-from metrics import compute_metrics, load_metrics_trend, save_metrics
-from rag import build_and_store_embeddings
-from runtime_config import RuntimeConfig, load_runtime_config
-from settings import Settings, get_settings
-from store import (
+from infra.db import get_session_factory
+from pipeline.metrics import compute_metrics, load_metrics_trend, save_metrics
+from pipeline.rag import build_and_store_embeddings
+from config.runtime import RuntimeConfig, load_runtime_config
+from config.settings import Settings, get_settings
+from pipeline.store import (
     compute_diff,
     diff_digest,
     save_events,
     snapshot_week_items,
     upsert_items,
 )
-from weeks import current_week, iso_week_of, prev_week, recent_weeks
+from common.weeks import current_week, iso_week_of, prev_week, recent_weeks
 
 logger = logging.getLogger(__name__)
 

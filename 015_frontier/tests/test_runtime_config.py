@@ -9,9 +9,9 @@ from datetime import date
 
 import pytest
 
-import runtime_config
-import weekly
-from runtime_config import RuntimeConfig, load_runtime_config, save_runtime_config
+from config import runtime as runtime_config
+from pipeline import weekly
+from config.runtime import RuntimeConfig, load_runtime_config, save_runtime_config
 
 
 @pytest.fixture()

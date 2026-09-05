@@ -24,7 +24,7 @@ def __sa_bindparam(name: str):
     return __sa_bindparam_factory(name, expanding=True)
 
 from collectors.base import Event, ItemRecord
-from weeks import iso_week_of, prev_week, week_end
+from common.weeks import iso_week_of, prev_week, week_end
 
 logger = logging.getLogger(__name__)
 

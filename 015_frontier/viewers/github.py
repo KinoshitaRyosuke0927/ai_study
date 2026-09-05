@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover
     ZoneInfo = None  # type: ignore
 
 from collectors.base import HttpClient
-from settings import Settings
+from config.settings import Settings
 
 logger = logging.getLogger(__name__)
 

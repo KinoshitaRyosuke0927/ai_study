@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 import responses
 
-from settings import Settings
-from trello_view import TrelloViewError, fetch_board, list_configured_boards
+from config.settings import Settings
+from viewers.trello import TrelloViewError, fetch_board, list_configured_boards
 
 API = "https://api.trello.com/1"
 

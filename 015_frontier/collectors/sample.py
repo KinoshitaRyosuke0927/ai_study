@@ -14,7 +14,7 @@ from __future__ import annotations
 import random
 from datetime import datetime, timedelta
 
-from weeks import current_week, recent_weeks, week_start
+from common.weeks import current_week, recent_weeks, week_start
 
 from .base import Event, ItemRecord
 

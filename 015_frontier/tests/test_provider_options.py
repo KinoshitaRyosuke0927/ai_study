@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import responses
 
-from provider_options import check_github_path, check_github_repo, check_growi_path
-from settings import Settings
+from viewers.options import check_github_path, check_github_repo, check_growi_path
+from config.settings import Settings
 
 
 def _settings(**over) -> Settings:

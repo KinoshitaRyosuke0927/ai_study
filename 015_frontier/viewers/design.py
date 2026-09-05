@@ -13,7 +13,7 @@ import logging
 from typing import Any
 
 from collectors.base import HttpClient
-from settings import Settings
+from config.settings import Settings
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from store import compute_diff, diff_digest
+from pipeline.store import compute_diff, diff_digest
 
 
 def _put_week_item(session, week, item_key, status, title):

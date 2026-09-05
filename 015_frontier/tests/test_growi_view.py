@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 import responses
 
-from growi_view import GrowiViewError, _relative_path, fetch_page, list_pages
-from settings import Settings
+from viewers.growi import GrowiViewError, _relative_path, fetch_page, list_pages
+from config.settings import Settings
 
 
 def test_relative_path():

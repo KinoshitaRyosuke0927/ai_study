@@ -12,8 +12,8 @@ import logging
 import re
 from typing import Any
 
-from settings import Settings
-from vectors import hash_embedding
+from config.settings import Settings
+from common.vectors import hash_embedding
 
 logger = logging.getLogger(__name__)
 

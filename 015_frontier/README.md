@@ -140,28 +140,44 @@ pytest
 
 ## 構成
 
+コードは役割ごとにパッケージへ分割しています。エントリポイントの `app.py` のみルート直下。
+
 ```
-app.py            FastAPI + APScheduler + 静的配信
-weekly.py         週次パイプライン(collectors → events → metrics → AI → embeddings)
-settings.py       pydantic-settings による設定
-db.py             SQLAlchemy エンジン / schema.sql 適用
-schema.sql        テーブル定義(CREATE TABLE IF NOT EXISTS)
-store.py          events/items 保存・週次断面・差分
-metrics.py        指標計算(すべて Python 側)
-ai.py             Azure OpenAI 分析(未設定時フォールバック)
-rag.py            埋め込み生成 + コサイン類似度検索
-vectors.py        float32 BLOB シリアライズ / コサイン
-weeks.py          ISO 週ユーティリティ
-runtime_config.py データ取得の実行時設定(acquisition_settings.json の読み書き)
-provider_options.py 設定画面のアクセス確認 / 選択肢取得(Mattermost/Trello/GitHub/GROWI)
-mattermost_view.py 「Mattermost情報取得」画面用の投稿取得(チャンネル別・スレッド構造)
-trello_view.py    「Trello情報取得」画面用のボード取得(リスト/カード/詳細/活動)
-growi_view.py     「wiki情報取得」画面用のページ取得(記事内容/更新履歴/コメント)
-github_view.py    「GitHub情報取得」画面用のブランチ活動 + PR 取得
-design_view.py    「設計書情報取得」画面用のフォルダ配下ファイル取得
-collectors/       base / sample / mattermost / github / growi / trello
-static/index.html 単一ファイルのダッシュボード
-docs/deploy-azure.md  Azure デプロイ手順
+app.py                 エントリポイント(FastAPI + APScheduler + 静的配信 + API ルーティング)
+schema.sql             テーブル定義(CREATE TABLE IF NOT EXISTS)
+
+config/                設定
+  settings.py            pydantic-settings による環境変数設定(旧 settings.py)
+  runtime.py             データ取得の実行時設定 acquisition_settings.json の読み書き(旧 runtime_config.py)
+
+infra/                インフラ
+  db.py                 SQLAlchemy エンジン / schema.sql 適用(旧 db.py)
+
+common/               共通ユーティリティ
+  weeks.py              ISO 週ユーティリティ(旧 weeks.py)
+  vectors.py            float32 BLOB シリアライズ / コサイン類似度(旧 vectors.py)
+
+pipeline/             週次分析パイプライン(collectors → events → metrics → AI → embeddings)
+  weekly.py             パイプライン本体・定期実行ディスパッチャ(旧 weekly.py)
+  store.py              events/items 保存・週次断面・差分(旧 store.py)
+  metrics.py            指標計算(すべて Python 側)(旧 metrics.py)
+  ai.py                 Azure OpenAI 分析(未設定時フォールバック)(旧 ai.py)
+  rag.py                埋め込み生成 + コサイン類似度検索(旧 rag.py)
+
+collectors/           実データ収集コレクタ
+  base.py sample.py mattermost.py github.py growi.py trello.py
+
+viewers/              各「情報取得」画面のバックエンド
+  options.py            設定画面のアクセス確認 / 選択肢取得(旧 provider_options.py)
+  mattermost.py         「Mattermost情報取得」投稿取得(チャンネル別・スレッド構造)(旧 mattermost_view.py)
+  trello.py             「Trello情報取得」ボード取得(リスト/カード/詳細/活動)(旧 trello_view.py)
+  growi.py              「wiki情報取得」ページ取得(記事内容/更新履歴/コメント)(旧 growi_view.py)
+  github.py             「GitHub情報取得」ブランチ活動 + PR 取得(旧 github_view.py)
+  design.py             「設計書情報取得」フォルダ配下ファイル取得(旧 design_view.py)
+
+static/index.html      単一ファイルのダッシュボード
+docs/deploy-azure.md   Azure デプロイ手順
+tests/                 pytest(モジュール構成に合わせた import)
 ```
 
 ## Azure へのデプロイ
