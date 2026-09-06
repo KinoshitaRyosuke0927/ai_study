@@ -55,6 +55,18 @@ def db_session(settings):
     for table in [
         "events", "items", "week_items", "metrics",
         "reports", "decisions", "embeddings", "runs",
+        "analysis_feature_refs", "analysis_features", "analysis_runs",
+        "spec_code_diff_items", "spec_code_diffs",
+        "mm_account_analysis_refs", "mm_account_analysis_items", "mm_account_analyses",
+        "mm_chunks", "mm_posts", "mm_users", "mm_channels", "mm_ingest_runs",
+        "tr_account_analysis_refs", "tr_account_analysis_items", "tr_account_analyses",
+        "tr_chunks", "tr_activity", "tr_card_members", "tr_cards", "tr_lists",
+        "tr_members", "tr_boards", "tr_ingest_runs",
+        "gh_author_analysis_refs", "gh_author_analysis_items", "gh_author_analyses",
+        "gh_change_chunks", "gh_commit_files", "gh_commits", "gh_files",
+        "gh_history_ingest_runs",
+        "gh_activity_chunks", "gh_activity", "gh_pull_requests", "gh_branches",
+        "gh_activity_ingest_runs", "gh_users",
     ]:
         session.execute(text(f"TRUNCATE TABLE {table}"))
     session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))

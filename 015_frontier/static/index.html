@@ -4,7 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Frontier ダッシュボード</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   /* ライトモードの配色。ヘッダのみ濃色。 */
   :root {
@@ -198,6 +197,12 @@
   .dsg-name { font-weight: 700; word-break: break-all; }
   .dsg-size { font-size: 11px; color: var(--muted); }
   .dsg-file .gw-body { margin: 10px 12px 12px; }
+  /* 機能分析(2回目のやり取り)の詳細仕様表示 */
+  .dsg-feat-overview { margin: 10px 12px; color: var(--muted); font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+  .dsg-spec-sec { margin: 10px 12px; }
+  .dsg-spec-sec > h4 { font-size: 13px; margin: 0 0 6px; color: var(--fg); border-bottom: 2px solid var(--accent); padding-bottom: 4px; }
+  .dsg-spec-body { white-space: pre-wrap; word-break: break-word; font-size: 13px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+  .dsg-feat-error { color: var(--problem); font-size: 13px; margin: 8px 12px; }
   button.act { cursor: pointer; }
   button.act.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   button.act:disabled { opacity: .5; cursor: not-allowed; }
@@ -225,6 +230,27 @@
   pre.summary { white-space: pre-wrap; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-family: inherit; }
   code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
   hr { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+  /* ダッシュボード: 実装差分(機能別)テーブル */
+  .sd-panel { cursor: pointer; }
+  .sd-sum { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+  .sd-sum b { font-weight: 700; }
+  .sd-table { table-layout: fixed; }
+  .sd-table th.num, .sd-table td.num { text-align: right; width: 64px; }
+  .sd-table th.bar, .sd-table td.bar { width: 168px; }
+  .sd-table td:first-child { word-break: break-word; }
+  .sd-table tbody tr:hover { background: var(--panel-2); }
+  .sd-feat { color: var(--accent); cursor: pointer; }
+  .sd-feat:hover { text-decoration: underline; }
+  .sd-table tfoot th { font-weight: 700; color: var(--fg); border-top: 2px solid var(--border); }
+  .sd-bar { display: flex; height: 10px; width: 150px; border-radius: 3px; overflow: hidden; background: var(--panel-2); }
+  .sd-bar > span { display: block; height: 100%; }
+  .sd-h { color: #dc2626; font-weight: 700; }
+  .sd-m { color: #d97706; font-weight: 700; }
+  .sd-l { color: #2563eb; font-weight: 700; }
+  .sd-z { color: var(--muted); }
+  .sd-seg-h { background: #dc2626; }
+  .sd-seg-m { background: #d97706; }
+  .sd-seg-l { background: #2563eb; }
 </style>
 </head>
 <body>
@@ -249,6 +275,9 @@
       <div class="side-item" data-tab="growi">wiki情報取得</div>
       <div class="side-item" data-tab="github">GitHub情報取得</div>
       <div class="side-item" data-tab="design">設計書情報取得</div>
+      <div class="side-item" data-tab="code">コード情報取得</div>
+      <div class="side-item" data-tab="changelog">変更履歴取得</div>
+      <div class="side-item" data-tab="specdiff">実装差分解析</div>
       <div class="side-item" data-tab="run">定期実行</div>
       <div class="side-item" data-tab="settings">設定</div>
     </nav>
@@ -257,11 +286,7 @@
       <div class="inner">
         <!-- ダッシュボード -->
         <section class="tab active" id="tab-dashboard">
-          <div class="row" id="metricCards"><span class="muted">読み込み中...</span></div>
-          <div class="panel">
-            <h2>指標の推移</h2>
-            <canvas id="trendChart" height="110"></canvas>
-          </div>
+          <div class="row" id="diffCards"><span class="muted">読み込み中...</span></div>
         </section>
 
         <!-- 週次レポート -->
@@ -305,7 +330,10 @@
             <div class="row" style="align-items:center">
               最新日 <input type="date" id="mmCurrentLatest" />
               <button class="act primary" id="mmCurrentBtn">取得</button>
+              <button class="act primary" id="mmAnalyzeBtn">分析</button>
+              <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="mmForce" /> キャッシュを無視して再分析</label>
             </div>
+            <p class="field-hint">「分析」は取得した投稿をチャンネル/アカウント別に DB へ蓄積し、アカウントごとにチャンネル横断の発言・活動を AI で分析します(結果は保存され、次回以降は投稿に変化が無ければ保存済みを表示)。会話は RAG 用にも蓄積されます。</p>
 
             <hr />
 
@@ -323,6 +351,13 @@
             <div id="mmStatus" class="muted"></div>
             <div id="mmResults"></div>
           </div>
+
+          <div class="panel">
+            <h2>分析結果(アカウント別・チャンネル横断) <span id="mmAnalysisSummary" class="muted"></span></h2>
+            <div id="mmAnalysisStatus" class="muted"></div>
+            <div id="mmAnalysisTopics" style="margin:6px 0"></div>
+            <div id="mmAnalysisResults"></div>
+          </div>
         </section>
 
         <!-- Trello 情報取得 -->
@@ -333,13 +368,23 @@
             <div class="row" style="align-items:center">
               <select id="trelloBoardSelect"><option value="">読み込み中...</option></select>
               <button class="act primary" id="trelloFetchBtn">取得</button>
+              <button class="act primary" id="trelloAnalyzeBtn">分析</button>
+              <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="trelloForce" /> キャッシュを無視して再分析</label>
             </div>
+            <p class="field-hint">「分析」は設定した全ボードのカード/活動をボード/カード/アカウント別に DB へ蓄積し、アカウントごとにボード横断の活動を AI で分析します(結果は保存、投稿に変化が無ければ保存済みを表示)。カードは RAG 用にも蓄積されます。</p>
           </div>
 
           <div class="panel">
             <h2>取得結果 <span id="trelloResultSummary" class="muted"></span></h2>
             <div id="trelloStatus" class="muted"></div>
             <div id="trelloResults"></div>
+          </div>
+
+          <div class="panel">
+            <h2>分析結果(アカウント別・ボード横断) <span id="trelloAnalysisSummary" class="muted"></span></h2>
+            <div id="trelloAnalysisStatus" class="muted"></div>
+            <div id="trelloAnalysisTopics" style="margin:6px 0"></div>
+            <div id="trelloAnalysisResults"></div>
           </div>
         </section>
 
@@ -367,11 +412,16 @@
           <div class="panel">
             <h2>取得</h2>
             <p class="field-hint" id="ghMeta">対象リポジトリ: 読み込み中...</p>
-            <button class="act primary" id="ghFetchBtn">取得</button>
+            <div class="row" style="align-items:center">
+              <button class="act primary" id="ghFetchBtn">取得</button>
+              <button class="act primary" id="ghIngestBtn">DB登録</button>
+              <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="ghForce" /> 変化が無くても再登録</label>
+            </div>
             <p class="field-hint" style="margin-top:10px">
               ※ ブランチの「操作」は、そのブランチへのコミット履歴(直近15件)で表します。
               GitHub にはリポジトリ単位のブランチ操作ログ API が無いため、ブランチ作成/削除の記録は取得できません。
               PR のマージ実行者・コメントは処理量の都合で直近30件のみ取得します。
+              「DB登録」で「誰が・いつ・どのような操作/コメントをしたか」を DB に記録し、RAG 用にも蓄積します(分析は行いません)。
             </p>
           </div>
 
@@ -380,6 +430,13 @@
             <div id="ghStatus" class="muted"></div>
             <div id="ghResults"></div>
           </div>
+
+          <div class="panel">
+            <h2>登録済みアクティビティ(誰が何をしたか) <span id="ghActSummary" class="muted"></span></h2>
+            <div id="ghActStatus" class="muted"></div>
+            <div id="ghActByActor"></div>
+            <div id="ghActLog"></div>
+          </div>
         </section>
 
         <!-- 設計書情報取得 -->
@@ -387,13 +444,87 @@
           <div class="panel">
             <h2>取得</h2>
             <p class="field-hint" id="dsgMeta">対象: 読み込み中...</p>
-            <button class="act primary" id="dsgFetchBtn">取得</button>
+            <div class="row" style="align-items:center">
+              <button class="act primary" id="dsgFetchBtn">取得</button>
+              <button class="act primary" id="dsgAnalyzeBtn">機能分析</button>
+              <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="dsgForce" /> キャッシュを無視して再分析</label>
+            </div>
+            <p class="field-hint" style="margin-top:10px">
+              ※「機能分析」は設計書を取得し、その内容から AI がこのアプリケーションの機能を分析します。結果は DB に保存され、次回以降は設計書に変更が無ければ保存済みの結果を表示します。
+            </p>
           </div>
 
           <div class="panel">
-            <h2>取得結果 <span id="dsgResultSummary" class="muted"></span></h2>
+            <h2><span id="dsgResultTitle">取得結果</span> <span id="dsgResultSummary" class="muted"></span></h2>
             <div id="dsgStatus" class="muted"></div>
             <div id="dsgResults"></div>
+          </div>
+        </section>
+
+        <!-- コード情報取得 -->
+        <section class="tab" id="tab-code">
+          <div class="panel">
+            <h2>取得</h2>
+            <p class="field-hint" id="codeMeta">対象: 読み込み中...</p>
+            <div class="row" style="align-items:center">
+              <button class="act primary" id="codeFetchBtn">取得</button>
+              <button class="act primary" id="codeAnalyzeBtn">機能分析</button>
+              <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="codeForce" /> キャッシュを無視して再分析</label>
+            </div>
+            <p class="field-hint" style="margin-top:10px">
+              ※「機能分析」はリポジトリ全体のソースコードを取得し、コード構造から AI がこのアプリケーションの機能を洗い出したうえで、機能ごとに該当する関数/クラスへ絞り込んで詳細仕様を分析します。結果は DB に保存され、次回以降はコードに変更が無ければ保存済みの結果を表示します。
+            </p>
+          </div>
+
+          <div class="panel">
+            <h2><span id="codeResultTitle">取得結果</span> <span id="codeResultSummary" class="muted"></span></h2>
+            <div id="codeStatus" class="muted"></div>
+            <div id="codeResults"></div>
+          </div>
+        </section>
+
+        <!-- 変更履歴取得 -->
+        <section class="tab" id="tab-changelog">
+          <div class="panel">
+            <h2>取得</h2>
+            <p class="field-hint" id="clMeta">対象: 読み込み中...</p>
+            <div class="row" style="align-items:center">
+              <button class="act primary" id="clFetchBtn">取得</button>
+              <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="clFull" /> 全期間(取得開始日を無視)</label>
+              <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="clForceFetch" /> 増分を無視して取り直す</label>
+              <button class="act primary" id="clAnalyzeBtn">分析</button>
+              <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="clForce" /> キャッシュを無視して再分析</label>
+            </div>
+            <p class="field-hint">既定ブランチのコミット履歴をファイル単位・ユーザ単位で DB に蓄積します(patch 本体は保存せず、変更箇所の見出しと打ち切り抜粋のみ)。2回目以降は前回 HEAD からの増分だけ取得。「分析」はアカウントごとの変更傾向を AI 分析します。会話ログと同様に RAG 用にも蓄積されます。</p>
+          </div>
+
+          <div class="panel">
+            <h2>取得結果 <span id="clSummary" class="muted"></span></h2>
+            <div id="clStatus" class="muted"></div>
+            <div id="clUsers"></div>
+            <div id="clFiles"></div>
+          </div>
+
+          <div class="panel">
+            <h2>分析結果(アカウント別) <span id="clAnalysisSummary" class="muted"></span></h2>
+            <div id="clAnalysisStatus" class="muted"></div>
+            <div id="clAnalysisTopics" style="margin:6px 0"></div>
+            <div id="clAnalysisResults"></div>
+          </div>
+        </section>
+
+        <!-- 実装差分解析 -->
+        <section class="tab" id="tab-specdiff">
+          <div class="panel">
+            <h2>差分解析</h2>
+            <p class="field-hint">DB に保存済みの最新の「設計書分析」結果と「コード分析」結果を、機能ごとに AI で突き合わせ、相違点を抽出します。先に「設計書情報取得」「コード情報取得」で機能分析を実行してください。結果は保存され、ダッシュボードで件数を確認できます。</p>
+            <button class="act primary" id="specDiffBtn">差分解析</button>
+          </div>
+
+          <div class="panel">
+            <h2>差分 <span id="specDiffSummary" class="muted"></span></h2>
+            <div id="specDiffStatus" class="muted"></div>
+            <div id="specDiffResults"></div>
           </div>
         </section>
 
@@ -499,15 +630,25 @@ function selectTab(name) {
   // 設定画面は表示のたびに最新の選択肢(チャンネル/ボード)を取得する
   if (name === "settings") loadSettings().catch(() => {});
   // Mattermost 情報取得は条件欄のヒントだけ更新(取得結果はそのまま残す)
-  if (name === "mattermost") loadMattermostMeta().catch(() => {});
+  if (name === "mattermost") { loadMattermostMeta().catch(() => {}); loadLatestMattermostAnalysis().catch(() => {}); }
   // Trello 情報取得はボード選択肢だけ更新(取得結果はそのまま残す)
-  if (name === "trello") loadTrelloBoards().catch(() => {});
+  if (name === "trello") { loadTrelloBoards().catch(() => {}); loadLatestTrelloAnalysis().catch(() => {}); }
   // wiki 情報取得は設定パスのヒントだけ更新(一覧・取得結果はそのまま残す)
   if (name === "growi") loadGrowiMeta().catch(() => {});
   // GitHub 情報取得は対象リポジトリのヒントだけ更新(取得結果はそのまま残す)
-  if (name === "github") loadGithubMeta().catch(() => {});
-  // 設計書情報取得は対象フォルダのヒントだけ更新(取得結果はそのまま残す)
-  if (name === "design") loadDesignMeta().catch(() => {});
+  if (name === "github") { loadGithubMeta().catch(() => {}); loadGithubActivity().catch(() => {}); }
+  // 設計書情報取得: 対象フォルダのヒント更新 + 未表示なら保存済み分析結果を復元
+  if (name === "design") { loadDesignMeta().catch(() => {}); loadLatestDesignAnalysis().catch(() => {}); }
+  // コード情報取得: 対象リポジトリのヒント更新 + 未表示なら保存済み分析結果を復元
+  if (name === "code") { loadCodeMeta().catch(() => {}); loadLatestCodeAnalysis().catch(() => {}); }
+  // 実装差分解析: 未表示なら保存済みの差分解析結果を復元
+  if (name === "specdiff") loadLatestSpecDiff().catch(() => {});
+  // 変更履歴取得: 対象ヒント更新 + 保存済みサマリ・分析を復元
+  if (name === "changelog") {
+    loadChangelogMeta().catch(() => {});
+    loadChangelogSummary().catch(() => {});
+    loadLatestChangelogAnalysis().catch(() => {});
+  }
 }
 $$("#side .side-item").forEach((b) => b.addEventListener("click", () => selectTab(b.dataset.tab)));
 // ヘッダの「Frontier」クリックでダッシュボードへ
@@ -520,46 +661,6 @@ async function loadHealth() {
     $("#modeBadge").textContent = "mode: " + h.run_mode + (h.status === "ok" ? "" : " (DB NG)");
     $("#aiBadge").textContent = "AI: " + (h.ai_enabled ? "接続" : "フォールバック");
   } catch (e) { $("#modeBadge").textContent = "health error"; }
-}
-
-// --- ダッシュボード ---
-const METRIC_LABELS = {
-  mattermost_posts: "MM投稿数", mattermost_active_users: "MMアクティブ人数",
-  trello_cards_created: "カード作成", trello_cards_done: "カード完了", trello_wip: "WIP",
-  github_commits: "コミット", github_prs_merged: "PRマージ", github_prs_opened: "PRオープン",
-  github_stale_prs: "滞留PR", github_issues_reopened: "issue再オープン",
-  growi_pages_created: "Wiki作成", growi_pages_updated: "Wiki更新",
-};
-let trendChart = null;
-async function loadDashboard() {
-  const m = await api("/api/metrics");
-  const cont = $("#metricCards");
-  if (!m.weeks.length) { cont.innerHTML = '<span class="muted">データがありません。「定期実行」タブから実行してください。</span>'; return; }
-  const last = m.weeks[m.weeks.length - 1];
-  const lastData = m.data[last] || {};
-  cont.innerHTML = m.metric_names.map((n) =>
-    `<div class="card metric-card"><div class="l">${esc(METRIC_LABELS[n] || n)}</div><div class="v">${(lastData[n] ?? 0)}</div></div>`
-  ).join("");
-
-  const palette = ["#2563eb", "#16a34a", "#dc2626", "#d97706", "#7c3aed", "#0891b2", "#db2777", "#65a30d"];
-  const shown = ["mattermost_posts", "github_commits", "github_prs_merged", "github_stale_prs", "trello_wip", "trello_cards_done"];
-  const datasets = shown.map((n, i) => ({
-    label: METRIC_LABELS[n] || n,
-    data: m.weeks.map((w) => (m.data[w] || {})[n] ?? 0),
-    borderColor: palette[i % palette.length],
-    backgroundColor: palette[i % palette.length] + "22",
-    tension: 0.25,
-  }));
-  if (trendChart) trendChart.destroy();
-  trendChart = new Chart($("#trendChart"), {
-    type: "line",
-    data: { labels: m.weeks, datasets },
-    options: {
-      responsive: true,
-      plugins: { legend: { labels: { color: "#6b7787" } } },
-      scales: { x: { ticks: { color: "#6b7787" }, grid: { color: "#e5e9f0" } }, y: { ticks: { color: "#6b7787" }, grid: { color: "#e5e9f0" } } },
-    },
-  });
 }
 
 // --- 週セレクタ ---
@@ -873,6 +974,154 @@ function renderMattermost(r) {
   }).join("");
 }
 
+// --- Mattermost 分析(アカウント別・チャンネル横断) ---
+// 分析結果はタブを切り替えても保持(アプリ停止で消えるのは仕様どおり)
+let mmAnalysis = null;
+async function analyzeMattermost() {
+  $("#mmAnalyzeBtn").disabled = true;
+  $("#mmCurrentBtn").disabled = true;
+  $("#mmAnalysisStatus").innerHTML = '<span class="spinner"></span> 分析中...(投稿の蓄積 → チーム話題の抽出 → アカウントごとの分析を行うため時間がかかる場合があります)';
+  $("#mmAnalysisSummary").textContent = "";
+  try {
+    const force = $("#mmForce").checked;
+    const body = { mode: "current", latest_date: $("#mmCurrentLatest").value || null };
+    const r = await api("/api/mattermost/analyze" + (force ? "?force=true" : ""), {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    mmAnalysis = r;
+    renderMattermostAnalysis(r);
+    const at = (r.saved_at || "").replace("T", " ").slice(0, 16);
+    $("#mmAnalysisStatus").innerHTML = `<span class="muted">${r.cached ? "投稿に変化が無いため保存済みの結果を表示" : "分析して保存しました"}(analysis #${r.analysis_id} / ${esc(at)})。作り直す場合は「キャッシュを無視して再分析」。</span>`;
+  } catch (e) {
+    $("#mmAnalysisStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#mmAnalysisResults").innerHTML = "";
+    $("#mmAnalysisTopics").innerHTML = "";
+    mmAnalysis = null;
+  } finally {
+    $("#mmAnalyzeBtn").disabled = false;
+    $("#mmCurrentBtn").disabled = false;
+  }
+}
+async function loadLatestMattermostAnalysis() {
+  if (mmAnalysis) return;
+  try {
+    const r = await api("/api/mattermost/analysis/latest");
+    if (!r.analysis_id) return;
+    mmAnalysis = r;
+    renderMattermostAnalysis(r);
+    const at = (r.saved_at || "").replace("T", " ").slice(0, 16);
+    $("#mmAnalysisStatus").innerHTML = `<span class="muted">保存済みの分析結果を表示しています(analysis #${r.analysis_id} / ${esc(at)})。</span>`;
+  } catch (e) { /* 無ければ何もしない */ }
+}
+// mm / trello 共通: アカウント分析 1 件のアコーディオンカード
+function accountAnalysisCard(o) {
+  const chips = (o.chips || []).map((t) => `<span class="badge">${esc(t)}</span>`).join(" ");
+  const overview = o.overview ? `<div class="dsg-feat-overview">${esc(o.overview)}</div>` : "";
+  const err = o.error ? `<div class="dsg-feat-error">${esc(o.error)}</div>` : "";
+  const secs = (o.sections || []).map((x) => `
+    <div class="dsg-spec-sec">
+      <h4>${esc(x.heading)}</h4>
+      <div class="dsg-spec-body">${esc(x.body) || '<span class="muted">(記載なし)</span>'}</div>
+    </div>`).join("");
+  const noSec = (!o.error && !(o.sections || []).length)
+    ? `<div class="muted" style="margin:0 12px 10px">${esc(o.emptyText || "分析できる内容がありませんでした。")}</div>` : "";
+  const refNote = o.refCount
+    ? `<div class="muted" style="margin:6px 12px 10px;font-size:12px">根拠にした${esc(o.refLabel || "記録")}: ${o.refCount} 件(トレーサビリティ用に保存)</div>` : "";
+  return `<details class="dsg-file">
+    <summary><span class="dsg-name">${esc(o.title)}</span> ${chips}</summary>
+    ${overview}${o.extraTop || ""}${err}${secs}${noSec}${refNote}
+  </details>`;
+}
+function renderMattermostAccount(a) {
+  const s = a.stats || {};
+  const chList = (s.channels || []).slice(0, 8).map((c) => esc(c)).join("、 ");
+  return accountAnalysisCard({
+    title: a.username,
+    chips: [
+      `投稿 ${s.post_count ?? 0}`, `返信 ${s.reply_count ?? 0}`, `スレ立 ${s.thread_started ?? 0}`,
+      `被リアクション ${s.reactions_received ?? 0}`, `参加ch ${s.channel_count ?? 0}`, `活動 ${s.active_days ?? 0}日`,
+    ],
+    overview: a.overview, error: a.error, sections: a.sections,
+    extraTop: chList ? `<div class="field-hint" style="margin:8px 12px">主な参加チャンネル: ${chList}</div>` : "",
+    emptyText: "発言から分析できる内容がありませんでした。",
+    refCount: (a.refs || []).length, refLabel: "投稿",
+  });
+}
+function renderMattermostAnalysis(r) {
+  $("#mmAnalysisStatus").textContent = "";
+  const w = r.window || {};
+  $("#mmAnalysisSummary").textContent =
+    `期間 ${w.start ?? "-"} 〜 ${w.end ?? "-"} / ${r.account_count} アカウント / ${r.post_count ?? "-"} 投稿 / チャンク ${r.chunk_count ?? "-"}(埋め込み更新 ${r.embedded_chunks ?? 0})`;
+  $("#mmAnalysisTopics").innerHTML = (r.topics || []).length
+    ? `<span class="muted" style="font-size:12px">チーム内の主な話題:</span> ${(r.topics || []).map((t) => `<span class="badge">${esc(t)}</span>`).join(" ")}`
+    : "";
+  $("#mmAnalysisResults").innerHTML = (r.accounts || []).length
+    ? r.accounts.map(renderMattermostAccount).join("")
+    : '<span class="muted">分析対象のアカウントがありませんでした。</span>';
+}
+
+// --- Trello 分析(アカウント別・ボード横断) ---
+let trelloAnalysis = null;
+async function analyzeTrello() {
+  $("#trelloAnalyzeBtn").disabled = true;
+  $("#trelloFetchBtn").disabled = true;
+  $("#trelloAnalysisStatus").innerHTML = '<span class="spinner"></span> 分析中...(カードの蓄積 → 作業テーマの抽出 → アカウントごとの分析を行うため時間がかかる場合があります)';
+  $("#trelloAnalysisSummary").textContent = "";
+  try {
+    const force = $("#trelloForce").checked;
+    const r = await api("/api/trello/analyze" + (force ? "?force=true" : ""), { method: "POST" });
+    trelloAnalysis = r;
+    renderTrelloAnalysis(r);
+    const at = (r.saved_at || "").replace("T", " ").slice(0, 16);
+    $("#trelloAnalysisStatus").innerHTML = `<span class="muted">${r.cached ? "カード/活動に変化が無いため保存済みの結果を表示" : "分析して保存しました"}(analysis #${r.analysis_id} / ${esc(at)})。作り直す場合は「キャッシュを無視して再分析」。</span>`;
+  } catch (e) {
+    $("#trelloAnalysisStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#trelloAnalysisResults").innerHTML = "";
+    $("#trelloAnalysisTopics").innerHTML = "";
+    trelloAnalysis = null;
+  } finally {
+    $("#trelloAnalyzeBtn").disabled = false;
+    $("#trelloFetchBtn").disabled = false;
+  }
+}
+async function loadLatestTrelloAnalysis() {
+  if (trelloAnalysis) return;
+  try {
+    const r = await api("/api/trello/analysis/latest");
+    if (!r.analysis_id) return;
+    trelloAnalysis = r;
+    renderTrelloAnalysis(r);
+    const at = (r.saved_at || "").replace("T", " ").slice(0, 16);
+    $("#trelloAnalysisStatus").innerHTML = `<span class="muted">保存済みの分析結果を表示しています(analysis #${r.analysis_id} / ${esc(at)})。</span>`;
+  } catch (e) { /* 無ければ何もしない */ }
+}
+function renderTrelloAccount(a) {
+  const s = a.stats || {};
+  const bdList = (s.boards || []).slice(0, 8).map((b) => esc(b)).join("、 ");
+  return accountAnalysisCard({
+    title: a.full_name ? `${a.username}(${a.full_name})` : a.username,
+    chips: [
+      `コメント ${s.comment_count ?? 0}`, `操作 ${s.action_count ?? 0}`, `担当カード ${s.assigned_cards ?? 0}`,
+      `関与ボード ${s.board_count ?? 0}`, `関与リスト ${s.list_count ?? 0}`,
+    ],
+    overview: a.overview, error: a.error, sections: a.sections,
+    extraTop: bdList ? `<div class="field-hint" style="margin:8px 12px">関与ボード: ${bdList}</div>` : "",
+    emptyText: "活動から分析できる内容がありませんでした。",
+    refCount: (a.refs || []).length, refLabel: "カード・コメント",
+  });
+}
+function renderTrelloAnalysis(r) {
+  $("#trelloAnalysisStatus").textContent = "";
+  $("#trelloAnalysisSummary").textContent =
+    `${r.board_count ?? (r.board_ids || []).length} ボード / ${r.account_count} アカウント / カード ${r.card_count ?? "-"} / 活動 ${r.activity_count ?? "-"} / チャンク ${r.chunk_count ?? "-"}(埋め込み更新 ${r.embedded_chunks ?? 0})`;
+  $("#trelloAnalysisTopics").innerHTML = (r.themes || []).length
+    ? `<span class="muted" style="font-size:12px">チームの作業テーマ:</span> ${(r.themes || []).map((t) => `<span class="badge">${esc(t)}</span>`).join(" ")}`
+    : "";
+  $("#trelloAnalysisResults").innerHTML = (r.accounts || []).length
+    ? r.accounts.map(renderTrelloAccount).join("")
+    : '<span class="muted">分析対象のアカウントがありませんでした。</span>';
+}
+
 // --- Trello 情報取得 ---
 // 取得結果はタブを切り替えても保持(アプリ停止で消えるのは仕様どおり)
 let trelloResult = null;
@@ -1110,9 +1359,73 @@ function renderGithub(r) {
     </div>`;
 }
 
+// --- GitHub 活動の DB 登録(誰が何をしたか) ---
+let githubActivity = null;
+const GH_KIND_COLS = [
+  ["commit", "コミット"], ["pr_opened", "PR作成"], ["pr_merged", "マージ"],
+  ["pr_closed", "PRクローズ"], ["pr_comment", "コメント"], ["pr_review", "レビュー"],
+];
+function renderGithubActivity(r) {
+  $("#ghActStatus").textContent = "";
+  $("#ghActSummary").textContent =
+    `${esc(r.repo || "")} / ブランチ ${r.branch_count ?? "-"} / PR ${r.pr_count ?? "-"} / 活動 ${r.activity_total ?? 0} 件`
+    + (r.last_run_at ? ` / 最終登録 ${esc((r.last_run_at || "").replace("T", " ").slice(0, 16))}` : "");
+  const tally = (r.by_actor || []).map((a) => `<tr>
+      <td>${esc(a.actor)}</td>
+      ${GH_KIND_COLS.map(([k]) => `<td class="num">${a[k] || 0}</td>`).join("")}
+      <td class="num"><b>${a.total}</b></td>
+    </tr>`).join("");
+  $("#ghActByActor").innerHTML = tally
+    ? `<h3>アカウント別</h3><div style="overflow-x:auto"><table class="sd-table">
+        <thead><tr><th>ユーザ</th>${GH_KIND_COLS.map(([, l]) => `<th class="num">${l}</th>`).join("")}<th class="num">計</th></tr></thead>
+        <tbody>${tally}</tbody></table></div>`
+    : '<span class="muted">まだ活動が登録されていません。「DB登録」を実行してください。</span>';
+  const log = (r.activities || []).map((a) => `<tr>
+      <td>${esc((a.occurred_at || "").replace("T", " ").slice(0, 16))}</td>
+      <td>${esc(a.actor || "(不明)")}</td>
+      <td><span class="badge">${esc(a.kind_label)}</span></td>
+      <td>${a.pr_number != null ? `PR #${a.pr_number}` : (a.branch ? esc(a.branch) : "")}</td>
+      <td style="word-break:break-word">${esc(a.summary)}${a.body_excerpt ? " — " + esc(a.body_excerpt) : (a.title && a.pr_number != null ? " — " + esc(a.title) : "")}</td>
+    </tr>`).join("");
+  $("#ghActLog").innerHTML = log
+    ? `<h3 style="margin-top:16px">アクティビティ(新しい順・最大 ${(r.activities || []).length} 件)</h3><div style="overflow-x:auto"><table class="sd-table">
+        <thead><tr><th style="width:130px">日時</th><th>ユーザ</th><th>操作</th><th>対象</th><th>内容</th></tr></thead>
+        <tbody>${log}</tbody></table></div>`
+    : "";
+}
+async function loadGithubActivity() {
+  if (githubActivity) return;
+  try {
+    const r = await api("/api/github/activity/summary");
+    if (!r.activity_total) return;
+    githubActivity = r;
+    renderGithubActivity(r);
+  } catch (e) { /* 無ければ何もしない */ }
+}
+async function ingestGithub() {
+  $("#ghIngestBtn").disabled = true;
+  $("#ghFetchBtn").disabled = true;
+  $("#ghActStatus").innerHTML = '<span class="spinner"></span> DB 登録中...(ブランチ活動と PR/コメントを取得して記録します)';
+  $("#ghActSummary").textContent = "";
+  try {
+    const force = $("#ghForce").checked;
+    const r = await api("/api/github/ingest" + (force ? "?force=true" : ""), { method: "POST" });
+    githubActivity = r;
+    renderGithubActivity(r);
+    $("#ghActStatus").innerHTML = `<span class="muted">${r.ingested ? `登録しました(活動 ${r.activity_total} 件 / チャンク ${r.chunk_count}・埋め込み更新 ${r.embedded_chunks})` : "変化が無いため登録済みの内容を表示"}。</span>`;
+  } catch (e) {
+    $("#ghActStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    githubActivity = null;
+  } finally {
+    $("#ghIngestBtn").disabled = false;
+    $("#ghFetchBtn").disabled = false;
+  }
+}
+
 // --- 設計書情報取得 ---
-// 取得結果はタブを切り替えても保持(アプリ停止で消えるのは仕様どおり)
+// 取得結果・分析結果はタブを切り替えても保持(アプリ停止で消えるのは仕様どおり)
 let designResult = null;
+let designAnalysis = null;
 async function loadDesignMeta() {
   try {
     const d = await api("/api/settings");
@@ -1125,6 +1438,9 @@ async function loadDesignMeta() {
 }
 async function fetchDesign() {
   $("#dsgFetchBtn").disabled = true;
+  $("#dsgAnalyzeBtn").disabled = true;
+  // 取得結果を表示するのでラベルを「取得結果」に戻す
+  $("#dsgResultTitle").textContent = "取得結果";
   $("#dsgStatus").innerHTML = '<span class="spinner"></span> 取得中...';
   $("#dsgResultSummary").textContent = "";
   try {
@@ -1137,7 +1453,49 @@ async function fetchDesign() {
     designResult = null;
   } finally {
     $("#dsgFetchBtn").disabled = false;
+    $("#dsgAnalyzeBtn").disabled = false;
   }
+}
+// 保存済み run のメタ情報(いつ保存 / キャッシュ再利用か)を1行で表す
+function analysisSavedNote(r) {
+  const at = (r.saved_at || "").replace("T", " ").slice(0, 16);
+  const src = r.cached ? "内容に変更が無いため保存済みの結果を表示" : "分析して保存しました";
+  return `<span class="muted">${src}(run #${r.run_id} / ${esc(at)})。作り直す場合は「キャッシュを無視して再分析」。</span>`;
+}
+// 「機能分析」: 設計書を取得し、その内容から AI がアプリの機能一覧を分析する
+async function analyzeDesign() {
+  $("#dsgFetchBtn").disabled = true;
+  $("#dsgAnalyzeBtn").disabled = true;
+  // 分析結果を表示するのでラベルを「分析結果」に変更する
+  $("#dsgResultTitle").textContent = "分析結果";
+  $("#dsgStatus").innerHTML = '<span class="spinner"></span> 機能を分析中...(全体の機能の洗い出し → 機能ごとに該当箇所へ絞り込んで詳細仕様を読み取るため時間がかかる場合があります)';
+  $("#dsgResultSummary").textContent = "";
+  try {
+    const force = $("#dsgForce").checked;
+    const r = await api("/api/design/analyze" + (force ? "?force=true" : ""), { method: "POST" });
+    designAnalysis = r;
+    renderDesignAnalysis(r);
+    $("#dsgStatus").innerHTML = analysisSavedNote(r);
+  } catch (e) {
+    $("#dsgStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#dsgResults").innerHTML = "";
+    designAnalysis = null;
+  } finally {
+    $("#dsgFetchBtn").disabled = false;
+    $("#dsgAnalyzeBtn").disabled = false;
+  }
+}
+// タブを開いたとき、まだ何も表示していなければ保存済みの最新分析結果を表示する
+async function loadLatestDesignAnalysis() {
+  if (designAnalysis || designResult) return;
+  try {
+    const runs = await api("/api/analysis/runs?kind=design&limit=1");
+    if (!runs.length) return;
+    const r = await api("/api/analysis/runs/" + runs[0].id);
+    designAnalysis = r;
+    renderDesignAnalysis(r);
+    $("#dsgStatus").innerHTML = analysisSavedNote({ ...r, cached: true });
+  } catch (e) { /* 保存済みが無ければ何もしない */ }
 }
 function renderDesignFile(f) {
   let body;
@@ -1157,15 +1515,499 @@ function renderDesignFile(f) {
 }
 function renderDesign(r) {
   $("#dsgStatus").textContent = "";
+  $("#dsgResultTitle").textContent = "取得結果";
   const note = r.truncated ? `(上限 ${r.file_count} 件で打ち切り)` : "";
   $("#dsgResultSummary").textContent = `${esc(r.repo)}@${esc(r.branch)} / ${esc(r.path)} / ${r.file_count} ファイル${note}`;
   $("#dsgResults").innerHTML = (r.files || []).length
     ? r.files.map(renderDesignFile).join("")
     : '<span class="muted">ファイルがありません。</span>';
 }
+// 機能分析(2回目のやり取り)の結果を、機能ごとに詳細仕様として表示する
+function renderDesignFeatureDetail(f) {
+  // 概要
+  const overview = f.overview
+    ? `<div class="dsg-feat-overview">${esc(f.overview)}</div>` : "";
+  // 詳細分析に失敗した機能はエラー文言を表示する
+  const err = f.error ? `<div class="dsg-feat-error">${esc(f.error)}</div>` : "";
+  // 2回目リクエストの絞り込み状況(動作確認用のバッジ)
+  const mode = f.context_mode === "full"
+    ? '<span class="badge">全文フォールバック</span>'
+    : `<span class="badge">絞り込み ${(f.selected_section_ids || []).length} 節 / ${f.context_char_len || 0} 字</span>`;
+  // 見出しごとの詳細仕様
+  const secs = (f.sections || []).map((s) => `
+    <div class="dsg-spec-sec">
+      <h4>${esc(s.heading)}</h4>
+      <div class="dsg-spec-body">${esc(s.body) || '<span class="muted">(記載なし)</span>'}</div>
+    </div>`).join("");
+  const noSec = (!f.error && !(f.sections || []).length)
+    ? '<div class="muted" style="margin:0 12px 10px">詳細な仕様は設計書から読み取れませんでした。</div>' : "";
+  return `<details class="dsg-file" open>
+    <summary><span class="dsg-name">${esc(f.name)}</span>${mode}</summary>
+    ${overview}${err}${secs}${noSec}
+  </details>`;
+}
+function renderDesignAnalysis(r) {
+  $("#dsgStatus").textContent = "";
+  $("#dsgResultTitle").textContent = "分析結果";
+  $("#dsgResultSummary").textContent =
+    `${esc(r.repo)}@${esc(r.branch)} / ${esc(r.path)} / ${r.feature_count} 機能` +
+    `(${r.analyzed_file_count} ファイル・全 ${r.section_count ?? "-"} 節 / 共通 ${r.common_section_count ?? "-"} 節)`;
+  $("#dsgResults").innerHTML = (r.features || []).length
+    ? r.features.map(renderDesignFeatureDetail).join("")
+    : '<span class="muted">機能を抽出できませんでした。</span>';
+}
+
+// --- コード情報取得 ---
+// 取得結果・分析結果はタブを切り替えても保持(アプリ停止で消えるのは仕様どおり)
+let codeResult = null;
+let codeAnalysis = null;
+async function loadCodeMeta() {
+  try {
+    const d = await api("/api/settings");
+    const repo = d.config.github_repo;
+    $("#codeMeta").textContent = repo
+      ? `対象: ${repo} のリポジトリ全体(設定画面の「GitHub リポジトリ名称」)`
+      : "設定画面で「GitHub リポジトリ名称」を設定してください。";
+  } catch (e) { /* ヒントのみ */ }
+}
+async function fetchCode() {
+  $("#codeFetchBtn").disabled = true;
+  $("#codeAnalyzeBtn").disabled = true;
+  // 取得結果を表示するのでラベルを「取得結果」に戻す
+  $("#codeResultTitle").textContent = "取得結果";
+  $("#codeStatus").innerHTML = '<span class="spinner"></span> 取得中...(リポジトリ全体のため時間がかかる場合があります)';
+  $("#codeResultSummary").textContent = "";
+  try {
+    const r = await api("/api/code/fetch", { method: "POST" });
+    codeResult = r;
+    renderCode(r);
+  } catch (e) {
+    $("#codeStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#codeResults").innerHTML = "";
+    codeResult = null;
+  } finally {
+    $("#codeFetchBtn").disabled = false;
+    $("#codeAnalyzeBtn").disabled = false;
+  }
+}
+// 「機能分析」: コードを取得し、コード構造から AI がアプリの機能一覧を分析する
+async function analyzeCode() {
+  $("#codeFetchBtn").disabled = true;
+  $("#codeAnalyzeBtn").disabled = true;
+  // 分析結果を表示するのでラベルを「分析結果」に変更する
+  $("#codeResultTitle").textContent = "分析結果";
+  $("#codeStatus").innerHTML = '<span class="spinner"></span> 機能を分析中...(コードの取得 → 機能の洗い出し → 機能ごとに該当する関数/クラスへ絞り込んで詳細仕様を分析するため時間がかかる場合があります)';
+  $("#codeResultSummary").textContent = "";
+  try {
+    const force = $("#codeForce").checked;
+    const r = await api("/api/code/analyze" + (force ? "?force=true" : ""), { method: "POST" });
+    codeAnalysis = r;
+    renderCodeAnalysis(r);
+    $("#codeStatus").innerHTML = analysisSavedNote(r);
+  } catch (e) {
+    $("#codeStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#codeResults").innerHTML = "";
+    codeAnalysis = null;
+  } finally {
+    $("#codeFetchBtn").disabled = false;
+    $("#codeAnalyzeBtn").disabled = false;
+  }
+}
+// タブを開いたとき、まだ何も表示していなければ保存済みの最新分析結果を表示する
+async function loadLatestCodeAnalysis() {
+  if (codeAnalysis || codeResult) return;
+  try {
+    const runs = await api("/api/analysis/runs?kind=code&limit=1");
+    if (!runs.length) return;
+    const r = await api("/api/analysis/runs/" + runs[0].id);
+    codeAnalysis = r;
+    renderCodeAnalysis(r);
+    $("#codeStatus").innerHTML = analysisSavedNote({ ...r, cached: true });
+  } catch (e) { /* 保存済みが無ければ何もしない */ }
+}
+function renderCodeFile(f) {
+  let body;
+  if (f.binary) {
+    body = '<span class="muted">(バイナリ・上限超過などのため表示を省略しました)</span>';
+  } else {
+    body = `<pre class="gw-body">${esc(f.content) || '<span class="muted">(空ファイル)</span>'}</pre>`;
+    if (f.truncated) body += '<div class="muted" style="margin:0 12px 10px">※ 大きいファイルのため先頭のみ表示しています。</div>';
+  }
+  return `<details class="dsg-file">
+    <summary>
+      <span class="dsg-name">${esc(f.name)}</span>
+      <span class="dsg-size">${f.size} bytes</span>
+    </summary>
+    ${body}
+  </details>`;
+}
+function renderCode(r) {
+  $("#codeStatus").textContent = "";
+  $("#codeResultTitle").textContent = "取得結果";
+  const note = r.truncated ? `(上限 ${r.file_count} 件で打ち切り)` : "";
+  $("#codeResultSummary").textContent = `${esc(r.repo)}@${esc(r.branch)} / ${esc(r.path)} / ${r.file_count} ファイル${note}`;
+  $("#codeResults").innerHTML = (r.files || []).length
+    ? r.files.map(renderCodeFile).join("")
+    : '<span class="muted">ファイルがありません。</span>';
+}
+// 機能分析(2回目のやり取り)の結果を、機能ごとに詳細仕様として表示する
+function renderCodeFeatureDetail(f) {
+  const overview = f.overview
+    ? `<div class="dsg-feat-overview">${esc(f.overview)}</div>` : "";
+  const err = f.error ? `<div class="dsg-feat-error">${esc(f.error)}</div>` : "";
+  // 2回目リクエストの絞り込み状況(動作確認用のバッジ)
+  const mode = f.context_mode === "fallback"
+    ? '<span class="badge">コアセットにフォールバック</span>'
+    : `<span class="badge">絞り込み ${(f.selected_symbols || []).length} 定義 / ${(f.selected_paths || []).length} ファイル / ${f.context_char_len || 0} 字</span>`;
+  const secs = (f.sections || []).map((s) => `
+    <div class="dsg-spec-sec">
+      <h4>${esc(s.heading)}</h4>
+      <div class="dsg-spec-body">${esc(s.body) || '<span class="muted">(記載なし)</span>'}</div>
+    </div>`).join("");
+  const noSec = (!f.error && !(f.sections || []).length)
+    ? '<div class="muted" style="margin:0 12px 10px">詳細な仕様はコードから読み取れませんでした。</div>' : "";
+  return `<details class="dsg-file" open>
+    <summary><span class="dsg-name">${esc(f.name)}</span>${mode}</summary>
+    ${overview}${err}${secs}${noSec}
+  </details>`;
+}
+function renderCodeAnalysis(r) {
+  $("#codeStatus").textContent = "";
+  $("#codeResultTitle").textContent = "分析結果";
+  $("#codeResultSummary").textContent =
+    `${esc(r.repo)}@${esc(r.branch)} / ${r.feature_count} 機能` +
+    `(${r.analyzed_file_count} / ${r.file_count ?? "-"} ファイル・${r.symbol_count ?? "-"} 定義を走査 / コア ${r.core_file_count ?? "-"} ファイル)`;
+  $("#codeResults").innerHTML = (r.features || []).length
+    ? r.features.map(renderCodeFeatureDetail).join("")
+    : '<span class="muted">機能を抽出できませんでした。</span>';
+}
+
+// --- 変更履歴取得 ---
+let changelogSummary = null;
+let changelogAnalysis = null;
+async function loadChangelogMeta() {
+  try {
+    const d = await api("/api/settings");
+    const repo = d.config.github_repo;
+    const since = d.config.since_date;
+    $("#clMeta").textContent = repo
+      ? `対象: ${repo}(既定ブランチ)/ 取得開始日 ${since || "(未設定)"}`
+      : "設定画面で「GitHub リポジトリ名称」を設定してください。";
+  } catch (e) { /* ヒントのみ */ }
+}
+function _ymd(s) { return (s || "").replace("T", " ").slice(0, 16); }
+function renderChangelogSummary(r) {
+  $("#clStatus").textContent = "";
+  $("#clSummary").textContent =
+    `${esc(r.repo || "")}@${esc(r.branch || "-")} / 蓄積コミット ${r.commit_count ?? 0} / ユーザ ${(r.users || []).length} / ファイル上位 ${(r.files || []).length}`
+    + (r.head_sha ? ` / HEAD ${esc(String(r.head_sha).slice(0, 7))}` : "");
+  const users = (r.users || []).map((u) => `<tr>
+      <td>${esc(u.author)}${u.author_name && u.author_name !== u.author ? ` <span class="muted">(${esc(u.author_name)})</span>` : ""}</td>
+      <td class="num">${u.commit_count}</td>
+      <td class="num" style="color:#16a34a">+${u.additions}</td>
+      <td class="num" style="color:#dc2626">-${u.deletions}</td>
+      <td class="num">${u.files_touched}</td>
+      <td>${esc(_ymd(u.first_at))}</td><td>${esc(_ymd(u.last_at))}</td>
+    </tr>`).join("");
+  const files = (r.files || []).map((f) => `<tr>
+      <td style="word-break:break-all">${esc(f.path)}</td>
+      <td class="num">${f.change_count}</td>
+      <td class="num" style="color:#16a34a">+${f.additions}</td>
+      <td class="num" style="color:#dc2626">-${f.deletions}</td>
+      <td>${(f.authors || []).slice(0, 5).map(esc).join("、 ")}</td>
+      <td>${esc(_ymd(f.last_at))}</td>
+    </tr>`).join("");
+  $("#clUsers").innerHTML = users
+    ? `<h3>ユーザごと</h3><div style="overflow-x:auto"><table class="sd-table">
+        <thead><tr><th>ユーザ</th><th class="num">コミット</th><th class="num">追加</th><th class="num">削除</th><th class="num">ファイル</th><th>初回</th><th>最終</th></tr></thead>
+        <tbody>${users}</tbody></table></div>`
+    : '<span class="muted">まだ変更履歴が蓄積されていません。「取得」を実行してください。</span>';
+  $("#clFiles").innerHTML = files
+    ? `<h3 style="margin-top:16px">ファイルごと(変更回数 上位)</h3><div style="overflow-x:auto"><table class="sd-table">
+        <thead><tr><th>ファイル</th><th class="num">変更回数</th><th class="num">追加</th><th class="num">削除</th><th>変更者</th><th>最終変更</th></tr></thead>
+        <tbody>${files}</tbody></table></div>`
+    : "";
+}
+async function loadChangelogSummary() {
+  if (changelogSummary) return;
+  try {
+    const r = await api("/api/changelog/summary");
+    if (!r.commit_count) return;
+    changelogSummary = r;
+    renderChangelogSummary(r);
+  } catch (e) { /* 無ければ何もしない */ }
+}
+async function fetchChangelog() {
+  $("#clFetchBtn").disabled = true;
+  $("#clAnalyzeBtn").disabled = true;
+  $("#clStatus").innerHTML = '<span class="spinner"></span> 変更履歴を取得中...(コミットごとにファイル変更を取得するため時間がかかる場合があります)';
+  try {
+    const qs = [];
+    if ($("#clFull").checked) qs.push("full=true");
+    if ($("#clForceFetch").checked) qs.push("force=true");
+    const r = await api("/api/changelog/fetch" + (qs.length ? "?" + qs.join("&") : ""), { method: "POST" });
+    changelogSummary = r;
+    renderChangelogSummary(r);
+    const note = r.truncated ? `(上限のため ${r.detail_commits} 件まで取得)` : "";
+    $("#clStatus").innerHTML = `<span class="muted">新規コミット ${r.new_commits} 件 / ファイル変更 ${r.ingested_file_changes} 件 を蓄積、チャンク ${r.chunk_count}(埋め込み更新 ${r.embedded_chunks})${note}。</span>`;
+  } catch (e) {
+    $("#clStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+  } finally {
+    $("#clFetchBtn").disabled = false;
+    $("#clAnalyzeBtn").disabled = false;
+  }
+}
+function renderChangelogAccount(a) {
+  const s = a.stats || {};
+  const topFiles = (s.top_files || []).slice(0, 8).map((f) => esc(f)).join("、 ");
+  return accountAnalysisCard({
+    title: a.full_name && a.full_name !== a.username ? `${a.username}(${a.full_name})` : a.username,
+    chips: [
+      `コミット ${s.commit_count ?? 0}`, `+${s.additions ?? 0}`, `-${s.deletions ?? 0}`,
+      `変更ファイル ${s.files_touched ?? 0}`,
+    ],
+    overview: a.overview, error: a.error, sections: a.sections,
+    extraTop: topFiles ? `<div class="field-hint" style="margin:8px 12px">よく触るファイル: ${topFiles}</div>` : "",
+    emptyText: "コミット履歴から分析できる内容がありませんでした。",
+    refCount: (a.refs || []).length, refLabel: "コミット",
+  });
+}
+function renderChangelogAnalysis(r) {
+  $("#clAnalysisStatus").textContent = "";
+  $("#clAnalysisSummary").textContent =
+    `${r.account_count} アカウント / コミット ${r.commit_count ?? "-"}`;
+  $("#clAnalysisTopics").innerHTML = (r.themes || []).length
+    ? `<span class="muted" style="font-size:12px">リポジトリの作業テーマ:</span> ${(r.themes || []).map((t) => `<span class="badge">${esc(t)}</span>`).join(" ")}`
+    : "";
+  $("#clAnalysisResults").innerHTML = (r.accounts || []).length
+    ? r.accounts.map(renderChangelogAccount).join("")
+    : '<span class="muted">分析対象のアカウントがありませんでした。</span>';
+}
+async function analyzeChangelog() {
+  $("#clAnalyzeBtn").disabled = true;
+  $("#clFetchBtn").disabled = true;
+  $("#clAnalysisStatus").innerHTML = '<span class="spinner"></span> 分析中...(作業テーマの抽出 → アカウントごとの分析を行うため時間がかかる場合があります)';
+  $("#clAnalysisSummary").textContent = "";
+  try {
+    const force = $("#clForce").checked;
+    const r = await api("/api/changelog/analyze" + (force ? "?force=true" : ""), { method: "POST" });
+    changelogAnalysis = r;
+    renderChangelogAnalysis(r);
+    $("#clAnalysisStatus").innerHTML = `<span class="muted">${r.cached ? "履歴に変化が無いため保存済みの結果を表示" : "分析して保存しました"}(analysis #${r.analysis_id} / ${esc(_ymd(r.saved_at))})。</span>`;
+  } catch (e) {
+    $("#clAnalysisStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#clAnalysisResults").innerHTML = "";
+    $("#clAnalysisTopics").innerHTML = "";
+    changelogAnalysis = null;
+  } finally {
+    $("#clAnalyzeBtn").disabled = false;
+    $("#clFetchBtn").disabled = false;
+  }
+}
+async function loadLatestChangelogAnalysis() {
+  if (changelogAnalysis) return;
+  try {
+    const r = await api("/api/changelog/analysis/latest");
+    if (!r.analysis_id) return;
+    changelogAnalysis = r;
+    renderChangelogAnalysis(r);
+    $("#clAnalysisStatus").innerHTML = `<span class="muted">保存済みの分析結果を表示しています(analysis #${r.analysis_id} / ${esc(_ymd(r.saved_at))})。</span>`;
+  } catch (e) { /* 無ければ何もしない */ }
+}
+
+// --- 実装差分解析 ---
+// 解析結果はタブを切り替えても保持(アプリ停止で消えるのは仕様どおり)
+let specDiffResult = null;
+const VERDICT_LABEL = {
+  conflict: "食い違い",
+  design_only: "未実装(設計書のみ)",
+  code_only: "設計書に記載なし(実装のみ)",
+};
+async function analyzeSpecDiff() {
+  $("#specDiffBtn").disabled = true;
+  $("#specDiffStatus").innerHTML = '<span class="spinner"></span> 差分解析中...(機能の対応付け → 機能ごとの比較を行うため時間がかかる場合があります)';
+  $("#specDiffSummary").textContent = "";
+  try {
+    const r = await api("/api/spec-diff/analyze", { method: "POST" });
+    specDiffResult = r;
+    renderSpecDiff(r);
+    $("#specDiffStatus").innerHTML = `<span class="muted">解析して保存しました(diff #${r.diff_id} / ${esc((r.created_at || "").replace("T", " ").slice(0, 16))})。</span>`;
+    loadDiffCard().catch(() => {});
+  } catch (e) {
+    $("#specDiffStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#specDiffResults").innerHTML = "";
+    specDiffResult = null;
+  } finally {
+    $("#specDiffBtn").disabled = false;
+  }
+}
+async function loadLatestSpecDiff() {
+  if (specDiffResult) return;
+  try {
+    const r = await api("/api/spec-diff/latest");
+    if (!r.diff_id) return;
+    specDiffResult = r;
+    renderSpecDiff(r);
+    $("#specDiffStatus").innerHTML = `<span class="muted">保存済みの解析結果を表示しています(diff #${r.diff_id} / ${esc((r.created_at || "").replace("T", " ").slice(0, 16))})。</span>`;
+  } catch (e) { /* 無ければ何もしない */ }
+}
+// ダッシュボードの機能名クリック: 差分画面へ遷移し、その機能だけアコーディオンを開く
+async function openSpecDiffFeature(name) {
+  selectTab("specdiff");
+  if (!specDiffResult) await loadLatestSpecDiff();
+  if (!specDiffResult) return;
+  // 全アコーディオンを閉じた状態に戻してから、対象だけ開く
+  renderSpecDiff(specDiffResult);
+  requestAnimationFrame(() => {
+    let target = null;
+    $$("#specDiffResults details[data-feature]").forEach((d) => {
+      const match = d.dataset.feature === name;
+      d.open = match;
+      if (match) target = d;
+    });
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+// 参照元(トレーサビリティ)を、設計書 / コードで左右に分けて表示する
+function renderSpecDiffEvidence(ev) {
+  const d = (ev.design || []).map((x) =>
+    `<span class="badge">${esc(x.file_path)}${x.heading ? " / " + esc(x.heading) : ""}</span>`).join(" ");
+  const c = (ev.code || []).map((x) =>
+    `<span class="badge">${esc(x.file_path)}${x.symbol_name ? "::" + esc(x.symbol_name) : ""}${x.start_line ? " L" + x.start_line + "-" + x.end_line : ""}</span>`).join(" ");
+  if (!d && !c) return "";
+  return `<div class="row" style="margin-top:6px;gap:10px">
+    <div style="flex:1 1 300px"><div class="muted" style="font-size:12px">参照元(設計書)</div>${d || '<span class="muted">-</span>'}</div>
+    <div style="flex:1 1 300px"><div class="muted" style="font-size:12px">参照元(コード)</div>${c || '<span class="muted">-</span>'}</div>
+  </div>`;
+}
+function renderSpecDiffItem(it) {
+  return `<div class="kpt-item">
+    <span class="badge sev-${esc(it.severity)}">${esc(it.severity)}</span>
+    <span class="badge">${esc(VERDICT_LABEL[it.verdict] || it.verdict)}</span>
+    <div class="t" style="margin-top:6px">${esc(it.summary)}</div>
+    <div class="row" style="margin-top:6px;gap:10px">
+      <div style="flex:1 1 300px"><div class="muted" style="font-size:12px">設計書</div><div class="dsg-spec-body">${esc(it.design_state) || '<span class="muted">-</span>'}</div></div>
+      <div style="flex:1 1 300px"><div class="muted" style="font-size:12px">コード</div><div class="dsg-spec-body">${esc(it.code_state) || '<span class="muted">-</span>'}</div></div>
+    </div>
+    ${renderSpecDiffEvidence(it.evidence || {})}
+  </div>`;
+}
+// 機能ごとに、その機能の差分をまとめてアコーディオン表示する
+function renderSpecDiffGroup(g) {
+  const sev = { high: 0, mid: 0, low: 0 };
+  g.items.forEach((it) => { if (sev[it.severity] != null) sev[it.severity]++; });
+  const tally = ["high", "mid", "low"].filter((k) => sev[k])
+    .map((k) => `<span class="badge sev-${k}">${k} ${sev[k]}</span>`).join(" ");
+  return `<details class="dsg-file" data-feature="${esc(g.name)}">
+    <summary>
+      <span class="dsg-name">${esc(g.name)}</span>
+      <span class="muted">差分 ${g.items.length} 件</span>
+      ${tally}
+    </summary>
+    <div style="padding:6px 12px 10px">
+      ${g.items.map(renderSpecDiffItem).join("")}
+    </div>
+  </details>`;
+}
+function renderSpecDiff(r) {
+  $("#specDiffStatus").textContent = "";
+  const items = r.items || [];
+  const sc = r.severity_counts || { high: 0, mid: 0, low: 0 };
+  $("#specDiffSummary").textContent =
+    `相違 ${r.diff_count} 件(High ${sc.high} / Mid ${sc.mid} / Low ${sc.low})`;
+  if (!items.length) {
+    $("#specDiffResults").innerHTML = '<span class="muted">相違点は検出されませんでした。</span>';
+    return;
+  }
+  // 機能ごとにまとめる(出現順を維持)
+  const groups = [];
+  const idx = new Map();
+  items.forEach((it) => {
+    const key = it.feature_name || "(機能名なし)";
+    if (!idx.has(key)) { idx.set(key, groups.length); groups.push({ name: key, items: [] }); }
+    groups[idx.get(key)].items.push(it);
+  });
+  $("#specDiffResults").innerHTML = groups.map(renderSpecDiffGroup).join("");
+}
+// ダッシュボード: 保存済みの最新の差分を「機能別 × 重大度別」に集計した強化テーブル
+async function loadDiffCard() {
+  const cont = $("#diffCards");
+  try {
+    const sd = await api("/api/spec-diff/latest");
+    if (!sd.diff_id) {
+      cont.innerHTML = '<span class="muted">実装差分解析はまだ実行されていません。「実装差分解析」タブから実行してください。</span>';
+      return;
+    }
+    const at = (sd.created_at || "").replace("T", " ").slice(0, 16);
+    // 機能ごとに High / Mid / Low の件数を数える
+    const byFeat = new Map();
+    (sd.items || []).forEach((it) => {
+      const k = it.feature_name || "(機能名なし)";
+      if (!byFeat.has(k)) byFeat.set(k, { high: 0, mid: 0, low: 0 });
+      const b = byFeat.get(k);
+      if (b[it.severity] != null) b[it.severity]++;
+    });
+    const rows = [...byFeat.entries()]
+      .map(([name, b]) => ({ name, ...b, total: b.high + b.mid + b.low }))
+      .sort((a, b) => (b.high - a.high) || (b.mid - a.mid) || (b.low - a.low) || (b.total - a.total));
+    const tot = rows.reduce((a, r) => ({
+      high: a.high + r.high, mid: a.mid + r.mid, low: a.low + r.low, total: a.total + r.total,
+    }), { high: 0, mid: 0, low: 0, total: 0 });
+
+    // 非ゼロは重大度色、0 はグレー
+    const num = (n, cls) => n ? `<span class="${cls}">${n}</span>` : '<span class="sd-z">0</span>';
+    // High/Mid/Low を比率で塗り分けた積み上げバー
+    const bar = (r) => {
+      const seg = (n, cls) => n ? `<span class="${cls}" style="flex:${n} 0 0"></span>` : "";
+      return `<div class="sd-bar" title="High ${r.high} / Mid ${r.mid} / Low ${r.low}">`
+        + seg(r.high, "sd-seg-h") + seg(r.mid, "sd-seg-m") + seg(r.low, "sd-seg-l") + `</div>`;
+    };
+
+    cont.innerHTML = `
+      <div class="panel sd-panel" style="flex:1 1 100%;margin-top:0" title="実装差分解析へ">
+        <h2 style="margin-bottom:6px">実装差分(機能別 / 最新 ${esc(at)})</h2>
+        <p class="sd-sum">全体
+          <b class="sd-h">High ${tot.high}</b> ・
+          <b class="sd-m">Mid ${tot.mid}</b> ・
+          <b class="sd-l">Low ${tot.low}</b> ／ 計 <b>${tot.total}</b>(差分あり ${rows.length} 機能)</p>
+        <table class="sd-table">
+          <thead><tr>
+            <th>機能</th>
+            <th class="bar">分布</th>
+            <th class="num sd-h">High</th><th class="num sd-m">Mid</th><th class="num sd-l">Low</th>
+            <th class="num">計</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map((r) => `<tr>
+              <td><span class="sd-feat" data-feature="${esc(r.name)}">${esc(r.name)}</span></td>
+              <td class="bar">${bar(r)}</td>
+              <td class="num">${num(r.high, "sd-h")}</td>
+              <td class="num">${num(r.mid, "sd-m")}</td>
+              <td class="num">${num(r.low, "sd-l")}</td>
+              <td class="num"><b>${r.total}</b></td>
+            </tr>`).join("")}
+          </tbody>
+          <tfoot><tr>
+            <th>合計</th><th class="bar"></th>
+            <th class="num">${tot.high}</th><th class="num">${tot.mid}</th><th class="num">${tot.low}</th>
+            <th class="num">${tot.total}</th>
+          </tr></tfoot>
+        </table>
+      </div>`;
+    // 機能名クリック: その機能のアコーディオンを開いた状態で差分画面へ
+    cont.querySelectorAll(".sd-feat").forEach((el) => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openSpecDiffFeature(el.dataset.feature);
+      });
+    });
+    // それ以外(バー・数値・見出し)をクリックしたら差分画面へ
+    cont.querySelector(".panel").addEventListener("click", () => selectTab("specdiff"));
+  } catch (e) { cont.innerHTML = '<span class="muted">差分件数を取得できませんでした。</span>'; }
+}
 
 async function refreshAll() {
-  await Promise.all([loadHealth(), loadDashboard().catch(() => {}), fillWeekSelectors().catch(() => {}), loadRuns().catch(() => {})]);
+  await Promise.all([loadHealth(), fillWeekSelectors().catch(() => {}), loadRuns().catch(() => {}), loadDiffCard().catch(() => {})]);
   await loadReport().catch(() => {});
   await loadDiff().catch(() => {});
 }
@@ -1178,12 +2020,21 @@ $("#runBtn").addEventListener("click", doRun);
 $("#saveSettingsBtn").addEventListener("click", saveSettings);
 $$("input[name=schedKind]").forEach((r) => r.addEventListener("change", applySchedKindVisibility));
 $("#mmCurrentBtn").addEventListener("click", () => fetchMattermost("current"));
+$("#mmAnalyzeBtn").addEventListener("click", analyzeMattermost);
 $("#mmRangeBtn").addEventListener("click", () => fetchMattermost("range"));
 $("#trelloFetchBtn").addEventListener("click", fetchTrello);
+$("#trelloAnalyzeBtn").addEventListener("click", analyzeTrello);
 $("#growiListBtn").addEventListener("click", loadGrowiPages);
 $("#growiFetchBtn").addEventListener("click", fetchGrowi);
 $("#ghFetchBtn").addEventListener("click", fetchGithub);
+$("#ghIngestBtn").addEventListener("click", ingestGithub);
 $("#dsgFetchBtn").addEventListener("click", fetchDesign);
+$("#dsgAnalyzeBtn").addEventListener("click", analyzeDesign);
+$("#codeFetchBtn").addEventListener("click", fetchCode);
+$("#codeAnalyzeBtn").addEventListener("click", analyzeCode);
+$("#specDiffBtn").addEventListener("click", analyzeSpecDiff);
+$("#clFetchBtn").addEventListener("click", fetchChangelog);
+$("#clAnalyzeBtn").addEventListener("click", analyzeChangelog);
 
 refreshAll();
 </script>

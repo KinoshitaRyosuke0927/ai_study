@@ -180,9 +180,12 @@ def _fetch_branches(api: _GitHubApi, repo: str, tzinfo) -> list[dict]:
             commits_out.append(
                 {
                     "sha": (c.get("sha") or "")[:7],
+                    "sha_full": c.get("sha") or "",
                     "author": author,
                     "date": _fmt(info.get("author", {}).get("date"), tzinfo),
+                    "date_iso": info.get("author", {}).get("date"),
                     "message": _first_line(info.get("message", "")),
+                    "message_full": info.get("message", "") or "",
                     "url": c.get("html_url", ""),
                 }
             )
@@ -221,8 +224,11 @@ def _fetch_pull_requests(api: _GitHubApi, repo: str, tzinfo) -> tuple[list[dict]
             "merged": merged,
             "author": (pr.get("user") or {}).get("login"),
             "created": _fmt(pr.get("created_at"), tzinfo),
+            "created_iso": pr.get("created_at"),
             "closed": _fmt(pr.get("closed_at"), tzinfo),
+            "closed_iso": pr.get("closed_at"),
             "merged_at": _fmt(pr.get("merged_at"), tzinfo),
+            "merged_at_iso": pr.get("merged_at"),
             "merged_by": None,
             "url": pr.get("html_url", ""),
             "detail_loaded": False,
@@ -246,9 +252,11 @@ def _load_pr_detail(api: _GitHubApi, repo: str, num: int, merged: bool, entry: d
         for c in api.paginate(f"/repos/{repo}/issues/{num}/comments", {"per_page": 100}, 300):
             comments.append(
                 {
+                    "id": c.get("id"),
                     "kind": "comment",
                     "author": (c.get("user") or {}).get("login"),
                     "date": _fmt(c.get("created_at"), tzinfo),
+                    "date_iso": c.get("created_at"),
                     "text": c.get("body", "") or "",
                 }
             )
@@ -260,9 +268,12 @@ def _load_pr_detail(api: _GitHubApi, repo: str, num: int, merged: bool, entry: d
             body = (r.get("body") or "").strip()
             comments.append(
                 {
+                    "id": r.get("id"),
                     "kind": "review",
+                    "review_state": state,
                     "author": (r.get("user") or {}).get("login"),
                     "date": _fmt(r.get("submitted_at"), tzinfo),
+                    "date_iso": r.get("submitted_at"),
                     "text": f"[{label}] {body}".strip(),
                 }
             )

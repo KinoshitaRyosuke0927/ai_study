@@ -76,6 +76,15 @@ def _member_label(m: dict) -> str:
     return f"@{username}" if username else (full or "不明")
 
 
+def _member_ident(m: dict) -> dict:
+    """メンバーの識別情報(分析/蓄積用): username / 氏名 / 表示ラベル。"""
+    return {
+        "username": (m.get("username") or "").strip(),
+        "full_name": (m.get("fullName") or "").strip(),
+        "label": _member_label(m),
+    }
+
+
 def _cover_color(cover: dict | None) -> str | None:
     """カバーに「色」が設定されていればその色名。画像カバー・未設定は None。"""
     return (cover or {}).get("color") or None
@@ -85,11 +94,13 @@ def _summarize_action(action: dict) -> dict:
     """アクションを「誰が / いつ / 何をしたか(またはコメント本文)」へ整形する。"""
     atype = action.get("type", "")
     data = action.get("data", {})
-    who = _member_label(action.get("memberCreator") or {})
+    creator = action.get("memberCreator") or {}
+    who = _member_label(creator)
+    ident = {"username": (creator.get("username") or "").strip(), "full_name": (creator.get("fullName") or "").strip()}
     target = _member_label(action.get("member") or {}) if action.get("member") else ""
 
     if atype == "commentCard":
-        return {"kind": "comment", "user": who, "date": None, "text": data.get("text", ""), "summary": ""}
+        return {"kind": "comment", "user": who, **ident, "date": None, "text": data.get("text", ""), "summary": ""}
 
     summary = atype  # 既定はタイプ名
     if atype in ("createCard", "copyCard"):
@@ -130,7 +141,7 @@ def _summarize_action(action: dict) -> dict:
         lbl = (data.get("label") or {})
         summary = f"ラベルを除外: {lbl.get('name') or lbl.get('color') or ''}"
 
-    return {"kind": "activity", "user": who, "date": None, "text": "", "summary": summary}
+    return {"kind": "activity", "user": who, **ident, "date": None, "text": "", "summary": summary}
 
 
 class _TrelloApi:
@@ -248,7 +259,9 @@ def fetch_board(settings: Settings, board_id: str) -> dict[str, Any]:
         if not cid:
             continue
         entry = _summarize_action(a)
+        entry["id"] = a.get("id")
         entry["date"] = _fmt_iso(a.get("date"), tzinfo)
+        entry["date_iso"] = a.get("date")  # 生 ISO(蓄積用)
         activity_by_card.setdefault(cid, []).append(entry)
 
     # リスト → カード
@@ -272,7 +285,9 @@ def fetch_board(settings: Settings, board_id: str) -> dict[str, Any]:
                     "name": c.get("name", ""),
                     "url": c.get("url", ""),
                     "members": [_member_label(m) for m in c.get("members", [])],
+                    "member_details": [_member_ident(m) for m in c.get("members", [])],
                     "due": _fmt_iso(c.get("due"), tzinfo),
+                    "due_iso": c.get("due"),  # 生 ISO(蓄積用)
                     "due_complete": bool(c.get("dueComplete")),
                     "labels": [
                         {"name": lb.get("name", ""), "color": lb.get("color") or "none"}
