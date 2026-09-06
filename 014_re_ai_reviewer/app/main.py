@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.renderer import images_to_base64_dict, render_pptx_to_images
+from app.pipeline.anticipated_questions import generate_anticipated_questions
 from app.pipeline.orchestrator import run_review
 from app.pipeline.suggestion import stream_slide_suggestions
 from app.schemas.models import ExportPdfRequest, ReviewRequest, SuggestRequest
@@ -102,6 +103,30 @@ async def review_pptx(request: ReviewRequest) -> dict:
         raise HTTPException(status_code=500, detail=f"AIレビューに失敗しました: {exc}") from exc
 
     return {"findings": [f.model_dump() for f in findings]}
+
+
+@app.post("/api/anticipated-questions")
+async def anticipated_questions(request: ReviewRequest) -> dict:
+    """
+    スライド画像と伝えたい内容をもとに、AI技術者・アプリケーションエンジニア視点での想定質問をAIが提案する
+    （010_ai_reviewer の同名エンドポイントを移植。指摘事項のレビューとは独立して実行できる）
+    """
+    if not request.slides:
+        raise HTTPException(status_code=400, detail="スライドデータがありません。")
+
+    slides = [
+        {"slide_number": s.slide_number, "image_png_b64": s.image_png_b64}
+        for s in request.slides
+    ]
+
+    try:
+        questions = await asyncio.to_thread(
+            generate_anticipated_questions, slides, request.overall_intended_message
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AIによる想定質問の生成に失敗しました: {exc}") from exc
+
+    return {"questions": questions}
 
 
 @app.post("/api/suggest")

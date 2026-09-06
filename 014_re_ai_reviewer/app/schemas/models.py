@@ -22,7 +22,7 @@ class Candidate(BaseModel):
     issue: str
     evidence_hint: str = ""
     category: str = ""
-    severity_guess: str = "medium"  # blocker / high / medium / low
+    severity_guess: str = "medium"  # high / medium / low
 
 
 class Finding(BaseModel):

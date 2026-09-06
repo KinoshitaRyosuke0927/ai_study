@@ -41,7 +41,7 @@ _TECHNICAL_CANDIDATE_SYSTEM_PROMPT = """
        "issue": "string（技術的に何が問題・未確認か、具体的に）",
        "evidence_hint": "string（スライドのどの記載を根拠にした指摘か）",
        "category": "technical",
-       "severity_guess": "blocker | high | medium | low のいずれか"
+       "severity_guess": "high | medium | low のいずれか"
      }
    ]}
 2. 想像した利用者・利用シーンは issue または evidence_hint の中で簡潔に触れてください
@@ -96,7 +96,7 @@ def build_technical_candidate_prompt_package(
                 "issue": "string",
                 "evidence_hint": "string",
                 "category": "technical",
-                "severity_guess": "blocker|high|medium|low",
+                "severity_guess": "high|medium|low",
             }
         ]
     }

@@ -26,7 +26,7 @@ _DESIGN_CHECKLIST_SYSTEM_PROMPT = """
          {
            "slide_number": number,
            "detail": "string（そのスライドで具体的に何が問題か）",
-           "severity_guess": "blocker | high | medium | low のいずれか"
+           "severity_guess": "high | medium | low のいずれか"
          }
        ]
      }
@@ -79,7 +79,7 @@ def build_design_checklist_prompt_package(
         "results": [
             {
                 "question": "string",
-                "occurrences": [{"slide_number": "number", "detail": "string", "severity_guess": "blocker|high|medium|low"}],
+                "occurrences": [{"slide_number": "number", "detail": "string", "severity_guess": "high|medium|low"}],
             }
         ]
     }

@@ -4,7 +4,15 @@ from app.core.azure_client import call_structured
 from app.prompts.ranker_prompts import build_ranking_prompt_package
 from app.schemas.models import Candidate
 
-_VALID_SEVERITIES = {"blocker", "high", "medium", "low"}
+_VALID_SEVERITIES = {"high", "medium", "low"}
+
+
+def _normalize_severity(severity: str) -> str:
+    """severity文字列を high / medium / low の3段階に正規化する（廃止した blocker は high に丸める）"""
+    value = (severity or "").strip().lower()
+    if value == "blocker":
+        return "high"
+    return value if value in _VALID_SEVERITIES else "medium"
 
 
 def score_candidates(candidates: list[Candidate], memory_hints: list[str]) -> list[tuple[Candidate, float]]:
@@ -54,9 +62,9 @@ def score_candidates(candidates: list[Candidate], memory_hints: list[str]) -> li
             likeness = 0.5
         likeness = max(0.0, min(1.0, likeness))
 
-        severity = str(entry.get("severity", candidate.severity_guess)).strip()
-        if severity not in _VALID_SEVERITIES:
-            severity = candidate.severity_guess if candidate.severity_guess in _VALID_SEVERITIES else "medium"
+        severity = _normalize_severity(str(entry.get("severity", "")))
+        if not entry.get("severity"):
+            severity = _normalize_severity(candidate.severity_guess)
 
         updated = candidate.model_copy(update={"severity_guess": severity})
         scored.append((updated, likeness))

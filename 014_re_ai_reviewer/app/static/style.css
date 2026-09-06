@@ -177,6 +177,7 @@ button {
   flex-shrink: 0;
 }
 
+#qa-btn,
 #suggest-btn {
   margin-top: 12px;
 }
@@ -431,10 +432,24 @@ button:disabled {
   color: #276749;
 }
 
-.tag.severity-blocker { background-color: #fff5f5; color: #c53030; }
 .tag.severity-high     { background-color: #fff7ed; color: #c2410c; }
 .tag.severity-medium   { background-color: #fffbeb; color: #b45309; }
 .tag.severity-low      { background-color: #f1f5f9; color: #475569; }
+
+/* 指摘一覧の重大度フィルタ用トグルバッジ（クリックで表示/非表示を切り替え） */
+.severity-toggle {
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+.severity-toggle:hover {
+  border-color: currentColor;
+}
+.severity-toggle.inactive {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
 
 #summary-perspective-body {
   margin-top: 20px;
@@ -597,6 +612,32 @@ button:disabled {
   margin-right: 0;
 }
 
+/* ========== 想定質問タブ ========== */
+
+.qa-item {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.qa-question {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #333;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.qa-hint {
+  font-size: 0.82rem;
+  color: #555;
+  line-height: 1.6;
+  padding-top: 8px;
+  border-top: 1px dashed #cbd5e0;
+}
+
 /* ========== 修正方針タブ（修正前後の画像比較） ========== */
 
 .suggestion-compare {
@@ -643,7 +684,6 @@ button:disabled {
   border-left: 3px solid #cbd5e0;
 }
 
-.review-item.severity-blocker { border-left-color: #dc2626; }
 .review-item.severity-high     { border-left-color: #ea580c; }
 .review-item.severity-medium   { border-left-color: #d97706; }
 .review-item.severity-low      { border-left-color: #94a3b8; }

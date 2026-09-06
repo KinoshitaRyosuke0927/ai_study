@@ -106,9 +106,12 @@ const slideList          = document.getElementById("slide-list");
 const reviewAction       = document.getElementById("review-action");
 const reviewBtn          = document.getElementById("review-btn");
 const reviewMessage      = document.getElementById("review-message");
+const qaBtn              = document.getElementById("qa-btn");
+const qaMessage          = document.getElementById("qa-message");
 const suggestBtn         = document.getElementById("suggest-btn");
 const suggestMessage     = document.getElementById("suggest-message");
 const downloadFindingsBtn   = document.getElementById("download-findings-btn");
+const downloadQaBtn         = document.getElementById("download-qa-btn");
 const downloadSuggestionBtn = document.getElementById("download-suggestion-btn");
 // 修正対象指摘事項選択モーダル
 const suggestSelectionModal      = document.getElementById("suggest-selection-modal");
@@ -125,6 +128,7 @@ const tabBtns               = document.querySelectorAll(".tab-btn");
 const tabInputEl            = document.getElementById("tab-input");
 const tabFindingsContentEl  = document.getElementById("tab-findings-content");
 const tabFindingsDesignEl   = document.getElementById("tab-findings-design");
+const tabQaEl               = document.getElementById("tab-qa");
 const tabSuggestionEl       = document.getElementById("tab-suggestion");
 // 指摘事項タブ（内容／デザイン）— aspect ("content" | "design") をキーにDOM参照をまとめる
 const findingsTabs = {
@@ -145,6 +149,9 @@ const findingsTabs = {
     slideBody: document.getElementById("findings-design-slide-body"),
   },
 };
+const qaPlaceholder         = document.getElementById("qa-placeholder");
+const qaContent             = document.getElementById("qa-content");
+const qaList                = document.getElementById("qa-list");
 const suggestionPlaceholder = document.getElementById("suggestion-placeholder");
 const suggestionContent     = document.getElementById("suggestion-content");
 const suggestionSlideLabel  = document.getElementById("suggestion-slide-label");
@@ -171,8 +178,14 @@ let slideCount        = 0;
 let selectedSlide     = null;      // 現在選択中のスライド番号（1始まり）
 let perSlideMessages  = {};        // slideNum -> string
 let findingsData             = null; // APIから返ってきた指摘事項（Finding[]）
+// 指摘一覧の重大度フィルタ（内容／デザインタブごとに、上部バッジのクリックで表示ON/OFFを切り替える）
+let severityFilters          = {
+  content: { high: true, medium: true, low: true },
+  design:  { high: true, medium: true, low: true },
+};
+let qaData                   = null; // APIから返ってきた想定質問一覧（[{question, hint}]）
 let suggestionBySlide        = {};   // slide_number -> 修正方針テキスト（またはエラー情報）
-let activeTab                = "input"; // "input" | "findings-content" | "findings-design" | "suggestion"
+let activeTab                = "input"; // "input" | "findings-content" | "findings-design" | "qa" | "suggestion"
 let suggestInProgress        = false; // 修正方針提案のストリーミング処理中かどうか
 
 // ============================================================
@@ -244,10 +257,14 @@ uploadBtn.addEventListener("click", async () => {
     renderMethod  = data.render_method || "none";
     slideCount    = data.slide_count || 0;
     findingsData      = null;
+    resetSeverityFilters();
+    qaData             = null;
     suggestionBySlide  = {};
     selectedSlide      = null;
     perSlideMessages   = {};
     downloadFindingsBtn.disabled = true;
+    downloadQaBtn.disabled = true;
+    qaBtn.disabled = false;
     suggestBtn.disabled = true;
     downloadSuggestionBtn.disabled = true;
 
@@ -259,6 +276,8 @@ uploadBtn.addEventListener("click", async () => {
       tab.placeholder.classList.remove("hidden");
       tab.bodyWrap.classList.add("hidden");
     });
+    if (qaPlaceholder) qaPlaceholder.classList.remove("hidden");
+    if (qaContent) qaContent.classList.add("hidden");
     if (suggestionPlaceholder) suggestionPlaceholder.classList.remove("hidden");
     if (suggestionContent) suggestionContent.classList.add("hidden");
 
@@ -379,6 +398,7 @@ tabBtns.forEach((btn) => {
     tabInputEl.classList.toggle("hidden", activeTab !== "input");
     tabFindingsContentEl.classList.toggle("hidden", activeTab !== "findings-content");
     tabFindingsDesignEl.classList.toggle("hidden", activeTab !== "findings-design");
+    tabQaEl.classList.toggle("hidden", activeTab !== "qa");
     tabSuggestionEl.classList.toggle("hidden", activeTab !== "suggestion");
     refreshRightPanel();
   });
@@ -395,6 +415,8 @@ function refreshRightPanel() {
     if (selectedSlide) renderFindingsTab("content", selectedSlide);
   } else if (activeTab === "findings-design") {
     if (selectedSlide) renderFindingsTab("design", selectedSlide);
+  } else if (activeTab === "qa") {
+    renderQaTab();
   } else if (activeTab === "suggestion") {
     if (selectedSlide) renderSuggestionTab(selectedSlide);
   }
@@ -418,8 +440,17 @@ function renderInputTab(num) {
 // 指摘事項タブ（内容／デザイン） — スライドごとの指摘カード
 // ============================================================
 
-const SEVERITY_LABELS = { blocker: "blocker", high: "high", medium: "medium", low: "low" };
+const SEVERITY_LABELS = { high: "high", medium: "medium", low: "low" };
+const SEVERITY_ORDER = ["high", "medium", "low"];
 const ASPECT_LABELS = { content: "内容", design: "デザイン" };
+
+// 重大度フィルタを全レベル表示ONの初期状態に戻す（アップロード時・レビュー再実行時に呼ぶ）
+function resetSeverityFilters() {
+  severityFilters = {
+    content: { high: true, medium: true, low: true },
+    design:  { high: true, medium: true, low: true },
+  };
+}
 
 function findingsByAspect(aspect) {
   return (findingsData || []).filter((f) => f.aspect === aspect);
@@ -434,16 +465,24 @@ function renderFindingsTab(aspect, num) {
   dom.slideImg.alt = `スライド ${num}`;
 
   const slideFindings = findingsByAspect(aspect).filter((f) => f.slide_number === num);
+  // 上部バッジで非表示にした重大度を除外する
+  const filter = severityFilters[aspect];
+  const visibleFindings = slideFindings.filter((f) => filter[f.severity] !== false);
 
   if (slideFindings.length === 0) {
     dom.slideBody.innerHTML = `<div class="good-point">このスライドに${ASPECT_LABELS[aspect]}面の指摘事項はありませんでした。</div>`;
     return;
   }
 
+  if (visibleFindings.length === 0) {
+    dom.slideBody.innerHTML = `<div class="good-point">表示中の重大度に該当する指摘事項はありません（上部のバッジで表示/非表示を切り替えられます）。</div>`;
+    return;
+  }
+
   dom.slideBody.innerHTML = `
     <div class="review-section-block">
-      <div class="review-section-label">指摘事項（${slideFindings.length}件）</div>
-      ${slideFindings.map(renderFindingCard).join("")}
+      <div class="review-section-label">指摘事項（${visibleFindings.length}件）</div>
+      ${visibleFindings.map(renderFindingCard).join("")}
     </div>
   `;
 }
@@ -463,8 +502,6 @@ function renderFindingCard(f) {
       </div>
       <p>${escHtml(f.issue)}</p>
       <ul>
-        ${f.evidence ? `<li>根拠: ${escHtml(f.evidence)}</li>` : ""}
-        ${f.critic_comment ? `<li>検証コメント: ${escHtml(f.critic_comment)}</li>` : ""}
         ${f.suggestion ? `<li class="suggestion">修正提案: ${escHtml(f.suggestion)}</li>` : ""}
       </ul>
     </div>
@@ -474,23 +511,67 @@ function renderFindingCard(f) {
 function renderOverallFindingsSummary(aspect) {
   const dom = findingsTabs[aspect];
   const findings = findingsByAspect(aspect);
-  const counts = { blocker: 0, high: 0, medium: 0, low: 0 };
+  const counts = { high: 0, medium: 0, low: 0 };
   findings.forEach((f) => {
     if (f.severity in counts) counts[f.severity] += 1;
   });
 
+  // 各重大度バッジはクリックで指摘一覧の表示/非表示を切り替えるトグル。
+  // 非表示状態のものは inactive クラスで淡色＋打ち消し線にする。
+  const filter = severityFilters[aspect];
+  const badges = SEVERITY_ORDER.map((sev) => {
+    const inactive = filter[sev] === false ? " inactive" : "";
+    return `<span class="tag severity-${sev} severity-toggle${inactive}" data-aspect="${aspect}" data-severity="${sev}" role="button" tabindex="0" title="クリックで${sev}の指摘の表示/非表示を切り替え">${sev} ${counts[sev]}</span>`;
+  }).join("");
+
   dom.overallSummary.innerHTML = `
     <p>資料全体で ${findings.length} 件の${ASPECT_LABELS[aspect]}面の指摘事項が見つかりました。</p>
-    <div class="tag-list">
-      <span class="tag severity-blocker">blocker ${counts.blocker}</span>
-      <span class="tag severity-high">high ${counts.high}</span>
-      <span class="tag severity-medium">medium ${counts.medium}</span>
-      <span class="tag severity-low">low ${counts.low}</span>
-    </div>
+    <div class="tag-list">${badges}</div>
   `;
+
+  // 描画のたびに新しい要素へ張り直す（古い要素はinnerHTML差し替えで破棄される）
+  dom.overallSummary.querySelectorAll(".severity-toggle").forEach((el) => {
+    const toggle = () => {
+      const a = el.dataset.aspect;
+      const s = el.dataset.severity;
+      severityFilters[a][s] = severityFilters[a][s] === false ? true : false;
+      renderOverallFindingsSummary(a);
+      if (selectedSlide) renderFindingsTab(a, selectedSlide);
+    };
+    el.addEventListener("click", toggle);
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggle();
+      }
+    });
+  });
 
   dom.placeholder.classList.add("hidden");
   dom.bodyWrap.classList.remove("hidden");
+}
+
+// ============================================================
+// 想定質問タブ
+// ============================================================
+
+function renderQaTab() {
+  if (!qaData || qaData.length === 0) {
+    qaPlaceholder.classList.remove("hidden");
+    qaContent.classList.add("hidden");
+    return;
+  }
+
+  qaPlaceholder.classList.add("hidden");
+  qaContent.classList.remove("hidden");
+
+  // 質問（question）と、回答準備のヒント（hint／Markdown可）を1件ずつカード表示する
+  qaList.innerHTML = qaData.map((q, i) => `
+    <div class="qa-item">
+      <div class="qa-question">Q${i + 1}. ${escHtml(q.question || "")}</div>
+      ${q.hint ? `<div class="qa-hint markdown-body">${renderMarkdown(q.hint)}</div>` : ""}
+    </div>
+  `).join("");
 }
 
 // ============================================================
@@ -594,6 +675,7 @@ reviewBtn.addEventListener("click", async () => {
     }
 
     findingsData = data.findings || [];
+    resetSeverityFilters();
     suggestionBySlide = {};
     downloadFindingsBtn.disabled = findingsData.length === 0;
     suggestBtn.disabled = false;
@@ -609,6 +691,7 @@ reviewBtn.addEventListener("click", async () => {
     tabInputEl.classList.add("hidden");
     tabFindingsContentEl.classList.remove("hidden");
     tabFindingsDesignEl.classList.add("hidden");
+    tabQaEl.classList.add("hidden");
     tabSuggestionEl.classList.add("hidden");
 
     renderOverallFindingsSummary("content");
@@ -620,6 +703,60 @@ reviewBtn.addEventListener("click", async () => {
   } finally {
     reviewBtn.disabled = false;
     reviewBtn.textContent = "AIレビューを実行";
+  }
+});
+
+// ============================================================
+// 想定質問の生成（010_ai_reviewerの想定質問機能を移植）
+// ============================================================
+
+qaBtn.addEventListener("click", async () => {
+  if (!currentFile || slidePngs.length === 0) return;
+
+  saveCurrentInput();
+  hideMessage(qaMessage);
+  qaBtn.disabled = true;
+  qaBtn.innerHTML = '<span class="loading"></span>AIが想定質問を検討中...';
+
+  try {
+    // 指摘事項レビューと同じく、全スライドのPNG画像＋資料全体の伝えたいことを送る
+    const overallIntendedMessage = buildCombinedIntendedMessage();
+    const slides = slidePngs.map((png, i) => ({
+      slide_number: i + 1,
+      image_png_b64: png,
+    }));
+
+    const res  = await fetch("/api/anticipated-questions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ overall_intended_message: overallIntendedMessage, slides }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showMessage(qaMessage, `エラー: ${formatErrorDetail(data.detail)}`, "error");
+      return;
+    }
+
+    qaData = data.questions || [];
+    downloadQaBtn.disabled = qaData.length === 0;
+    showMessage(qaMessage, `想定質問の提案が完了しました（${qaData.length}件）`, "success");
+
+    // 想定質問タブに切り替えて結果を表示
+    activeTab = "qa";
+    tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === "qa"));
+    tabInputEl.classList.add("hidden");
+    tabFindingsContentEl.classList.add("hidden");
+    tabFindingsDesignEl.classList.add("hidden");
+    tabSuggestionEl.classList.add("hidden");
+    tabQaEl.classList.remove("hidden");
+
+    renderQaTab();
+  } catch (err) {
+    showMessage(qaMessage, `ネットワークエラー: ${err.message}`, "error");
+  } finally {
+    qaBtn.disabled = false;
+    qaBtn.textContent = "想定質問を提案する";
   }
 });
 
@@ -685,6 +822,7 @@ async function runSuggestionProcess(findings) {
   tabInputEl.classList.add("hidden");
   tabFindingsContentEl.classList.add("hidden");
   tabFindingsDesignEl.classList.add("hidden");
+  tabQaEl.classList.add("hidden");
   tabSuggestionEl.classList.remove("hidden");
   suggestionPlaceholder.classList.add("hidden");
   suggestionContent.classList.remove("hidden");
@@ -934,6 +1072,31 @@ downloadFindingsBtn.addEventListener("click", () => {
   const a = document.createElement("a");
   a.href = url;
   a.download = "review_result.md";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// ============================================================
+// 想定質問のMarkdownダウンロード（010_ai_reviewerと同一）
+// ============================================================
+
+downloadQaBtn.addEventListener("click", () => {
+  if (!qaData || qaData.length === 0) return;
+
+  const lines = ["| No | 想定質問 | 準備のヒント |", "| --- | --- | --- |"];
+  qaData.forEach((q, i) => {
+    lines.push(`| ${i + 1} | ${markdownTableEscape(q.question || "")} | ${markdownTableEscape(q.hint || "")} |`);
+  });
+
+  const markdownContent = lines.join("\n") + "\n";
+  const blob = new Blob([markdownContent], { type: "text/markdown;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "anticipated_questions.md";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

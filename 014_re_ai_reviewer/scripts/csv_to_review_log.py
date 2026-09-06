@@ -25,7 +25,7 @@ import json
 import sys
 from pathlib import Path
 
-_VALID_SEVERITIES = {"blocker", "high", "medium", "low"}
+_VALID_SEVERITIES = {"high", "medium", "low"}
 _REQUIRED_FIELDS = ("slide_summary", "category", "comment")
 
 _DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "data" / "review_log.jsonl"
@@ -69,6 +69,9 @@ def convert(csv_path: Path) -> list[dict]:
                 continue
 
             severity = (row.get("severity") or "").strip().lower() or "medium"
+            if severity == "blocker":
+                # blocker段階は廃止したため high に丸める
+                severity = "high"
             if severity not in _VALID_SEVERITIES:
                 print(f"[skip] {row_no}行目: severityが不正です ({severity})", file=sys.stderr)
                 skipped += 1

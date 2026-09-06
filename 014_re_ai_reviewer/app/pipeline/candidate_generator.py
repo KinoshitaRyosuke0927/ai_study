@@ -20,6 +20,16 @@ else:
 
 _SEED_CSV_PATH = _APP_ROOT / "data" / "seed_review_points.csv"
 
+_VALID_SEVERITIES = {"high", "medium", "low"}
+
+
+def _normalize_severity(severity: str) -> str:
+    """severity文字列を high / medium / low の3段階に正規化する（廃止した blocker は high に丸める）"""
+    value = (severity or "").strip().lower()
+    if value == "blocker":
+        return "high"
+    return value if value in _VALID_SEVERITIES else "medium"
+
 
 def _load_seed_points() -> dict[str, list[str]]:
     """
@@ -57,12 +67,33 @@ def _parse_candidates(result: dict[str, Any]) -> list[Candidate]:
                 issue=str(entry.get("issue", "")).strip(),
                 evidence_hint=str(entry.get("evidence_hint", "")).strip(),
                 category=str(entry.get("category", "")).strip(),
-                severity_guess=str(entry.get("severity_guess", "medium")).strip() or "medium",
+                severity_guess=_normalize_severity(str(entry.get("severity_guess", "medium"))),
             ))
         except (TypeError, ValueError):
             # AIの出力が想定外の形式だった1件はスキップし、他の候補の処理は継続する
             continue
     return [c for c in candidates if c.issue]
+
+
+def _run_content_perspective(
+    perspective_type: str,
+    checklist_items: list[str],
+    slides: list[dict[str, Any]],
+    overall_intended_message: str,
+    memory_hints: list[str],
+) -> list[Candidate]:
+    """
+    1つの内容観点タイプ（assignment / plan / story など）について、その観点に絞った候補生成を実行する（同期処理）
+    """
+    package = build_candidate_generation_prompt_package(
+        slides=slides,
+        overall_intended_message=overall_intended_message,
+        perspective_type=perspective_type,
+        checklist_items=checklist_items,
+        memory_hints=memory_hints,
+    )
+    result = call_structured(package)
+    return _parse_candidates(result)
 
 
 def generate_candidates(
@@ -71,7 +102,12 @@ def generate_candidates(
     memory_hints: list[str],
 ) -> list[Candidate]:
     """
-    資料全体のスライド画像から、指摘候補を複数生成する（候補生成層のエントリポイント）
+    資料全体のスライド画像から、内容観点の指摘候補を複数生成する（候補生成層のエントリポイント）
+
+    1回のAI呼び出しで全観点を見ると1回あたりの確認観点が多くなり指摘が浅くなるため、
+    内容観点タイプ（assignment / evaluation / feasibility / overall / plan / priority / story）ごとに
+    独立したLLM呼び出しへ分割し、各呼び出しはその観点だけに集中させる
+    （デザイン観点の generate_design_candidates と同じ方針）。
 
     Args
     -----------------
@@ -81,24 +117,36 @@ def generate_candidates(
 
     Returns
     -----------------
-    - candidates: list[Candidate],      生成された指摘候補のリスト
+    - candidates: list[Candidate],      生成された指摘候補のリスト（全観点タイプ分をまとめたもの）
 
     """
     # デザイン観点（character/colors/composition/figures/sentence）は generate_design_candidates で
-    # 別途チェックリスト形式でレビューするため、ここでは内容観点のみをヒントとして渡す
-    seed_points_by_type = {
+    # 別途チェックリスト形式でレビューするため、ここでは内容観点タイプのみを対象にする
+    content_points_by_type = {
         ptype: points
         for ptype, points in _load_seed_points().items()
-        if classify_aspect(ptype) == "content"
+        if classify_aspect(ptype) == "content" and points
     }
-    package = build_candidate_generation_prompt_package(
-        slides=slides,
-        overall_intended_message=overall_intended_message,
-        seed_points_by_type=seed_points_by_type,
-        memory_hints=memory_hints,
-    )
-    result = call_structured(package)
-    return _parse_candidates(result)
+    if not content_points_by_type:
+        return []
+
+    # 観点タイプ数（最大7件）ぶん並列実行してレイテンシを抑える
+    with ThreadPoolExecutor(max_workers=len(content_points_by_type)) as executor:
+        futures = [
+            executor.submit(
+                _run_content_perspective,
+                perspective_type=ptype,
+                checklist_items=items,
+                slides=slides,
+                overall_intended_message=overall_intended_message,
+                memory_hints=memory_hints,
+            )
+            for ptype, items in content_points_by_type.items()
+        ]
+        candidates: list[Candidate] = []
+        for future in futures:
+            candidates.extend(future.result())
+    return candidates
 
 
 def generate_technical_candidates(
@@ -139,7 +187,6 @@ def _run_design_checklist(category: str, checklist_items: list[str], slides: lis
 
     candidates: list[Candidate] = []
     for item in result.get("results", []):
-        question = str(item.get("question", "")).strip()
         for occ in item.get("occurrences", []):
             try:
                 slide_number = int(occ.get("slide_number", 0))
@@ -148,8 +195,10 @@ def _run_design_checklist(category: str, checklist_items: list[str], slides: lis
             detail = str(occ.get("detail", "")).strip()
             if not detail:
                 continue
-            issue = f"{question} {detail}" if question else detail
-            severity_guess = str(occ.get("severity_guess", "medium")).strip() or "medium"
+            # 指摘観点（チェック項目の文言 = question）はプロンプト内部の判定用途に留め、
+            # 画面表示する issue にはそのスライドで実際に見つかった指摘結果（detail）のみを入れる
+            issue = detail
+            severity_guess = _normalize_severity(str(occ.get("severity_guess", "medium")))
             candidates.append(Candidate(
                 slide_number=slide_number,
                 issue=issue,

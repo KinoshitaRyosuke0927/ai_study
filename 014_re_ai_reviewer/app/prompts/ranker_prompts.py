@@ -19,7 +19,7 @@ _RANKER_SYSTEM_PROMPT = """
      {
        "candidate_index": number,
        "manager_likeness": number (0.0〜1.0、この上司が実際に言いそうかどうか),
-       "severity": "blocker | high | medium | low のいずれか（上記傾向を踏まえた最終重要度）"
+       "severity": "high | medium | low のいずれか（上記傾向を踏まえた最終重要度）"
      }
    ]}
 2. candidate_index は、入力で渡された候補リストの0始まりインデックスと必ず一致させてください。
@@ -56,7 +56,7 @@ def build_ranking_prompt_package(
         hints_text = "\n".join(f"- {h}" for h in memory_hints)
         intro += f"\n過去の類似レビューでこの上司が実際に指摘した内容の参考例:\n{hints_text}\n"
 
-    schema = {"scores": [{"candidate_index": "number", "manager_likeness": "number", "severity": "blocker|high|medium|low"}]}
+    schema = {"scores": [{"candidate_index": "number", "manager_likeness": "number", "severity": "high|medium|low"}]}
     intro += "\n以下のスキーマでJSONのみを返してください:\n" + json.dumps(schema, ensure_ascii=False, indent=2)
 
     return {"system_prompt": _RANKER_SYSTEM_PROMPT, "user_prompt": [{"type": "text", "text": intro}]}

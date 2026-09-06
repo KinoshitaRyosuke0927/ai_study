@@ -9,7 +9,15 @@ from app.prompts.critic_prompts import build_critic_prompt_package
 from app.schemas.models import Candidate, Finding
 
 _VALID_VERDICTS = {"keep", "drop"}
-_SEVERITY_RANK = {"blocker": 3, "high": 2, "medium": 1, "low": 0}
+_SEVERITY_RANK = {"high": 2, "medium": 1, "low": 0}
+
+
+def _normalize_severity(severity: str) -> str:
+    """severity文字列を high / medium / low の3段階に正規化する（廃止した blocker は high に丸める）"""
+    value = (severity or "").strip().lower()
+    if value == "blocker":
+        return "high"
+    return value if value in _SEVERITY_RANK else "medium"
 
 
 def verify_candidates(
@@ -91,7 +99,7 @@ def verify_candidates(
                 evidence=str(entry.get("evidence", "") or candidate.evidence_hint),
                 category=candidate.category,
                 aspect=aspect,
-                severity=candidate.severity_guess,
+                severity=_normalize_severity(candidate.severity_guess),
                 manager_likeness=clamped_likeness,
                 confidence=confidence,
                 verdict=verdict,

@@ -7,9 +7,9 @@ from app.pipeline import candidate_generator, critic, manager_ranker, review_mem
 from app.pipeline.aspect import classify_aspect
 from app.schemas.models import Candidate, Finding
 
-# デザイン観点はチェックリスト方式で網羅的に候補を出す分ノイズが増えやすいため、
-# 画面には重大度の高い指摘のみを表示する（内容観点は severity を絞らず全件表示する）
-_DESIGN_DISPLAY_SEVERITIES = {"blocker", "high"}
+# デザイン観点はチェックリスト方式で件数が多くなりやすく low は軽微・好みの範囲に留まりやすいため、
+# 画面には high / medium のみ表示する（内容観点は severity を絞らず全件表示する）
+_DESIGN_DISPLAY_SEVERITIES = {"high", "medium"}
 
 
 def run_review(slides: list[dict[str, Any]], overall_intended_message: str) -> list[Finding]:
@@ -24,8 +24,9 @@ def run_review(slides: list[dict[str, Any]], overall_intended_message: str) -> l
 
     Returns
     -----------------
-    - findings: list[Finding],          critic検証を通過した指摘事項。内容観点は全severityを
-                                          manager_likeness降順で、デザイン観点はseverity（blocker/highのみ）降順で返す
+    - findings: list[Finding],          critic検証を通過した指摘事項。内容観点はmanager_likeness降順で
+                                          全severity（high/medium/low）を、デザイン観点はseverity降順で
+                                          high/medium のみを返す（low は表示対象外）
 
     """
     # Step1: 過去レビュー参照（review_log.jsonl が空の間は常に空リストが返り、後続はヒントなしで動く）
@@ -80,7 +81,7 @@ def run_review(slides: list[dict[str, Any]], overall_intended_message: str) -> l
         scored_design: list[tuple[Candidate, float | None]] = [(c, None) for c in design_candidates]
         # Step4b: critic検証（内容観点と同様、根拠確認は行う）
         design_findings = critic.verify_candidates(scored_design, slides_by_number, aspect="design")
-        # デザイン観点はチェックリスト方式で件数が多くなりやすいため、重大度の高いものだけ残す
+        # デザイン観点は low（軽微・好みの範囲）を除外し、high / medium のみ画面に表示する
         return [f for f in design_findings if f.severity in _DESIGN_DISPLAY_SEVERITIES]
 
     # 内容観点パイプライン（ランキング+critic）とデザイン観点パイプライン（critic）は互いに独立
