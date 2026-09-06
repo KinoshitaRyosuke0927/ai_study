@@ -1,30 +1,23 @@
 """FastAPI アプリ本体。
 
-- 起動時に schema.sql を適用し、APScheduler(有効時)を開始する。
+- 起動時に schema.sql を適用する。
 - ダッシュボード(static/index.html)と JSON API を提供する。
-- パイプラインの手動実行はバックグラウンドスレッドで開始し run_id を即返す。
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
+import hashlib
 import logging
-import threading
 from contextlib import asynccontextmanager
 from typing import Any
 
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from sqlalchemy import text
 
-from pipeline import weekly
-from pipeline.ai import AiAnalyzer
-from infra.db import apply_schema, get_session_factory, ping
+from infra.db import apply_schema, ping
 from viewers.options import (
     check_github_path,
     check_github_repo,
@@ -32,10 +25,7 @@ from viewers.options import (
     list_mattermost_channels,
     list_trello_boards,
 )
-from pipeline.rag import search as rag_search
 from config.runtime import (
-    SCHEDULE_KINDS,
-    WEEKDAY_LABELS_JA,
     RuntimeConfig,
     load_runtime_config,
     save_runtime_config,
@@ -49,84 +39,19 @@ logging.basicConfig(
 logger = logging.getLogger("frontier.app")
 
 STATIC_DIR = "static"
-_scheduler: BackgroundScheduler | None = None
-
-
-def _run_pipeline_async(mode: str, analyze: bool) -> int:
-    """パイプラインを別スレッドで開始し、run_id を返す。"""
-    run_id = weekly.create_run(mode)
-
-    def _target() -> None:
-        try:
-            weekly.run(mode=mode, analyze=analyze, run_id=run_id)
-        except Exception:  # pragma: no cover - スレッド内の最終防波堤
-            logger.exception("パイプラインスレッドで未捕捉例外")
-
-    threading.Thread(target=_target, name=f"pipeline-{run_id}", daemon=True).start()
-    return run_id
-
-
-def _scheduler_tick() -> None:
-    """毎日 0:00 に APScheduler から呼ばれるディスパッチャ。
-
-    実際の実行間隔判定(日次 N 日 / 週次 曜日)は weekly.scheduled_tick が
-    acquisition_settings.json を「実行時に」読み込んで行う。
-    """
-    try:
-        weekly.scheduled_tick()
-    except Exception:  # pragma: no cover - スケジューラスレッドの防波堤
-        logger.exception("定期実行チェックで未捕捉例外")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """起動時: スキーマ適用 + スケジューラ開始 / 終了時: スケジューラ停止。"""
+    """起動時: スキーマ適用。"""
     settings = get_settings()
     apply_schema(settings)
-    logger.info(
-        "起動: run_mode=%s ai_enabled=%s schedule_enabled=%s",
-        settings.app_run_mode,
-        settings.ai_enabled,
-        settings.app_schedule_enabled,
-    )
-
-    global _scheduler
-    if settings.app_schedule_enabled:
-        _scheduler = BackgroundScheduler(timezone=settings.app_tz)
-        # 毎日 0:00 に起動判定。間隔・曜日の設定は tick 実行時に acquisition_settings.json から読む
-        _scheduler.add_job(
-            _scheduler_tick,
-            CronTrigger(hour=0, minute=0, timezone=settings.app_tz),
-            id="daily-tick",
-            replace_existing=True,
-        )
-        _scheduler.start()
-        logger.info("APScheduler 開始: 毎日 0:00 に定期実行を判定 tz=%s", settings.app_tz)
-
+    logger.info("起動: run_mode=%s ai_enabled=%s", settings.app_run_mode, settings.ai_enabled)
     yield
-
-    if _scheduler is not None:
-        _scheduler.shutdown(wait=False)
-        logger.info("APScheduler 停止")
 
 
 app = FastAPI(title="Frontier", version="0.1.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-
-# ----------------------------------------------------------------------
-# ヘルパ
-# ----------------------------------------------------------------------
-def _session():
-    """新しい SQLAlchemy セッションを返す。"""
-    return get_session_factory(get_settings())()
-
-
-def _json_col(value: Any) -> Any:
-    """MySQL の JSON カラム値(dict または str)を Python オブジェクトへ。"""
-    if value is None:
-        return None
-    return value if not isinstance(value, (str, bytes)) else json.loads(value)
 
 
 # ----------------------------------------------------------------------
@@ -145,215 +70,17 @@ def health() -> dict[str, Any]:
     return {
         "status": "ok" if ping(settings) else "db_error",
         "run_mode": settings.app_run_mode,
-        "is_sample_mode": settings.is_sample_mode,
         "ai_enabled": settings.ai_enabled,
-        "schedule_enabled": settings.app_schedule_enabled,
     }
-
-
-@app.post("/api/run")
-def api_run(analyze: bool = Query(default=True)) -> dict[str, Any]:
-    """パイプラインを手動実行(非同期開始)。run_id を返す。"""
-    run_id = _run_pipeline_async(mode="manual", analyze=analyze)
-    return {"run_id": run_id, "status": "started", "analyze": analyze}
-
-
-@app.get("/api/runs")
-def api_runs(limit: int = Query(default=30, le=200)) -> list[dict[str, Any]]:
-    """実行履歴一覧(新しい順)。"""
-    with _session() as s:
-        rows = s.execute(
-            text(
-                """
-                SELECT id, started_at, finished_at, status, mode, detail
-                FROM runs ORDER BY id DESC LIMIT :lim
-                """
-            ),
-            {"lim": limit},
-        ).all()
-    return [
-        {
-            "id": r.id,
-            "started_at": r.started_at.isoformat() if r.started_at else None,
-            "finished_at": r.finished_at.isoformat() if r.finished_at else None,
-            "status": r.status,
-            "mode": r.mode,
-            "detail": r.detail,
-        }
-        for r in rows
-    ]
-
-
-@app.get("/api/weeks")
-def api_weeks() -> list[str]:
-    """データが存在する週の一覧(古い順)。"""
-    with _session() as s:
-        rows = s.execute(
-            text(
-                """
-                SELECT DISTINCT week FROM (
-                    SELECT week FROM metrics
-                    UNION SELECT week FROM events
-                    UNION SELECT week FROM week_items
-                ) t ORDER BY week ASC
-                """
-            )
-        ).scalars().all()
-    return list(rows)
-
-
-@app.get("/api/metrics")
-def api_metrics() -> dict[str, Any]:
-    """週ごとの指標(推移グラフ用)。"""
-    from pipeline.metrics import METRIC_NAMES
-
-    with _session() as s:
-        weeks = s.execute(
-            text("SELECT DISTINCT week FROM metrics ORDER BY week ASC")
-        ).scalars().all()
-        rows = s.execute(text("SELECT week, name, value FROM metrics")).all()
-    by_week: dict[str, dict[str, float]] = {w: {} for w in weeks}
-    for w, name, value in rows:
-        by_week.setdefault(w, {})[name] = value
-    return {"weeks": list(weeks), "metric_names": METRIC_NAMES, "data": by_week}
-
-
-@app.get("/api/report/{week}")
-def api_report(week: str) -> dict[str, Any]:
-    """指定週の KPT + risks + サマリ。"""
-    with _session() as s:
-        row = s.execute(
-            text("SELECT week, kpt, risks, summary_md, created_at FROM reports WHERE week = :w"),
-            {"w": week},
-        ).first()
-    if not row:
-        raise HTTPException(status_code=404, detail=f"レポート未生成の週です: {week}")
-    return {
-        "week": row.week,
-        "kpt": _json_col(row.kpt),
-        "risks": _json_col(row.risks),
-        "summary_md": row.summary_md,
-        "created_at": row.created_at.isoformat() if row.created_at else None,
-    }
-
-
-@app.get("/api/diff/{week}")
-def api_diff(week: str) -> dict[str, Any]:
-    """指定週の added / changed / removed 一覧。"""
-    from pipeline.store import compute_diff
-
-    with _session() as s:
-        diff = compute_diff(s, week)
-    return {"week": week, **diff}
-
-
-@app.get("/api/events")
-def api_events(
-    week: str | None = None,
-    source: str | None = None,
-    type: str | None = None,
-    limit: int = Query(default=200, le=1000),
-) -> list[dict[str, Any]]:
-    """生イベント閲覧(week / source / type で絞り込み)。"""
-    clauses: list[str] = []
-    params: dict[str, Any] = {"lim": limit}
-    if week:
-        clauses.append("week = :week")
-        params["week"] = week
-    if source:
-        clauses.append("source = :source")
-        params["source"] = source
-    if type:
-        clauses.append("type = :type")
-        params["type"] = type
-    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
-    with _session() as s:
-        rows = s.execute(
-            text(
-                f"""
-                SELECT id, week, source, type, actor, ts, ref, payload, event_uid
-                FROM events {where}
-                ORDER BY ts DESC LIMIT :lim
-                """
-            ),
-            params,
-        ).all()
-    return [
-        {
-            "id": r.id,
-            "week": r.week,
-            "source": r.source,
-            "type": r.type,
-            "actor": r.actor,
-            "ts": r.ts.isoformat() if r.ts else None,
-            "ref": r.ref,
-            "payload": _json_col(r.payload),
-            "event_uid": r.event_uid,
-        }
-        for r in rows
-    ]
-
-
-@app.get("/api/decisions")
-def api_decisions(week: str | None = None) -> list[dict[str, Any]]:
-    """暗黙知(決定事項)一覧。"""
-    where = "WHERE week = :week" if week else ""
-    params = {"week": week} if week else {}
-    with _session() as s:
-        rows = s.execute(
-            text(
-                f"""
-                SELECT id, week, summary, rationale, participants, source_refs
-                FROM decisions {where} ORDER BY week DESC, id DESC
-                """
-            ),
-            params,
-        ).all()
-    return [
-        {
-            "id": r.id,
-            "week": r.week,
-            "summary": r.summary,
-            "rationale": r.rationale,
-            "participants": _json_col(r.participants),
-            "source_refs": _json_col(r.source_refs),
-        }
-        for r in rows
-    ]
-
-
-class SearchBody(BaseModel):
-    """/api/search のリクエストボディ。"""
-
-    query: str
-
-
-@app.post("/api/search")
-def api_search(body: SearchBody) -> dict[str, Any]:
-    """自然文検索(RAG): 検索結果 + AI 回答。"""
-    settings = get_settings()
-    analyzer = AiAnalyzer(settings)
-    with _session() as s:
-        result = rag_search(s, analyzer, body.query)
-    return result
 
 
 # ----------------------------------------------------------------------
 # 設定(データ取得に関する実行時設定 / acquisition_settings.json)
 # ----------------------------------------------------------------------
-class ScheduleBody(BaseModel):
-    """定期実行間隔。"""
-
-    kind: str  # "daily" | "weekly"
-    interval_days: int = 7  # daily: N 日ごと
-    weekday: int = 0  # weekly: 0=月 .. 6=日
-
-
 class SettingsBody(BaseModel):
     """/api/settings (POST) のリクエストボディ。"""
 
     since_date: str | None = None  # "YYYY-MM-DD" または null
-    schedule: ScheduleBody
     mattermost_channel_ids: list[str] = []
     trello_board_ids: list[str] = []
     github_repo: str = ""          # "owner/repo" またはリポジトリ名。空可
@@ -373,9 +100,6 @@ def api_get_settings() -> dict[str, Any]:
     boards, trello_err = list_trello_boards(settings)
     return {
         "config": rc.to_api_dict(),
-        "schedule_kinds": list(SCHEDULE_KINDS),
-        "weekday_labels": WEEKDAY_LABELS_JA,
-        "is_sample_mode": settings.is_sample_mode,
         "options": {
             "mattermost": {"channels": channels, "error": mm_err},
             "trello": {"boards": boards, "error": trello_err},
@@ -394,14 +118,6 @@ def api_save_settings(body: SettingsBody) -> dict[str, Any]:
     from datetime import date as _date
 
     settings = get_settings()
-
-    # --- 形式バリデーション ---
-    if body.schedule.kind not in SCHEDULE_KINDS:
-        raise HTTPException(status_code=422, detail=f"kind は {SCHEDULE_KINDS} のいずれか")
-    if not (1 <= body.schedule.interval_days <= 31):
-        raise HTTPException(status_code=422, detail="interval_days は 1〜31")
-    if not (0 <= body.schedule.weekday <= 6):
-        raise HTTPException(status_code=422, detail="weekday は 0(月)〜6(日)")
 
     since_date = None
     if body.since_date:
@@ -443,9 +159,6 @@ def api_save_settings(body: SettingsBody) -> dict[str, Any]:
 
     rc = RuntimeConfig(
         since_date=since_date,
-        schedule_kind=body.schedule.kind,
-        schedule_interval_days=body.schedule.interval_days,
-        schedule_weekday=body.schedule.weekday,
         mattermost_channel_ids=[c for c in body.mattermost_channel_ids if c],
         trello_board_ids=[b for b in body.trello_board_ids if b],
         github_repo=github_repo,
@@ -1587,6 +1300,516 @@ def api_spec_diff_runs(limit: int = Query(default=30, le=200)) -> list[dict[str,
     from pipeline import analysis_store
 
     return analysis_store.list_diffs(limit=limit)
+
+
+# ----------------------------------------------------------------------
+# アクティビティ分析(各ツールのアカウント別分析を settings.ini の
+# [USER_ID] でユーザ単位に束ねる)
+# ----------------------------------------------------------------------
+def _user_activity_response(analysis: dict[str, Any], *, cached: bool) -> dict[str, Any]:
+    stats = analysis.get("stats") or {}
+    items = analysis.get("items") or []
+    return {
+        "analysis_id": analysis["id"],
+        "cached": cached,
+        "saved_at": analysis.get("created_at"),
+        "source_ids": analysis.get("source_ids") or {},
+        "members": [it for it in items if it.get("is_member")],
+        "others": [it for it in items if not it.get("is_member")],
+        **stats,
+    }
+
+
+@app.post("/api/user-activity/analyze")
+async def api_user_activity_analyze(force: bool = Query(default=False)) -> dict[str, Any]:
+    """Mattermost / Trello / コード変更履歴 の各アカウント別分析結果と GitHub 情報を、
+    settings.ini の [USER_ID] でユーザ単位に束ねて、プロジェクトにおけるメンバーごとの
+    アクティビティを AI で分析する。
+    """
+    from pipeline import (
+        changelog_store,
+        github_activity_store,
+        mm_store,
+        project_config,
+        trello_store,
+        user_activity_analysis as uaa,
+        user_activity_store as uastore,
+    )
+    from viewers import github as github_view
+
+    settings = get_settings()
+    rc = load_runtime_config()
+
+    proj = project_config.load_project_config()
+    if not proj["found"] or not proj["members"]:
+        raise HTTPException(
+            status_code=422, detail="settings.ini の [USER_ID] にメンバーが定義されていません"
+        )
+    repo = github_view._resolve_repo(settings, (rc.github_repo or "").strip())
+
+    mm = await asyncio.to_thread(mm_store.get_latest_account_analysis)
+    tr = await asyncio.to_thread(trello_store.get_latest_account_analysis)
+    cl = await asyncio.to_thread(changelog_store.get_latest_author_analysis)
+    gh = await asyncio.to_thread(github_activity_store.get_activity_summary, repo)
+    gh_hash = await asyncio.to_thread(github_activity_store.latest_content_hash, repo)
+
+    if not (mm or tr or cl or (gh and gh.get("activity_total"))):
+        raise HTTPException(
+            status_code=422,
+            detail="先に「Mattermost/Trello/変更履歴」の分析、または「GitHub情報取得」の DB登録を実行してください",
+        )
+
+    content_hash = hashlib.sha256(
+        "|".join([
+            str(mm["id"]) if mm else "-",
+            str(tr["id"]) if tr else "-",
+            str(cl["id"]) if cl else "-",
+            gh_hash or "-",
+            proj["raw_hash"],
+        ]).encode("utf-8")
+    ).hexdigest()
+    if not force:
+        cached = await asyncio.to_thread(uastore.find_cached_analysis, content_hash)
+        if cached:
+            return _user_activity_response(cached, cached=True)
+
+    # --- ソースをアカウント別に索引化 ---
+    mm_by = {i["username"]: i for i in (mm or {}).get("accounts", [])}
+    tr_by = {i["username"]: i for i in (tr or {}).get("accounts", [])}
+    cl_by = {i["username"]: i for i in (cl or {}).get("accounts", [])}
+    gh_tally_by = {a["actor"]: a for a in (gh or {}).get("by_actor", [])}
+    gh_acts_by: dict[str, list[dict[str, Any]]] = {}
+    for a in (gh or {}).get("activities", []):
+        gh_acts_by.setdefault(a["actor"], []).append(a)
+
+    used = {"mattermost": set(), "trello": set(), "changelog": set(), "github": set()}
+
+    def _bundle(name: str, personal: str, accounts: dict, is_member: bool) -> dict[str, Any]:
+        srcs: dict[str, Any] = {}
+        labels: list[str] = []
+        m, t, g = accounts.get("mattermost"), accounts.get("trello"), accounts.get("github")
+        if m and m in mm_by:
+            srcs["mattermost"] = mm_by[m]; used["mattermost"].add(m); labels.append(f"Mattermost:{m}")
+        if t and t in tr_by:
+            srcs["trello"] = tr_by[t]; used["trello"].add(t); labels.append(f"Trello:{t}")
+        if g and g in cl_by:
+            srcs["changelog"] = cl_by[g]; used["changelog"].add(g); labels.append(f"変更履歴:{g}")
+        if g and (g in gh_tally_by or g in gh_acts_by):
+            srcs["github"] = {"actor": g, "tally": gh_tally_by.get(g, {}), "recent": gh_acts_by.get(g, [])}
+            used["github"].add(g); labels.append(f"GitHub:{g}")
+        return {
+            "name": name, "personal": personal, "accounts": accounts, "is_member": is_member,
+            "sources": srcs, "used_labels": labels,
+        }
+
+    member_bundles = [
+        _bundle(m["name"], m["personal"], m["accounts"], True) for m in proj["members"]
+    ]
+
+    # --- [USER_ID] に無いアカウント → その他のメンバー(アカウント文字列でまとめる)---
+    others: dict[str, dict[str, Any]] = {}
+
+    def _other(acct: str) -> dict[str, Any]:
+        return others.setdefault(acct, {
+            "name": acct, "personal": "(settings.ini の [USER_ID] に未登録)", "is_member": False,
+            "accounts": {}, "sources": {}, "used_labels": [],
+        })
+
+    for u, it in mm_by.items():
+        if u not in used["mattermost"]:
+            e = _other(u); e["accounts"]["mattermost"] = u; e["sources"]["mattermost"] = it
+            e["used_labels"].append(f"Mattermost:{u}")
+    for u, it in tr_by.items():
+        if u not in used["trello"]:
+            e = _other(u); e["accounts"]["trello"] = u; e["sources"]["trello"] = it
+            e["used_labels"].append(f"Trello:{u}")
+    for u, it in cl_by.items():
+        if u not in used["changelog"]:
+            e = _other(u); e["accounts"]["github"] = u; e["sources"]["changelog"] = it
+            e["used_labels"].append(f"変更履歴:{u}")
+    for u in set(list(gh_tally_by) + list(gh_acts_by)):
+        if u not in used["github"]:
+            e = _other(u); e["accounts"].setdefault("github", u)
+            e["sources"]["github"] = {"actor": u, "tally": gh_tally_by.get(u, {}), "recent": gh_acts_by.get(u, [])}
+            e["used_labels"].append(f"GitHub:{u}")
+    other_bundles = list(others.values())
+
+    # --- メンバーごとに並列分析(材料が無い人は AI を呼ばない)---
+    all_bundles = member_bundles + other_bundles
+    sem = asyncio.Semaphore(DESIGN_DETAIL_MAX_PARALLEL)
+
+    async def _one(b: dict[str, Any]) -> dict[str, Any]:
+        if not b["sources"]:
+            return {"overview": "対象データにこのメンバーのアクティビティは見つかりませんでした。", "sections": []}
+        async with sem:
+            return await asyncio.to_thread(uaa.analyze_user, settings, b, proj["tool_context"])
+
+    results = await asyncio.gather(*(_one(b) for b in all_bundles), return_exceptions=True)
+
+    items: list[dict[str, Any]] = []
+    for b, res in zip(all_bundles, results):
+        base = {
+            "is_member": b["is_member"],
+            "display_name": b["name"],
+            "personal": b["personal"],
+            "accounts": b["accounts"],
+            "sources": b["used_labels"],
+        }
+        if isinstance(res, Exception):
+            logger.error("アクティビティ分析に失敗 name=%s: %s", b["name"], res)
+            items.append({**base, "overview": "分析に失敗しました。", "sections": []})
+        else:
+            items.append({**base, "overview": res["overview"], "sections": res["sections"]})
+
+    saved = await asyncio.to_thread(
+        uastore.save_analysis,
+        content_hash=content_hash,
+        model=uaa.MODEL_NAME,
+        source_ids={
+            "mattermost": mm["id"] if mm else None,
+            "trello": tr["id"] if tr else None,
+            "changelog": cl["id"] if cl else None,
+            "github_content_hash": gh_hash,
+        },
+        stats={
+            "member_count": len(member_bundles),
+            "other_count": len(other_bundles),
+            "available_sources": [
+                k for k, v in {
+                    "mattermost": mm, "trello": tr, "changelog": cl,
+                    "github": bool(gh and gh.get("activity_total")),
+                }.items() if v
+            ],
+        },
+        items=items,
+    )
+    return _user_activity_response(saved, cached=False)
+
+
+@app.get("/api/user-activity/latest")
+def api_user_activity_latest() -> dict[str, Any]:
+    """保存済みの最新のアクティビティ分析。無ければ analysis_id=null。"""
+    from pipeline import user_activity_store as uastore
+
+    a = uastore.get_latest_analysis()
+    if a is None:
+        return {"analysis_id": None, "members": [], "others": []}
+    return _user_activity_response(a, cached=True)
+
+
+@app.get("/api/user-activity/runs")
+def api_user_activity_runs(limit: int = Query(default=30, le=200)) -> list[dict[str, Any]]:
+    from pipeline import user_activity_store as uastore
+
+    return uastore.list_analyses(limit=limit)
+
+
+@app.get("/api/user-activity/runs/{analysis_id}")
+def api_user_activity_run(analysis_id: int) -> dict[str, Any]:
+    from pipeline import user_activity_store as uastore
+
+    a = uastore.get_analysis(analysis_id)
+    if not a:
+        raise HTTPException(status_code=404, detail="分析結果が見つかりません")
+    return _user_activity_response(a, cached=True)
+
+
+# ----------------------------------------------------------------------
+# KPT分析(Mattermost / Trello / GitHub / 変更履歴 / 実装差分 の分析結果を
+# プロジェクト全体で束ね、Keep / Problem / Try を AI で導出する)
+# ----------------------------------------------------------------------
+class KptItemBody(BaseModel):
+    """画面で編集した KPT カード 1 枚ぶん。"""
+
+    kind: str
+    title: str = ""
+    detail: str = ""
+    evidence: str = ""
+    sources: list[str] = []
+    importance: int = 0
+
+
+class KptSaveBody(BaseModel):
+    """KPT分析画面の保存リクエスト(カードを表示順で渡す)。"""
+
+    items: list[KptItemBody] = []
+
+
+def _kpt_response(a: dict[str, Any], *, cached: bool) -> dict[str, Any]:
+    """保存済みの KPT分析を、画面が期待するレスポンス形へ整える。"""
+    return {
+        "analysis_id": a["id"],
+        "cached": cached,
+        "saved_at": a.get("created_at"),
+        "model": a.get("model"),
+        "source_ids": a.get("source_ids") or {},
+        "stats": a.get("stats") or {},
+        "keep": a.get("keep") or [],
+        "problem": a.get("problem") or [],
+        "try": a.get("try") or [],
+    }
+
+
+@app.post("/api/kpt/analyze")
+async def api_kpt_analyze(force: bool = Query(default=False)) -> dict[str, Any]:
+    """Mattermost / Trello / 変更履歴 / GitHub / 実装差分 / アクティビティ分析 を
+    プロジェクト全体で 1 つに束ね、KPT法で Keep / Problem / Try を AI 分析する。
+    """
+    from pipeline import (
+        analysis_store,
+        changelog_store,
+        github_activity_store,
+        kpt_analysis as kpta,
+        kpt_store,
+        mm_store,
+        project_config,
+        trello_store,
+        user_activity_store as uastore,
+    )
+    from viewers import github as github_view
+
+    settings = get_settings()
+    rc = load_runtime_config()
+    repo = github_view._resolve_repo(settings, (rc.github_repo or "").strip())
+    proj = project_config.load_project_config()
+
+    # --- 6 ソースの最新結果を取得(直列 I/O を並列化)---
+    mm = await asyncio.to_thread(mm_store.get_latest_account_analysis)
+    tr = await asyncio.to_thread(trello_store.get_latest_account_analysis)
+    cl = await asyncio.to_thread(changelog_store.get_latest_author_analysis)
+    gh = await asyncio.to_thread(github_activity_store.get_activity_summary, repo)
+    gh_hash = await asyncio.to_thread(github_activity_store.latest_content_hash, repo)
+    sd = await asyncio.to_thread(analysis_store.get_latest_diff)
+    ua = await asyncio.to_thread(uastore.get_latest_analysis)
+
+    if not (mm or tr or cl or (gh and gh.get("activity_total")) or (sd and sd.get("items")) or (ua and ua.get("items"))):
+        raise HTTPException(
+            status_code=422,
+            detail="先に「Mattermost/Trello/変更履歴/実装差分/アクティビティ」の分析、または「GitHub情報取得」の DB登録を実行してください",
+        )
+
+    # --- キャッシュキー: 各ソースの分析ID + settings.ini のハッシュ ---
+    content_hash = hashlib.sha256(
+        "|".join([
+            str(mm["id"]) if mm else "-",
+            str(tr["id"]) if tr else "-",
+            str(cl["id"]) if cl else "-",
+            gh_hash or "-",
+            str(sd["id"]) if sd and sd.get("id") else "-",
+            str(ua["id"]) if ua and ua.get("id") else "-",
+            proj["raw_hash"] or "-",
+        ]).encode("utf-8")
+    ).hexdigest()
+    if not force:
+        cached = await asyncio.to_thread(kpt_store.find_cached_analysis, content_hash)
+        if cached:
+            return _kpt_response(cached, cached=True)
+
+    bundle = kpta.build_bundle(mm, tr, cl, gh, sd, ua, proj.get("tool_context") or {})
+    try:
+        result = await asyncio.to_thread(kpta.analyze_kpt, settings, bundle)
+    except kpta.KptAnalysisError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    items = [
+        {"kind": kind, **it}
+        for kind in ("keep", "problem", "try")
+        for it in result.get(kind, [])
+    ]
+    saved = await asyncio.to_thread(
+        kpt_store.save_analysis,
+        content_hash=content_hash,
+        model=kpta.MODEL_NAME,
+        source_ids={
+            "mattermost": mm["id"] if mm else None,
+            "trello": tr["id"] if tr else None,
+            "changelog": cl["id"] if cl else None,
+            "github_content_hash": gh_hash,
+            "spec_diff": sd["id"] if sd and sd.get("id") else None,
+            "user_activity": ua["id"] if ua and ua.get("id") else None,
+        },
+        stats={
+            "keep_count": len(result.get("keep", [])),
+            "problem_count": len(result.get("problem", [])),
+            "try_count": len(result.get("try", [])),
+            "available_sources": bundle.get("available", []),
+        },
+        items=items,
+    )
+    return _kpt_response(saved, cached=False)
+
+
+@app.get("/api/kpt/latest")
+def api_kpt_latest() -> dict[str, Any]:
+    """保存済みの最新の KPT分析。無ければ analysis_id=null。"""
+    from pipeline import kpt_store
+
+    a = kpt_store.get_latest_analysis()
+    if a is None:
+        return {"analysis_id": None, "keep": [], "problem": [], "try": []}
+    return _kpt_response(a, cached=True)
+
+
+@app.get("/api/kpt/runs")
+def api_kpt_runs(limit: int = Query(default=30, le=200)) -> list[dict[str, Any]]:
+    from pipeline import kpt_store
+
+    return kpt_store.list_analyses(limit=limit)
+
+
+@app.get("/api/kpt/runs/{analysis_id}")
+def api_kpt_run(analysis_id: int) -> dict[str, Any]:
+    from pipeline import kpt_store
+
+    a = kpt_store.get_analysis(analysis_id)
+    if not a:
+        raise HTTPException(status_code=404, detail="分析結果が見つかりません")
+    return _kpt_response(a, cached=True)
+
+
+@app.put("/api/kpt/runs/{analysis_id}")
+async def api_kpt_save(analysis_id: int, body: KptSaveBody) -> dict[str, Any]:
+    """KPT分析画面で編集したカードの状態(列・並び順・重要度)を DB に保存する。"""
+    from pipeline import kpt_analysis as kpta, kpt_store
+
+    items: list[dict[str, Any]] = []
+    for it in body.items:
+        if it.kind not in ("keep", "problem", "try"):
+            continue
+        items.append({
+            "kind": it.kind,
+            "title": it.title,
+            "detail": it.detail,
+            "evidence": it.evidence,
+            "sources": [s for s in it.sources if s in kpta.SOURCE_KEYS],
+            "importance": max(0, min(5, it.importance)),
+        })
+
+    updated = await asyncio.to_thread(kpt_store.replace_items, analysis_id, items)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="分析結果が見つかりません")
+    return _kpt_response(updated, cached=True)
+
+
+# ----------------------------------------------------------------------
+# 定期実行パイプライン(各ツールの取得・分析 → 実装差分解析 → アクティビティ分析)
+# ----------------------------------------------------------------------
+def _pipeline_step_summary(key: str, res: Any) -> dict[str, Any]:
+    """各ステップの主要な結果を、フロー図表示用の小さな dict に要約する。"""
+    if not isinstance(res, dict):
+        return {}
+    if key in ("design", "code"):
+        return {"run_id": res.get("run_id"), "feature_count": res.get("feature_count"), "cached": res.get("cached")}
+    if key in ("mattermost", "trello", "changelog"):
+        return {"analysis_id": res.get("analysis_id"), "account_count": res.get("account_count"), "cached": res.get("cached")}
+    if key == "github":
+        return {"ingested": res.get("ingested"), "activity_total": res.get("activity_total")}
+    if key == "spec_diff":
+        return {"diff_id": res.get("diff_id"), "diff_count": res.get("diff_count")}
+    if key == "user_activity":
+        return {"analysis_id": res.get("analysis_id"), "member_count": res.get("member_count"), "other_count": res.get("other_count")}
+    if key == "kpt":
+        st = res.get("stats") or {}
+        return {
+            "analysis_id": res.get("analysis_id"),
+            "keep": st.get("keep_count"),
+            "problem": st.get("problem_count"),
+            "try": st.get("try_count"),
+        }
+    return {}
+
+
+async def _run_pipeline(run_id: int, force: bool) -> None:
+    """パイプライン本体。各ステップの状態を pipeline_run_steps へ随時記録する。"""
+    from datetime import date as _date
+
+    from pipeline import pipeline_store as pstore
+
+    today = _date.today().isoformat()
+
+    async def _step(key: str, factory) -> Any:
+        pstore.set_step(run_id, key, "running", started=True)
+        try:
+            res = await factory()
+            pstore.set_step(run_id, key, "success", result=_pipeline_step_summary(key, res), finished=True)
+            return res
+        except HTTPException as exc:
+            pstore.set_step(run_id, key, "error", error=str(exc.detail), finished=True)
+        except Exception as exc:  # pragma: no cover - ステップ内の最終防波堤
+            logger.exception("パイプライン step=%s で失敗", key)
+            pstore.set_step(run_id, key, "error", error=str(exc), finished=True)
+        return None
+
+    try:
+        # --- フェーズ 1: 各ツールの取得・分析(並列)---
+        async def _changelog() -> Any:
+            await api_changelog_fetch(force=False, full=False)  # 増分取得
+            return await api_changelog_analyze(force=force)
+
+        await asyncio.gather(
+            _step("design", lambda: api_design_analyze(force=force)),
+            _step("code", lambda: api_code_analyze(force=force)),
+            _step("mattermost", lambda: api_mattermost_analyze(
+                MattermostAnalyzeBody(mode="current", latest_date=today), force=force
+            )),
+            _step("trello", lambda: api_trello_analyze(force=force)),
+            _step("github", lambda: api_github_ingest(force=force)),
+            _step("changelog", _changelog),
+        )
+
+        # --- フェーズ 2: 解析(並列)---
+        await asyncio.gather(
+            _step("spec_diff", lambda: api_spec_diff_analyze()),
+            _step("user_activity", lambda: api_user_activity_analyze(force=force)),
+            _step("kpt", lambda: api_kpt_analyze(force=force)),
+        )
+
+        run = pstore.get_run(run_id) or {"steps": []}
+        has_error = any(s["status"] == "error" for s in run["steps"])
+        pstore.finish_run(run_id, "error" if has_error else "success")
+    except Exception as exc:  # pragma: no cover - パイプライン全体の防波堤
+        logger.exception("パイプライン run=%s で未捕捉例外", run_id)
+        pstore.finish_run(run_id, "error", detail=str(exc))
+
+
+@app.post("/api/pipeline/run")
+async def api_pipeline_run(force: bool = Query(default=False)) -> dict[str, Any]:
+    """定期実行パイプラインを即時開始する(バックグラウンド)。run_id を即返す。"""
+    from pipeline import pipeline_store as pstore
+
+    existing = await asyncio.to_thread(pstore.running_run_id)
+    if existing:
+        raise HTTPException(status_code=409, detail=f"パイプラインは既に実行中です(run #{existing})")
+
+    run_id = await asyncio.to_thread(pstore.create_run)
+    asyncio.create_task(_run_pipeline(run_id, force))
+    return {"run_id": run_id, "status": "running"}
+
+
+@app.get("/api/pipeline/latest")
+def api_pipeline_latest() -> dict[str, Any]:
+    """最新のパイプライン実行の進捗(フロー図用)。無ければ id=null。"""
+    from pipeline import pipeline_store as pstore
+
+    run = pstore.get_latest_run()
+    return run or {"id": None, "status": None, "steps": []}
+
+
+@app.get("/api/pipeline/runs")
+def api_pipeline_runs(limit: int = Query(default=30, le=200)) -> list[dict[str, Any]]:
+    from pipeline import pipeline_store as pstore
+
+    return pstore.list_runs(limit=limit)
+
+
+@app.get("/api/pipeline/runs/{run_id}")
+def api_pipeline_run(run_id: int) -> dict[str, Any]:
+    from pipeline import pipeline_store as pstore
+
+    run = pstore.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="実行が見つかりません")
+    return run
 
 
 @app.exception_handler(Exception)

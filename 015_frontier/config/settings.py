@@ -29,8 +29,6 @@ class Settings(BaseSettings):
     # --- アプリ ---
     app_tz: str = Field(default="Asia/Tokyo", alias="APP_TZ")
     app_run_mode: str = Field(default="sample", alias="APP_RUN_MODE")  # sample / real
-    # 定期実行の有効化(実行間隔・曜日は acquisition_settings.json で設定する)
-    app_schedule_enabled: bool = Field(default=True, alias="APP_SCHEDULE_ENABLED")
 
     # --- MySQL ---
     mysql_host: str = Field(default="localhost", alias="MYSQL_HOST")

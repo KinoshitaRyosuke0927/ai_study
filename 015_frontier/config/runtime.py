@@ -4,10 +4,8 @@
 保存する。アプリ起動時にはキャッシュせず、**その設定を使う処理が実行されるたびに**
 このモジュールの load_runtime_config() を呼んで最新値を読み込む。
 
-- データ取得開始日時: この日付の 0:00(アプリのタイムゾーン基準)以降のみ取得対象
-- 定期実行間隔: 日次(N 日ごと 0:00)/ 週次(指定曜日 0:00)
+- データ取得開始日: この日付の 0:00(アプリのタイムゾーン基準)以降のみ取得対象
 - Mattermost 取得チャンネル / Trello 取得ボード: チェックした ID のみ取得対象
-  (1 件もなければそのソースの取得は行わない)
 """
 
 from __future__ import annotations
@@ -15,23 +13,13 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, time
+from datetime import date
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 # ユーザーが手書きする settings.ini とは別のファイルに保存する
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "acquisition_settings.json"
-
-# 0=月曜 .. 6=日曜(datetime.weekday() と同じ並び)
-WEEKDAY_LABELS_JA = ["月", "火", "水", "木", "金", "土", "日"]
-
-SCHEDULE_KINDS = ("daily", "weekly")
-
-
-def _clamp(value: int, lo: int, hi: int) -> int:
-    """value を [lo, hi] に収める。"""
-    return max(lo, min(hi, value))
 
 
 def _as_str_list(value: object) -> list[str]:
@@ -45,12 +33,8 @@ def _as_str_list(value: object) -> list[str]:
 class RuntimeConfig:
     """データ取得に関する実行時設定。"""
 
-    # データ取得開始日(None なら未設定 = 従来どおり前回実行時刻/初回ルックバック)
+    # データ取得開始日(None なら未設定)
     since_date: date | None = None
-    # 定期実行間隔
-    schedule_kind: str = "weekly"          # "daily" | "weekly"
-    schedule_interval_days: int = 7        # daily のとき 1..31(N 日ごと)
-    schedule_weekday: int = 0             # weekly のとき 0=月 .. 6=日
     # 取得対象
     mattermost_channel_ids: list[str] = field(default_factory=list)
     trello_board_ids: list[str] = field(default_factory=list)
@@ -58,21 +42,10 @@ class RuntimeConfig:
     github_design_path: str = ""   # github_repo からの相対パス。設計書フォルダ
     growi_page_path: str = ""      # "/projects/foo"。空なら .env の GROWI_TARGET_PATHS を使う
 
-    def since_datetime(self) -> datetime | None:
-        """取得開始日の 0:00 を naive datetime(アプリTZ基準)で返す。未設定なら None。"""
-        if self.since_date is None:
-            return None
-        return datetime.combine(self.since_date, time.min)
-
     def to_api_dict(self) -> dict:
         """フロントエンド / ファイル保存で使う辞書表現。"""
         return {
             "since_date": self.since_date.isoformat() if self.since_date else None,
-            "schedule": {
-                "kind": self.schedule_kind,
-                "interval_days": self.schedule_interval_days,
-                "weekday": self.schedule_weekday,
-            },
             "mattermost_channel_ids": list(self.mattermost_channel_ids),
             "trello_board_ids": list(self.trello_board_ids),
             "github_repo": self.github_repo,
@@ -107,20 +80,6 @@ def load_runtime_config() -> RuntimeConfig:
             cfg.since_date = date.fromisoformat(raw_since)
         except ValueError:
             logger.warning("since_date の形式が不正です(無視します): %r", raw_since)
-
-    # --- 定期実行間隔 ---
-    sched = data.get("schedule") or {}
-    if isinstance(sched, dict):
-        kind = str(sched.get("kind", "weekly")).strip().lower()
-        cfg.schedule_kind = kind if kind in SCHEDULE_KINDS else "weekly"
-        try:
-            cfg.schedule_interval_days = _clamp(int(sched.get("interval_days", 7)), 1, 31)
-        except (TypeError, ValueError):
-            cfg.schedule_interval_days = 7
-        try:
-            cfg.schedule_weekday = _clamp(int(sched.get("weekday", 0)), 0, 6)
-        except (TypeError, ValueError):
-            cfg.schedule_weekday = 0
 
     # --- 取得対象 ---
     cfg.mattermost_channel_ids = _as_str_list(data.get("mattermost_channel_ids"))

@@ -53,8 +53,7 @@ def db_session(settings):
     # 依存関係の無い順で全消去
     session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
     for table in [
-        "events", "items", "week_items", "metrics",
-        "reports", "decisions", "embeddings", "runs",
+        "embeddings",
         "analysis_feature_refs", "analysis_features", "analysis_runs",
         "spec_code_diff_items", "spec_code_diffs",
         "mm_account_analysis_refs", "mm_account_analysis_items", "mm_account_analyses",
@@ -67,6 +66,9 @@ def db_session(settings):
         "gh_history_ingest_runs",
         "gh_activity_chunks", "gh_activity", "gh_pull_requests", "gh_branches",
         "gh_activity_ingest_runs", "gh_users",
+        "user_activity_analysis_items", "user_activity_analyses",
+        "kpt_analysis_items", "kpt_analyses",
+        "pipeline_run_steps", "pipeline_runs",
     ]:
         session.execute(text(f"TRUNCATE TABLE {table}"))
     session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))

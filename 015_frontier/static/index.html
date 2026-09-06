@@ -213,10 +213,28 @@
   .kpt-col.try h3 { border-color: var(--try); }
   .kpt-col.done h3 { border-color: var(--done); }
   .kpt-col.learned h3 { border-color: var(--learned); }
+  .kpt-col { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+  .kpt-col h3 { margin: 2px 4px 8px; font-size: 14px; }
+  .kpt-col.drop-hint { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
   .kpt-item { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
-  .kpt-item .t { font-weight: 600; }
+  .kpt-item:last-child { margin-bottom: 0; }
+  .kpt-item.draggable { cursor: grab; }
+  .kpt-item.dragging { opacity: .4; }
+  .kpt-item .kpt-head { display: flex; align-items: flex-start; gap: 8px; }
+  .kpt-item .kpt-head .t { flex: 1; font-weight: 600; }
   .kpt-item .d { color: var(--muted); font-size: 12px; margin-top: 4px; }
   .kpt-item .e { margin-top: 6px; }
+  .kpt-stars { flex: none; white-space: nowrap; font-size: 15px; line-height: 1; user-select: none; }
+  .kpt-star { cursor: pointer; color: var(--border); padding: 0 1px; }
+  .kpt-star.on { color: var(--try); }
+  .kpt-col-empty { color: var(--muted); font-size: 12px; padding: 10px 4px; text-align: center; }
+  .kpt-dash-list { padding-left: 0; margin: 4px 0 0; }
+  .kpt-dash-list li { list-style: none; margin: 4px 0; font-size: 13px; }
+  .kpt-dash-tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; margin-right: 6px; color: #fff; vertical-align: 1px; }
+  .kpt-dash-tag.keep { background: var(--keep); }
+  .kpt-dash-tag.problem { background: var(--problem); }
+  .kpt-dash-tag.try { background: var(--try); }
+  .kpt-dash-star { color: var(--try); font-size: 11px; margin-right: 4px; letter-spacing: -1px; }
   .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); margin: 2px 4px 0 0; background: var(--panel); }
   .sev-high { background: #fdecec; color: #b91c1c; border-color: #f2b8b8; }
   .sev-mid { background: #fdf1e0; color: #b45309; border-color: #f0d3a6; }
@@ -241,6 +259,16 @@
   .sd-table tbody tr:hover { background: var(--panel-2); }
   .sd-feat { color: var(--accent); cursor: pointer; }
   .sd-feat:hover { text-decoration: underline; }
+  /* 定期実行パイプラインのフロー図 */
+  .pl-phase-label { font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
+  .pl-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .pl-step { border: 2px solid var(--border); border-radius: 10px; padding: 10px 12px; min-width: 210px; flex: 0 1 230px; background: var(--panel); }
+  .pl-step-hd { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .pl-step .pl-err { color: var(--problem); font-size: 11px; margin-top: 6px; white-space: pre-wrap; word-break: break-word; }
+  .pl-pending { opacity: .65; }
+  .pl-running { border-color: var(--accent); }
+  .pl-success { border-color: var(--keep); }
+  .pl-error { border-color: var(--problem); }
   .sd-table tfoot th { font-weight: 700; color: var(--fg); border-top: 2px solid var(--border); }
   .sd-bar { display: flex; height: 10px; width: 150px; border-radius: 3px; overflow: hidden; background: var(--panel-2); }
   .sd-bar > span { display: block; height: 100%; }
@@ -267,18 +295,17 @@
     <!-- サイドメニュー: 各機能への切り替え -->
     <nav class="app-side" id="side">
       <div class="side-item active" data-tab="dashboard">ダッシュボード</div>
-      <div class="side-item" data-tab="report">週次レポート</div>
-      <div class="side-item" data-tab="diff">差分</div>
-      <div class="side-item" data-tab="search">暗黙知検索</div>
-      <div class="side-item" data-tab="mattermost">Mattermost情報取得</div>
-      <div class="side-item" data-tab="trello">Trello情報取得</div>
-      <div class="side-item" data-tab="growi">wiki情報取得</div>
-      <div class="side-item" data-tab="github">GitHub情報取得</div>
-      <div class="side-item" data-tab="design">設計書情報取得</div>
-      <div class="side-item" data-tab="code">コード情報取得</div>
-      <div class="side-item" data-tab="changelog">変更履歴取得</div>
       <div class="side-item" data-tab="specdiff">実装差分解析</div>
-      <div class="side-item" data-tab="run">定期実行</div>
+      <!-- <div class="side-item" data-tab="design">設計書情報取得</div>
+      <div class="side-item" data-tab="code">コード情報取得</div> -->
+      <div class="side-item" data-tab="useractivity">アクティビティ分析</div>
+      <div class="side-item" data-tab="kpt">KPT分析</div>
+      <!-- <div class="side-item" data-tab="mattermost">Mattermost情報取得</div>
+      <div class="side-item" data-tab="trello">Trello情報取得</div>
+      <div class="side-item" data-tab="github">GitHub情報取得</div>
+      <div class="side-item" data-tab="changelog">変更履歴取得</div> -->
+      <!-- <div class="side-item" data-tab="growi">wiki情報取得</div> -->
+      <div class="side-item" data-tab="pipeline">定期実行設定</div>
       <div class="side-item" data-tab="settings">設定</div>
     </nav>
 
@@ -287,37 +314,9 @@
         <!-- ダッシュボード -->
         <section class="tab active" id="tab-dashboard">
           <div class="row" id="diffCards"><span class="muted">読み込み中...</span></div>
+          <div class="row" id="kptCards"><span class="muted">読み込み中...</span></div>
         </section>
 
-        <!-- 週次レポート -->
-        <section class="tab" id="tab-report">
-          <div class="panel">
-            <h2>週を選択</h2>
-            <select id="reportWeek"></select>
-          </div>
-          <div class="panel" id="reportBody"><span class="muted">週を選択してください</span></div>
-        </section>
-
-        <!-- 差分 -->
-        <section class="tab" id="tab-diff">
-          <div class="panel">
-            <h2>週を選択</h2>
-            <select id="diffWeek"></select>
-          </div>
-          <div class="panel" id="diffBody"><span class="muted">週を選択してください</span></div>
-        </section>
-
-        <!-- 暗黙知検索 -->
-        <section class="tab" id="tab-search">
-          <div class="panel">
-            <h2>自然文で検索</h2>
-            <div class="row">
-              <input type="text" id="searchQuery" placeholder="例: MySQL の文字コードはどう決めた?" style="flex:1 1 400px" />
-              <button class="act primary" id="searchBtn">検索</button>
-            </div>
-          </div>
-          <div class="panel" id="searchBody"><span class="muted">クエリを入力してください</span></div>
-        </section>
 
         <!-- Mattermost 情報取得 -->
         <section class="tab" id="tab-mattermost">
@@ -513,31 +512,57 @@
           </div>
         </section>
 
-        <!-- 実装差分解析 -->
+        <!-- 実装差分解析(表示のみ。解析は「定期実行設定」で行う) -->
         <section class="tab" id="tab-specdiff">
           <div class="panel">
-            <h2>差分解析</h2>
-            <p class="field-hint">DB に保存済みの最新の「設計書分析」結果と「コード分析」結果を、機能ごとに AI で突き合わせ、相違点を抽出します。先に「設計書情報取得」「コード情報取得」で機能分析を実行してください。結果は保存され、ダッシュボードで件数を確認できます。</p>
-            <button class="act primary" id="specDiffBtn">差分解析</button>
-          </div>
-
-          <div class="panel">
             <h2>差分 <span id="specDiffSummary" class="muted"></span></h2>
+            <p class="field-hint">DB に保存済みの最新の実装差分解析結果を表示します。解析の実行は「定期実行設定」画面から行ってください。</p>
             <div id="specDiffStatus" class="muted"></div>
             <div id="specDiffResults"></div>
           </div>
         </section>
 
-        <!-- 定期実行 -->
-        <section class="tab" id="tab-run">
+        <!-- アクティビティ分析(表示のみ。分析は「定期実行設定」で行う) -->
+        <section class="tab" id="tab-useractivity">
           <div class="panel">
-            <h2>パイプライン実行</h2>
-            <button class="act primary" id="runBtn">今すぐ実行</button>
-            <span id="runStatus" class="muted"></span>
+            <h2>分析結果(メンバー別) <span id="uaSummary" class="muted"></span></h2>
+            <p class="field-hint">DB に保存済みの最新のアクティビティ分析結果を表示します。分析の実行は「定期実行設定」画面から行ってください。</p>
+            <div id="uaStatus" class="muted"></div>
+            <div id="uaResults"></div>
           </div>
+        </section>
+
+        <!-- KPT分析(分析の実行は「定期実行設定」。この画面ではカードの整理・重要度づけと保存ができる) -->
+        <section class="tab" id="tab-kpt">
           <div class="panel">
-            <h2>実行履歴</h2>
-            <table id="runsTable"><thead><tr><th>ID</th><th>モード</th><th>状態</th><th>開始</th><th>終了</th></tr></thead><tbody></tbody></table>
+            <div class="settings-head">
+              <h2 style="margin:0">KPT分析 <span id="kptSummary" class="muted"></span></h2>
+              <div style="text-align:right">
+                <button class="act primary" id="kptSaveBtn" disabled>保存</button>
+                <div id="kptSaveStatus" class="muted" style="margin-top:6px;font-size:12px"></div>
+              </div>
+            </div>
+            <p class="field-hint">Mattermost / Trello / GitHub / 変更履歴 / 実装差分 の分析結果をプロジェクト全体で束ね、KPT法(Keep / Problem / Try)で振り返った結果です。分析の実行は「定期実行設定」画面から行ってください。カードは列内での並び替え・別の列への移動ができ、右上の★で重要度(0〜5)を設定できます。「保存」で現在の状態を DB に保存します。</p>
+            <div id="kptStatus" class="muted"></div>
+            <div id="kptResults"></div>
+          </div>
+        </section>
+
+        <!-- 定期実行設定 -->
+        <section class="tab" id="tab-pipeline">
+          <div class="panel">
+            <h2>即時実行</h2>
+            <p class="field-hint">各種ツールの情報取得・分析を一括で流します。フェーズ1(設計書 / コード / Mattermost / Trello / GitHub / 変更履歴)を並列実行したあと、フェーズ2(実装差分解析 / アクティビティ分析)を並列実行します。一部のステップが失敗しても後続は実行され、各ステップの成否が下のフロー図に表示されます。</p>
+            <div class="row" style="align-items:center">
+              <button class="act primary" id="plRunBtn">即時実行</button>
+              <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="plForce" /> キャッシュを無視して実行</label>
+            </div>
+            <div id="plStatus" class="muted" style="margin-top:8px"></div>
+          </div>
+
+          <div class="panel">
+            <h2>パイプライン <span id="plMeta" class="muted"></span></h2>
+            <div id="plFlow"><span class="muted">まだ実行されていません。</span></div>
           </div>
         </section>
 
@@ -555,22 +580,8 @@
             <h2>日付設定</h2>
             <div class="set-sub">
               <h3>データ取得開始日時</h3>
-              <p class="field-hint">選択した日付の 0:00 以降のデータのみが取得対象になります。</p>
+              <p class="field-hint">選択した日付の 0:00 以降のデータのみが取得対象になります(Mattermost の「現在情報取得」や変更履歴取得の起点)。</p>
               <input type="date" id="setSinceDate" />
-            </div>
-            <div class="set-sub">
-              <h3>定期実行間隔</h3>
-              <p class="field-hint">断面の取得と分析を行う間隔です。いずれも 0:00 に実行されます。</p>
-              <div class="radio-row">
-                <label><input type="radio" name="schedKind" value="daily" /> 日次</label>
-                <label><input type="radio" name="schedKind" value="weekly" /> 週次</label>
-              </div>
-              <div id="schedDaily" style="margin-top:12px">
-                <input type="number" id="setIntervalDays" min="1" max="31" style="width:80px" /> 日ごとに実行
-              </div>
-              <div id="schedWeekly" style="margin-top:12px">
-                毎週 <select id="setWeekday"></select> 曜日に実行
-              </div>
             </div>
           </div>
 
@@ -643,6 +654,14 @@ function selectTab(name) {
   if (name === "code") { loadCodeMeta().catch(() => {}); loadLatestCodeAnalysis().catch(() => {}); }
   // 実装差分解析: 未表示なら保存済みの差分解析結果を復元
   if (name === "specdiff") loadLatestSpecDiff().catch(() => {});
+  // アクティビティ分析: 未表示なら保存済みの結果を復元
+  if (name === "useractivity") loadLatestUserActivity().catch(() => {});
+  // KPT分析: 未表示なら保存済みの結果を復元
+  if (name === "kpt") loadLatestKpt().catch(() => {});
+  // ダッシュボード: カード類を最新化
+  if (name === "dashboard") { loadDiffCard().catch(() => {}); loadKptCard().catch(() => {}); }
+  // 定期実行設定: 最新のパイプライン進捗を取得(実行中なら自動でポーリング継続)
+  if (name === "pipeline") pollPipeline().catch(() => {});
   // 変更履歴取得: 対象ヒント更新 + 保存済みサマリ・分析を復元
   if (name === "changelog") {
     loadChangelogMeta().catch(() => {});
@@ -663,144 +682,7 @@ async function loadHealth() {
   } catch (e) { $("#modeBadge").textContent = "health error"; }
 }
 
-// --- 週セレクタ ---
-async function fillWeekSelectors() {
-  const weeks = await api("/api/weeks");
-  for (const id of ["#reportWeek", "#diffWeek"]) {
-    const sel = $(id);
-    sel.innerHTML = weeks.map((w) => `<option value="${w}">${w}</option>`).join("");
-    if (weeks.length) sel.value = weeks[weeks.length - 1];
-  }
-}
-
-// --- 週次レポート ---
-function renderKptCol(cls, title, items) {
-  const rows = (items || []).map((it) => `
-    <div class="kpt-item">
-      <div class="t">${esc(it.title)}</div>
-      <div class="d">${esc(it.detail || "")}</div>
-      <div class="e">${(it.evidence || []).map((e) => `<span class="badge">${esc(e)}</span>`).join("")}
-        ${it.followup_of ? `<span class="badge">↺ ${esc(it.followup_of)}</span>` : ""}</div>
-    </div>`).join("");
-  return `<div class="kpt-col ${cls}"><h3>${title} (${(items || []).length})</h3>${rows || '<span class="muted">なし</span>'}</div>`;
-}
-async function loadReport() {
-  const week = $("#reportWeek").value;
-  if (!week) return;
-  const body = $("#reportBody");
-  body.innerHTML = '<span class="muted">読み込み中...</span>';
-  try {
-    const r = await api("/api/report/" + week);
-    const k = r.kpt || {};
-    const risks = (r.risks || []).map((x) => `
-      <div class="kpt-item">
-        <span class="badge sev-${esc(x.severity)}">${esc(x.severity)}</span>
-        <span class="badge">${esc(x.category)}</span>
-        <div class="t" style="margin-top:6px">${esc(x.title)}</div>
-        <div class="d">${esc(x.detail || "")}</div>
-        <div class="e">${(x.evidence || []).map((e) => `<span class="badge">${esc(e)}</span>`).join("")}</div>
-      </div>`).join("");
-    body.innerHTML = `
-      <h2>KPT / Fun-Done-Learn — ${esc(week)}</h2>
-      <div class="kpt-grid">
-        ${renderKptCol("keep", "Keep", k.keep)}
-        ${renderKptCol("problem", "Problem", k.problem)}
-        ${renderKptCol("try", "Try", k.try)}
-        ${renderKptCol("done", "Done", k.done)}
-        ${renderKptCol("learned", "Learned", k.learned)}
-      </div>
-      <h2 style="margin-top:20px">潜在問題 (${(r.risks || []).length})</h2>
-      ${risks || '<span class="muted">検出なし</span>'}
-      <h2 style="margin-top:20px">サマリ</h2>
-      <pre class="summary">${esc(r.summary_md || "")}</pre>`;
-  } catch (e) {
-    body.innerHTML = `<span class="muted">${esc(e.message)}</span>`;
-  }
-}
-
-// --- 差分 ---
-function renderDiffBucket(title, rows) {
-  const bySource = {};
-  (rows || []).forEach((r) => { (bySource[r.source] = bySource[r.source] || []).push(r); });
-  const inner = Object.keys(bySource).map((src) => `
-    <h3>${esc(src)} (${bySource[src].length})</h3>
-    <table><thead><tr><th>種別</th><th>タイトル</th><th>状態</th></tr></thead><tbody>
-      ${bySource[src].map((r) => `<tr><td>${esc(r.type)}</td><td>${esc(r.title)}</td><td>${esc(r.prev_status ? r.prev_status + " → " : "")}${esc(r.status)}</td></tr>`).join("")}
-    </tbody></table>`).join("");
-  return `<h2>${title} (${(rows || []).length})</h2>${inner || '<span class="muted">なし</span>'}`;
-}
-async function loadDiff() {
-  const week = $("#diffWeek").value;
-  if (!week) return;
-  const body = $("#diffBody");
-  body.innerHTML = '<span class="muted">読み込み中...</span>';
-  try {
-    const d = await api("/api/diff/" + week);
-    body.innerHTML = renderDiffBucket("追加 (added)", d.added) +
-      "<hr>" + renderDiffBucket("変更 (changed)", d.changed) +
-      "<hr>" + renderDiffBucket("消滅 (removed)", d.removed);
-  } catch (e) { body.innerHTML = `<span class="muted">${esc(e.message)}</span>`; }
-}
-
-// --- 検索 ---
-async function doSearch() {
-  const q = $("#searchQuery").value.trim();
-  if (!q) return;
-  const body = $("#searchBody");
-  body.innerHTML = '<span class="spinner"></span> 検索中...';
-  try {
-    const r = await api("/api/search", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q }),
-    });
-    const sources = (r.sources || []).map((s) => `
-      <div class="kpt-item">
-        <span class="badge">${esc(s.source)}:${esc(s.ref)}</span>
-        <span class="badge">${esc(s.week)}</span>
-        <span class="badge">score ${esc(s.score)}</span>
-        <div class="d" style="margin-top:6px">${esc(s.text)}</div>
-      </div>`).join("");
-    body.innerHTML = `<h2>回答</h2><pre class="summary">${esc(r.answer)}</pre>
-      <h2 style="margin-top:18px">出典チャンク (${(r.sources || []).length})</h2>${sources || '<span class="muted">なし</span>'}`;
-  } catch (e) { body.innerHTML = `<span class="muted">${esc(e.message)}</span>`; }
-}
-
-// --- 実行 ---
-let polling = null;
-async function loadRuns() {
-  const runs = await api("/api/runs");
-  $("#runsTable tbody").innerHTML = runs.map((r) =>
-    `<tr><td>${r.id}</td><td>${esc(r.mode)}</td><td>${esc(r.status)}</td><td>${esc((r.started_at || "").replace("T", " ").slice(0, 19))}</td><td>${esc((r.finished_at || "").replace("T", " ").slice(0, 19))}</td></tr>`
-  ).join("");
-  return runs;
-}
-async function doRun() {
-  $("#runBtn").disabled = true;
-  $("#runStatus").innerHTML = '<span class="spinner"></span> 実行中...';
-  try {
-    const res = await api("/api/run?analyze=true", { method: "POST" });
-    const rid = res.run_id;
-    polling = setInterval(async () => {
-      const runs = await loadRuns();
-      const me = runs.find((r) => r.id === rid);
-      if (me && me.status !== "running") {
-        clearInterval(polling);
-        $("#runBtn").disabled = false;
-        $("#runStatus").textContent = me.status === "success" ? "完了しました" : "エラー: " + (me.detail || "").slice(0, 200);
-        await refreshAll();
-      }
-    }, 2000);
-  } catch (e) {
-    $("#runBtn").disabled = false;
-    $("#runStatus").textContent = "エラー: " + e.message;
-  }
-}
-
 // --- 設定 ---
-function applySchedKindVisibility() {
-  const kind = (document.querySelector("input[name=schedKind]:checked") || {}).value || "weekly";
-  $("#schedDaily").style.display = kind === "daily" ? "" : "none";
-  $("#schedWeekly").style.display = kind === "weekly" ? "" : "none";
-}
 // 親項目(チーム / ワークスペース)ごとにグループ化。1 行 3 列のグリッドで表示する。
 function _groupBy(list, keyFn, labelFn) {
   const m = new Map();
@@ -831,12 +713,6 @@ async function loadSettings() {
   const d = await api("/api/settings");
   const c = d.config;
   $("#setSinceDate").value = c.since_date || "";
-  const kindRadio = document.querySelector(`input[name=schedKind][value="${c.schedule.kind}"]`);
-  if (kindRadio) kindRadio.checked = true;
-  $("#setIntervalDays").value = c.schedule.interval_days;
-  $("#setWeekday").innerHTML = (d.weekday_labels || []).map((l, i) => `<option value="${i}">${esc(l)}</option>`).join("");
-  $("#setWeekday").value = c.schedule.weekday;
-  applySchedKindVisibility();
   $("#setGithubRepo").value = c.github_repo || "";
   $("#setGithubDesignPath").value = c.github_design_path || "";
   $("#setGrowiPath").value = c.growi_page_path || "";
@@ -856,14 +732,8 @@ async function loadSettings() {
   $("#saveSettingsStatus").textContent = "";
 }
 async function saveSettings() {
-  const kind = (document.querySelector("input[name=schedKind]:checked") || {}).value || "weekly";
   const body = {
     since_date: $("#setSinceDate").value || null,
-    schedule: {
-      kind,
-      interval_days: Number($("#setIntervalDays").value) || 7,
-      weekday: Number($("#setWeekday").value) || 0,
-    },
     mattermost_channel_ids: $$('input[data-grp="mm"]:checked').map((x) => x.value),
     trello_board_ids: $$('input[data-grp="tr"]:checked').map((x) => x.value),
     github_repo: $("#setGithubRepo").value.trim(),
@@ -1815,7 +1685,317 @@ async function loadLatestChangelogAnalysis() {
   } catch (e) { /* 無ければ何もしない */ }
 }
 
-// --- 実装差分解析 ---
+// --- 定期実行パイプライン ---
+let plPolling = null;
+const PL_ICON = { pending: "○", success: "✓", error: "✕" };
+const PL_COLOR = { pending: "var(--muted)", success: "var(--keep)", error: "var(--problem)" };
+function plResultText(s) {
+  const r = s.result || {};
+  if (s.step_key === "spec_diff") return `相違 ${r.diff_count ?? "-"} 件`;
+  if (s.step_key === "user_activity") return `メンバー ${r.member_count ?? "-"} / その他 ${r.other_count ?? "-"}`;
+  if (s.step_key === "github") return r.ingested ? `活動 ${r.activity_total ?? "-"} 件を登録` : "変化なし";
+  const tail = r.feature_count != null ? ` / ${r.feature_count} 機能` : (r.account_count != null ? ` / ${r.account_count} 名` : "");
+  return (r.cached ? "キャッシュ再利用" : "実行") + tail;
+}
+function plStepBox(s) {
+  const icon = s.status === "running"
+    ? '<span class="spinner"></span>'
+    : `<span style="color:${PL_COLOR[s.status] || "var(--muted)"};font-weight:700">${PL_ICON[s.status] || "○"}</span>`;
+  const dur = s.duration_sec != null ? ` <span class="muted" style="font-weight:400">${s.duration_sec}s</span>` : "";
+  let info = "";
+  if (s.status === "error") info = `<div class="pl-err">${esc((s.error || "").slice(0, 240))}</div>`;
+  else if (s.status === "success") info = `<div class="muted" style="font-size:11px;margin-top:4px">${esc(plResultText(s))}</div>`;
+  return `<div class="pl-step pl-${s.status}"><div class="pl-step-hd">${icon} ${esc(s.label)}${dur}</div>${info}</div>`;
+}
+function renderPipelineFlow(run) {
+  if (!run || !run.id || !(run.steps || []).length) {
+    $("#plFlow").innerHTML = '<span class="muted">まだ実行されていません。</span>';
+    $("#plMeta").textContent = "";
+    $("#plRunBtn").disabled = false;
+    return;
+  }
+  $("#plRunBtn").disabled = run.status === "running";
+  const at = (t) => (t || "").replace("T", " ").slice(0, 16);
+  $("#plMeta").textContent =
+    `run #${run.id} / ${run.status} / 開始 ${at(run.started_at)}` + (run.finished_at ? ` / 終了 ${at(run.finished_at)}` : "");
+  const p1 = run.steps.filter((s) => s.phase === "parallel");
+  const p2 = run.steps.filter((s) => s.phase === "sequential");
+  $("#plFlow").innerHTML = `
+    <div class="pl-phase-label">フェーズ1: 情報取得・分析(並列)</div>
+    <div class="pl-grid">${p1.map(plStepBox).join("")}</div>
+    <div class="pl-phase-label" style="margin-top:16px">フェーズ2: 解析(並列)</div>
+    <div class="pl-grid">${p2.map(plStepBox).join("")}</div>`;
+}
+async function pollPipeline() {
+  clearTimeout(plPolling);
+  try {
+    const r = await api("/api/pipeline/latest");
+    renderPipelineFlow(r.id ? r : null);
+    if (r.id && r.status === "running") {
+      plPolling = setTimeout(() => pollPipeline().catch(() => {}), 2500);
+    }
+  } catch (e) { /* ネットワーク断など。次回タブ表示で再取得 */ }
+}
+async function runPipeline() {
+  $("#plRunBtn").disabled = true;
+  $("#plStatus").innerHTML = '<span class="spinner"></span> 実行を開始しています...';
+  try {
+    const force = $("#plForce").checked;
+    const r = await api("/api/pipeline/run" + (force ? "?force=true" : ""), { method: "POST" });
+    $("#plStatus").innerHTML = `<span class="muted">実行を開始しました(run #${r.run_id})。進捗は下のフロー図で確認できます。</span>`;
+    pollPipeline();
+  } catch (e) {
+    $("#plRunBtn").disabled = false;
+    $("#plStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+  }
+}
+
+// --- アクティビティ分析(ユーザ単位) ---
+let userActivity = null;
+function renderUserActivityItem(it) {
+  return accountAnalysisCard({
+    title: it.display_name,
+    chips: (it.sources || []),
+    overview: it.overview,
+    sections: it.sections,
+    extraTop: it.personal
+      ? `<div class="field-hint" style="margin:8px 12px">役割: ${esc(it.personal)}</div>` : "",
+    emptyText: "対象データにアクティビティが見つかりませんでした。",
+  });
+}
+function renderUserActivity(r) {
+  $("#uaStatus").textContent = "";
+  $("#uaSummary").textContent =
+    `メンバー ${r.member_count ?? (r.members || []).length} 人 / その他 ${r.other_count ?? (r.others || []).length} 人`
+    + ((r.available_sources || []).length ? ` / 対象ソース: ${(r.available_sources || []).join("、 ")}` : "");
+  const members = (r.members || []).map(renderUserActivityItem).join("")
+    || '<span class="muted">メンバーの分析結果がありません。</span>';
+  const others = (r.others || []).length
+    ? `<h3 style="margin-top:20px">その他のメンバー(settings.ini の [USER_ID] に未登録)</h3>` + r.others.map(renderUserActivityItem).join("")
+    : "";
+  $("#uaResults").innerHTML = `<h3>メンバー</h3>${members}${others}`;
+}
+async function loadLatestUserActivity() {
+  if (userActivity) return;
+  try {
+    const r = await api("/api/user-activity/latest");
+    if (!r.analysis_id) {
+      $("#uaStatus").innerHTML = '<span class="muted">まだ分析結果がありません。「定期実行設定」画面から実行してください。</span>';
+      return;
+    }
+    userActivity = r;
+    renderUserActivity(r);
+    $("#uaStatus").innerHTML = `<span class="muted">保存済みの分析結果を表示しています(analysis #${r.analysis_id} / ${esc((r.saved_at || "").replace("T", " ").slice(0, 16))})。</span>`;
+  } catch (e) { /* 無ければ何もしない */ }
+}
+
+// --- KPT分析(カードの整理・重要度づけと保存)---
+const KPT_SOURCE_LABEL = {
+  mattermost: "Mattermost", trello: "Trello", github: "GitHub",
+  changelog: "変更履歴", spec_diff: "実装差分",
+};
+const KPT_COLS = [
+  { kind: "keep", label: "Keep(続けること)" },
+  { kind: "problem", label: "Problem(課題)" },
+  { kind: "try", label: "Try(次に試すこと)" },
+];
+let kptLoaded = false;          // 初回ロード済みか(タブ再表示で読み直さない)
+let kptAnalysisId = null;
+let kptAvailableSources = [];
+let kptCards = [];              // [{cid, kind, importance, title, detail, evidence, sources}]
+let kptDirty = false;           // 未保存の編集があるか
+let kptDragCid = null;          // ドラッグ中のカード cid
+let kptCidSeq = 0;
+
+// サーバ応答から画面用のカード配列を作る(列ごとの表示順を保持)
+function kptSetCardsFromResponse(r) {
+  kptAnalysisId = r.analysis_id;
+  kptAvailableSources = (r.stats || {}).available_sources || [];
+  kptCards = [];
+  for (const { kind } of KPT_COLS) {
+    for (const it of (r[kind] || [])) {
+      kptCards.push({
+        cid: "c" + (++kptCidSeq),
+        kind,
+        importance: Math.max(0, Math.min(5, it.importance || 0)),
+        title: it.title || "",
+        detail: it.detail || "",
+        evidence: it.evidence || "",  // 画面には出さないが保存時に送り返す
+        sources: it.sources || [],
+      });
+    }
+  }
+  kptDirty = false;
+}
+
+function kptStarsHtml(card) {
+  let s = "";
+  for (let i = 1; i <= 5; i++) {
+    s += `<span class="kpt-star ${i <= card.importance ? "on" : ""}" `
+      + `data-cid="${card.cid}" data-n="${i}" title="重要度 ${i}(同じ★をもう一度クリックで 0)">★</span>`;
+  }
+  return `<span class="kpt-stars">${s}</span>`;
+}
+
+function kptCardHtml(card) {
+  const badges = (card.sources || [])
+    .map((x) => `<span class="badge">${esc(KPT_SOURCE_LABEL[x] || x)}</span>`).join(" ");
+  const detail = card.detail ? `<div class="d">${esc(card.detail)}</div>` : "";
+  return `<div class="kpt-item draggable" draggable="true" data-cid="${card.cid}">
+    <div class="kpt-head">
+      <div class="t">${esc(card.title)}</div>
+      ${kptStarsHtml(card)}
+    </div>
+    ${detail}
+    ${badges ? `<div class="e">${badges}</div>` : ""}
+  </div>`;
+}
+
+function renderKptBoard() {
+  // 列ごとの件数をサマリに反映
+  const counts = { keep: 0, problem: 0, try: 0 };
+  kptCards.forEach((c) => { if (counts[c.kind] != null) counts[c.kind]++; });
+  $("#kptSummary").textContent =
+    `Keep ${counts.keep} / Problem ${counts.problem} / Try ${counts.try}`
+    + (kptAvailableSources.length
+      ? ` / 対象ソース: ${kptAvailableSources.map((s) => KPT_SOURCE_LABEL[s] || s).join("、 ")}` : "");
+
+  const grid = KPT_COLS.map(({ kind, label }) => {
+    const cards = kptCards.filter((c) => c.kind === kind);
+    const body = cards.length
+      ? cards.map(kptCardHtml).join("")
+      : '<div class="kpt-col-empty">ここにドラッグ</div>';
+    return `<div class="kpt-col ${kind}" data-kind="${kind}"><h3>${label}</h3>${body}</div>`;
+  }).join("");
+  $("#kptResults").innerHTML = `<div class="kpt-grid">${grid}</div>`;
+
+  wireKptBoard();
+  $("#kptSaveBtn").disabled = !kptDirty || !kptAnalysisId;
+  $("#kptSaveStatus").textContent = kptDirty ? "未保存の変更があります" : "";
+}
+
+// ★クリックとドラッグ&ドロップのハンドラを毎回貼り直す
+function wireKptBoard() {
+  $$("#kptResults .kpt-star").forEach((el) => {
+    el.addEventListener("click", () => {
+      const card = kptCards.find((c) => c.cid === el.dataset.cid);
+      if (!card) return;
+      const n = Number(el.dataset.n);
+      card.importance = (card.importance === n) ? 0 : n;  // 同じ★の再クリックで 0
+      kptDirty = true;
+      renderKptBoard();
+    });
+  });
+
+  $$("#kptResults .kpt-item").forEach((el) => {
+    el.addEventListener("dragstart", (e) => {
+      kptDragCid = el.dataset.cid;
+      el.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", el.dataset.cid);
+    });
+    el.addEventListener("dragend", () => {
+      kptDragCid = null;
+      $$("#kptResults .dragging").forEach((x) => x.classList.remove("dragging"));
+      $$("#kptResults .drop-hint").forEach((x) => x.classList.remove("drop-hint"));
+    });
+  });
+
+  $$("#kptResults .kpt-col").forEach((col) => {
+    col.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      col.classList.add("drop-hint");
+    });
+    col.addEventListener("dragleave", (e) => {
+      if (!col.contains(e.relatedTarget)) col.classList.remove("drop-hint");
+    });
+    col.addEventListener("drop", (e) => {
+      e.preventDefault();
+      col.classList.remove("drop-hint");
+      if (!kptDragCid) return;
+      const beforeEl = kptDragAfterElement(col, e.clientY);
+      kptMoveCard(kptDragCid, col.dataset.kind, beforeEl ? beforeEl.dataset.cid : null);
+    });
+  });
+}
+
+// 列内で、カーソル位置の直後にくるカード要素(なければ null = 末尾)
+function kptDragAfterElement(col, y) {
+  const els = Array.from(col.querySelectorAll(".kpt-item:not(.dragging)"));
+  for (const el of els) {
+    const box = el.getBoundingClientRect();
+    if (y < box.top + box.height / 2) return el;
+  }
+  return null;
+}
+
+// カードを別の列 / 別の位置へ移動し、再描画する
+function kptMoveCard(cid, toKind, beforeCid) {
+  const idx = kptCards.findIndex((c) => c.cid === cid);
+  if (idx < 0) return;
+  const [card] = kptCards.splice(idx, 1);
+  card.kind = toKind;
+  if (beforeCid) {
+    const bIdx = kptCards.findIndex((c) => c.cid === beforeCid);
+    kptCards.splice(bIdx < 0 ? kptCards.length : bIdx, 0, card);
+  } else {
+    // 移動先の列の最後尾へ
+    let lastIdx = -1;
+    kptCards.forEach((c, i) => { if (c.kind === toKind) lastIdx = i; });
+    kptCards.splice(lastIdx + 1, 0, card);
+  }
+  kptDirty = true;
+  renderKptBoard();
+}
+
+// 現在の画面状態(列・並び順・重要度)を DB に保存する
+async function saveKpt() {
+  if (!kptAnalysisId || !kptDirty) return;
+  const items = [];
+  for (const { kind } of KPT_COLS) {
+    for (const c of kptCards.filter((x) => x.kind === kind)) {
+      items.push({
+        kind, title: c.title, detail: c.detail, evidence: c.evidence,
+        sources: c.sources, importance: c.importance,
+      });
+    }
+  }
+  $("#kptSaveBtn").disabled = true;
+  $("#kptSaveStatus").textContent = "保存中...";
+  try {
+    const r = await api(`/api/kpt/runs/${kptAnalysisId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    });
+    kptSetCardsFromResponse(r);
+    renderKptBoard();
+    loadKptCard().catch(() => {});  // ダッシュボードのカードも更新
+    $("#kptSaveStatus").textContent = `保存しました(${new Date().toLocaleTimeString()})`;
+  } catch (e) {
+    $("#kptSaveStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
+    $("#kptSaveBtn").disabled = false;
+  }
+}
+
+async function loadLatestKpt() {
+  if (kptLoaded) return;
+  try {
+    const r = await api("/api/kpt/latest");
+    if (!r.analysis_id) {
+      $("#kptStatus").innerHTML = '<span class="muted">まだ分析結果がありません。「定期実行設定」画面から実行してください。</span>';
+      return;
+    }
+    kptLoaded = true;
+    kptSetCardsFromResponse(r);
+    renderKptBoard();
+    $("#kptStatus").innerHTML =
+      `<span class="muted">analysis #${r.analysis_id} / ${esc((r.saved_at || "").replace("T", " ").slice(0, 16))}</span>`;
+  } catch (e) { /* 無ければ何もしない */ }
+}
+
+// --- 実装差分解析(表示のみ)---
 // 解析結果はタブを切り替えても保持(アプリ停止で消えるのは仕様どおり)
 let specDiffResult = null;
 const VERDICT_LABEL = {
@@ -1823,29 +2003,14 @@ const VERDICT_LABEL = {
   design_only: "未実装(設計書のみ)",
   code_only: "設計書に記載なし(実装のみ)",
 };
-async function analyzeSpecDiff() {
-  $("#specDiffBtn").disabled = true;
-  $("#specDiffStatus").innerHTML = '<span class="spinner"></span> 差分解析中...(機能の対応付け → 機能ごとの比較を行うため時間がかかる場合があります)';
-  $("#specDiffSummary").textContent = "";
-  try {
-    const r = await api("/api/spec-diff/analyze", { method: "POST" });
-    specDiffResult = r;
-    renderSpecDiff(r);
-    $("#specDiffStatus").innerHTML = `<span class="muted">解析して保存しました(diff #${r.diff_id} / ${esc((r.created_at || "").replace("T", " ").slice(0, 16))})。</span>`;
-    loadDiffCard().catch(() => {});
-  } catch (e) {
-    $("#specDiffStatus").innerHTML = `<span style="color:var(--problem)">${esc(e.message)}</span>`;
-    $("#specDiffResults").innerHTML = "";
-    specDiffResult = null;
-  } finally {
-    $("#specDiffBtn").disabled = false;
-  }
-}
 async function loadLatestSpecDiff() {
   if (specDiffResult) return;
   try {
     const r = await api("/api/spec-diff/latest");
-    if (!r.diff_id) return;
+    if (!r.diff_id) {
+      $("#specDiffStatus").innerHTML = '<span class="muted">まだ解析結果がありません。「定期実行設定」画面から実行してください。</span>';
+      return;
+    }
     specDiffResult = r;
     renderSpecDiff(r);
     $("#specDiffStatus").innerHTML = `<span class="muted">保存済みの解析結果を表示しています(diff #${r.diff_id} / ${esc((r.created_at || "").replace("T", " ").slice(0, 16))})。</span>`;
@@ -2006,19 +2171,59 @@ async function loadDiffCard() {
   } catch (e) { cont.innerHTML = '<span class="muted">差分件数を取得できませんでした。</span>'; }
 }
 
-async function refreshAll() {
-  await Promise.all([loadHealth(), fillWeekSelectors().catch(() => {}), loadRuns().catch(() => {}), loadDiffCard().catch(() => {})]);
-  await loadReport().catch(() => {});
-  await loadDiff().catch(() => {});
+// ダッシュボード: 保存済みの最新 KPT分析の状況(件数 + 重要度の高い項目)
+async function loadKptCard() {
+  const cont = $("#kptCards");
+  try {
+    const r = await api("/api/kpt/latest");
+    if (!r.analysis_id) {
+      cont.innerHTML = '<span class="muted">KPT分析はまだ実行されていません。「定期実行設定」から実行してください。</span>';
+      return;
+    }
+    const at = (r.saved_at || "").replace("T", " ").slice(0, 16);
+    const cols = [["keep", "Keep"], ["problem", "Problem"], ["try", "Try"]];
+    const counts = {};
+    let total = 0;
+    cols.forEach(([k]) => { counts[k] = (r[k] || []).length; total += counts[k]; });
+
+    // 重要度(★1以上)がついた項目を集めて降順に
+    const rated = [];
+    cols.forEach(([k, label]) => (r[k] || []).forEach((it) => {
+      if ((it.importance || 0) > 0) rated.push({ kind: k, label, imp: it.importance, title: it.title });
+    }));
+    rated.sort((a, b) => b.imp - a.imp);
+    const top = rated.slice(0, 6);
+    const topHtml = top.length
+      ? `<div style="margin-top:8px"><div class="muted" style="font-size:12px">重要度の高い項目</div>
+         <ul class="kpt-dash-list">${top.map((t) =>
+           `<li><span class="kpt-dash-tag ${t.kind}">${t.label}</span>`
+           + `<span class="kpt-dash-star">${"★".repeat(t.imp)}</span>${esc(t.title)}</li>`).join("")}</ul></div>`
+      : '<div class="muted" style="font-size:12px;margin-top:8px">重要度が設定された項目はありません(「KPT分析」タブで★を設定できます)。</div>';
+
+    const src = ((r.stats && r.stats.available_sources) || [])
+      .map((s) => KPT_SOURCE_LABEL[s] || s).join("、 ");
+    cont.innerHTML = `
+      <div class="panel sd-panel" style="flex:1 1 100%;margin-top:0" title="KPT分析へ">
+        <h2 style="margin-bottom:6px">KPT分析(最新 ${esc(at)})</h2>
+        <p class="sd-sum">
+          <b style="color:var(--keep)">Keep ${counts.keep}</b> ・
+          <b style="color:var(--problem)">Problem ${counts.problem}</b> ・
+          <b style="color:var(--try)">Try ${counts.try}</b> ／ 計 <b>${total}</b>${src ? ` / 対象ソース: ${esc(src)}` : ""}</p>
+        ${topHtml}
+      </div>`;
+    cont.querySelector(".panel").addEventListener("click", () => selectTab("kpt"));
+  } catch (e) { cont.innerHTML = '<span class="muted">KPTの状況を取得できませんでした。</span>'; }
 }
 
-$("#reportWeek").addEventListener("change", loadReport);
-$("#diffWeek").addEventListener("change", loadDiff);
-$("#searchBtn").addEventListener("click", doSearch);
-$("#searchQuery").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
-$("#runBtn").addEventListener("click", doRun);
+async function refreshAll() {
+  await Promise.all([
+    loadHealth(),
+    loadDiffCard().catch(() => {}),
+    loadKptCard().catch(() => {}),
+  ]);
+}
+
 $("#saveSettingsBtn").addEventListener("click", saveSettings);
-$$("input[name=schedKind]").forEach((r) => r.addEventListener("change", applySchedKindVisibility));
 $("#mmCurrentBtn").addEventListener("click", () => fetchMattermost("current"));
 $("#mmAnalyzeBtn").addEventListener("click", analyzeMattermost);
 $("#mmRangeBtn").addEventListener("click", () => fetchMattermost("range"));
@@ -2032,9 +2237,10 @@ $("#dsgFetchBtn").addEventListener("click", fetchDesign);
 $("#dsgAnalyzeBtn").addEventListener("click", analyzeDesign);
 $("#codeFetchBtn").addEventListener("click", fetchCode);
 $("#codeAnalyzeBtn").addEventListener("click", analyzeCode);
-$("#specDiffBtn").addEventListener("click", analyzeSpecDiff);
+$("#plRunBtn").addEventListener("click", runPipeline);
 $("#clFetchBtn").addEventListener("click", fetchChangelog);
 $("#clAnalyzeBtn").addEventListener("click", analyzeChangelog);
+$("#kptSaveBtn").addEventListener("click", saveKpt);
 
 refreshAll();
 </script>

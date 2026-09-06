@@ -19,5 +19,5 @@ COPY . .
 ENV PORT=8000
 EXPOSE 8000
 
-# uvicorn 起動(単一インスタンス前提: APScheduler をアプリ内で動かす)
+# uvicorn 起動
 CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"]

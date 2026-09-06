@@ -20,7 +20,7 @@ from typing import Any
 MAX_ACCOUNT_CONTEXT_CHARS = 16000
 # 1 アカウントの分析に紐づけて保存する参照投稿(トレーサビリティ)の上限
 MAX_REFS_PER_ACCOUNT = 60
-# RAG 埋め込み用にチャンク本文を分割する単位(pipeline/rag.py と揃える)
+# RAG 埋め込み用にチャンク本文を分割する単位
 EMBED_SLICE_CHARS = 800
 
 

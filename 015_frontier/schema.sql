@@ -1,84 +1,18 @@
 -- Frontier スキーマ定義(MySQL 8.x / utf8mb4)
 -- 起動時に CREATE TABLE IF NOT EXISTS で冪等に適用する。
 
-CREATE TABLE IF NOT EXISTS events (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  week VARCHAR(10) NOT NULL,              -- ISO週 "2026-W36"
-  source VARCHAR(20) NOT NULL,            -- mattermost / trello / growi / github / sample
-  type VARCHAR(40) NOT NULL,              -- post / card_moved / pr_merged / page_updated / ...
-  actor VARCHAR(255) NOT NULL,
-  ts DATETIME NOT NULL,                   -- UTC
-  ref VARCHAR(255) NOT NULL,              -- ソース内一意キー(投稿ID / カードID / SHA / ページID)
-  payload JSON NOT NULL,
-  event_uid VARCHAR(300) GENERATED ALWAYS AS (concat(source, ':', ref, ':', type)) STORED,
-  UNIQUE KEY uq_event (event_uid),        -- 再実行時の二重取り込み防止
-  INDEX idx_week_source (week, source)
-) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-
-CREATE TABLE IF NOT EXISTS items (
-  item_key VARCHAR(255) PRIMARY KEY,      -- 例: "trello:card:abc123", "github:pr:42"
-  source VARCHAR(20) NOT NULL,
-  type VARCHAR(40) NOT NULL,              -- card / issue / pr / page / thread
-  title VARCHAR(1024) NOT NULL,
-  status VARCHAR(40) NOT NULL,            -- open / done / merged / archived / ...
-  assignee VARCHAR(255) NULL,
-  first_week VARCHAR(10) NOT NULL,        -- 初検出週
-  last_week VARCHAR(10) NOT NULL,         -- 最終確認週
-  payload JSON NOT NULL
-) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-
--- 週次断面(差分計算の本体)
-CREATE TABLE IF NOT EXISTS week_items (
-  week VARCHAR(10) NOT NULL,
-  item_key VARCHAR(255) NOT NULL,
-  status VARCHAR(40) NOT NULL,
-  title VARCHAR(1024) NOT NULL,
-  PRIMARY KEY (week, item_key)
-) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-
-CREATE TABLE IF NOT EXISTS metrics (
-  week VARCHAR(10) NOT NULL,
-  name VARCHAR(60) NOT NULL,              -- mattermost_posts, github_prs_merged など
-  value DOUBLE NOT NULL,
-  PRIMARY KEY (week, name)
-) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-
-CREATE TABLE IF NOT EXISTS reports (
-  week VARCHAR(10) PRIMARY KEY,
-  kpt JSON NOT NULL,                      -- keep / problem / try / done / learned
-  risks JSON NOT NULL,                    -- 潜在問題リスト
-  summary_md MEDIUMTEXT NOT NULL,         -- Markdown形式の週次サマリ
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-
-CREATE TABLE IF NOT EXISTS decisions (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  week VARCHAR(10) NOT NULL,
-  summary TEXT NOT NULL,                  -- 決定事項
-  rationale TEXT NULL,                    -- 理由・背景(暗黙知)
-  participants JSON NULL,
-  source_refs JSON NOT NULL               -- event_id や URL の配列
-) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-
+-- 各機能(Mattermost / Trello / 変更履歴 / GitHub 活動)が「将来の RAG 用」に
+-- チャンクの埋め込みを書き込む共通ストア。
 CREATE TABLE IF NOT EXISTS embeddings (
   chunk_id VARCHAR(300) PRIMARY KEY,      -- "{source}:{ref}:{chunk_no}"
   week VARCHAR(10) NOT NULL,
-  source VARCHAR(20) NOT NULL,
+  source VARCHAR(20) NOT NULL,            -- mattermost / trello / github_change / github_activity
   ref VARCHAR(255) NOT NULL,
   text MEDIUMTEXT NOT NULL,
   vec BLOB NOT NULL,                      -- float32配列
   model VARCHAR(100) NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_week (week)
-) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-
-CREATE TABLE IF NOT EXISTS runs (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  started_at DATETIME NOT NULL,
-  finished_at DATETIME NULL,
-  status VARCHAR(20) NOT NULL,            -- running / success / error
-  mode VARCHAR(10) NOT NULL,              -- manual / scheduled
-  detail TEXT NULL                        -- エラー内容など
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 
 -- ------------------------------------------------------------------
@@ -628,4 +562,91 @@ CREATE TABLE IF NOT EXISTS gh_activity_chunks (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_gh_ac_repo (repo),
   INDEX idx_gh_ac_week (week)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- ------------------------------------------------------------------
+-- アクティビティ分析(各ツールのアカウント別分析を settings.ini の
+-- [USER_ID] でユーザ単位に束ねた、プロジェクト横断のメンバー活動分析)
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_activity_analyses (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  content_hash CHAR(64) NOT NULL,         -- (各ソース分析ID + settings.ini ハッシュ)
+  model VARCHAR(100) NOT NULL,
+  source_ids JSON NOT NULL,               -- {mattermost, trello, changelog, github_content_hash}
+  stats JSON NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_ua_hash (content_hash),
+  INDEX idx_ua_created (created_at)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS user_activity_analysis_items (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  analysis_id BIGINT NOT NULL,
+  ordinal INT NOT NULL,
+  is_member TINYINT NOT NULL DEFAULT 0,   -- 1: [USER_ID] のメンバー / 0: その他のメンバー
+  display_name VARCHAR(255) NOT NULL,
+  personal MEDIUMTEXT NULL,
+  accounts JSON NOT NULL,                 -- {mattermost, trello, github, growi}
+  sources JSON NOT NULL,                  -- 材料になったソース一覧(トレーサビリティ)
+  overview MEDIUMTEXT NULL,
+  sections JSON NOT NULL,
+  INDEX idx_uai_analysis (analysis_id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- ------------------------------------------------------------------
+-- KPT 分析(Mattermost / Trello / GitHub / 変更履歴 / 実装差分 の各分析結果を材料に、
+-- プロジェクト全体の Keep / Problem / Try を AI で導出する)
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS kpt_analyses (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  content_hash CHAR(64) NOT NULL,         -- 各ソース分析ID + settings.ini ハッシュ
+  model VARCHAR(100) NOT NULL,
+  source_ids JSON NOT NULL,               -- {mattermost, trello, changelog, github_content_hash, spec_diff}
+  stats JSON NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_kpt_hash (content_hash),
+  INDEX idx_kpt_created (created_at)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS kpt_analysis_items (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  analysis_id BIGINT NOT NULL,
+  kind VARCHAR(8) NOT NULL,               -- keep / problem / try
+  ordinal INT NOT NULL,
+  title VARCHAR(512) NOT NULL,
+  detail MEDIUMTEXT NULL,
+  evidence MEDIUMTEXT NULL,               -- 根拠にした観察(画面には出さず保持のみ)
+  sources JSON NOT NULL,                  -- ["mattermost", "github", ...] 由来ソース
+  importance TINYINT NOT NULL DEFAULT 0,  -- 重要度 ★0〜5(画面で編集)
+  INDEX idx_kpt_item (analysis_id, kind)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- ------------------------------------------------------------------
+-- 定期実行パイプライン(各ツールの取得・分析 → 実装差分解析 → アクティビティ分析 を一括実行)
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  status VARCHAR(20) NOT NULL,            -- running / success / error
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  finished_at DATETIME NULL,
+  detail TEXT NULL,
+  INDEX idx_pr_started (started_at)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS pipeline_run_steps (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  run_id BIGINT NOT NULL,
+  ordinal INT NOT NULL,
+  step_key VARCHAR(40) NOT NULL,          -- design / code / mattermost / trello / github / changelog / spec_diff / user_activity
+  label VARCHAR(80) NOT NULL,
+  phase VARCHAR(12) NOT NULL,             -- parallel / sequential
+  status VARCHAR(12) NOT NULL,            -- pending / running / success / error
+  started_at DATETIME NULL,
+  finished_at DATETIME NULL,
+  result JSON NULL,                       -- 主要な結果サマリ
+  error TEXT NULL,
+  UNIQUE KEY uq_prs (run_id, step_key),
+  INDEX idx_prs_run (run_id)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
