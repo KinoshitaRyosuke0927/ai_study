@@ -1,0 +1,100 @@
+/* 各ツールの情報取得ビュー(Mattermost / Trello / wiki / GitHub / 設計書)。 */
+
+/* Mattermost 情報取得 */
+.mm-channel { margin-top: 18px; }
+.mm-channel > h3 { color: var(--fg); font-size: 14px; margin: 0 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--accent); }
+.mm-post { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin: 8px 0; background: var(--panel); }
+.mm-post.reply { margin-left: 28px; border-left: 3px solid var(--accent); background: var(--panel-2); }
+.mm-post-head { font-size: 12px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+.mm-post-user { font-weight: 700; color: var(--fg); }
+.mm-thread-tag { color: var(--accent); font-weight: 600; }
+.mm-body { margin-top: 5px; white-space: pre-wrap; word-break: break-word; }
+.mm-reactions { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+.mm-reaction { font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; background: var(--panel-2); color: var(--muted); }
+.mm-root-ref { font-size: 11px; color: var(--muted); font-style: italic; margin-bottom: 4px; }
+
+/* Trello 情報取得 */
+.tr-list { margin-top: 18px; }
+.tr-list > h3 { color: var(--fg); font-size: 14px; margin: 0 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--accent); }
+.tr-card { border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; background: var(--panel); }
+.tr-card > summary { list-style: none; cursor: pointer; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.tr-card > summary::-webkit-details-marker { display: none; }
+.tr-card > summary::before { content: "▸"; color: var(--muted); margin-right: 2px; }
+.tr-card[open] > summary::before { content: "▾"; }
+.tr-card[open] > summary { border-bottom: 1px solid var(--border); }
+.tr-card-name { font-weight: 700; }
+.tr-card-body { padding: 10px 12px; }
+.tr-row { font-size: 13px; margin-top: 6px; }
+.tr-row .k { color: var(--muted); }
+.tr-chip { font-size: 11px; padding: 1px 8px; border-radius: 999px; color: #fff; display: inline-flex; align-items: center; gap: 4px; }
+.tr-chip .kind { font-size: 9px; opacity: .85; border: 1px solid rgba(255,255,255,.6); border-radius: 3px; padding: 0 3px; }
+.tr-lc-green{background:#4caf50}.tr-lc-yellow{background:#e0b000;color:#3a2f00}.tr-lc-orange{background:#ef7b00}.tr-lc-red{background:#e2483d}.tr-lc-purple{background:#8e44c4}.tr-lc-blue{background:#2f80ed}.tr-lc-sky{background:#00a3c7}.tr-lc-lime{background:#7bc62d;color:#1f2f00}.tr-lc-pink{background:#e363b3}.tr-lc-black{background:#3a3f47}.tr-lc-none{background:#9aa4b2}
+.tr-due { border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; font-size: 11px; }
+.tr-due.done { color: var(--keep); border-color: var(--keep); }
+.tr-desc { white-space: pre-wrap; word-break: break-word; margin-top: 6px; font-size: 13px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+.tr-checklist { margin-top: 6px; font-size: 13px; }
+.tr-checklist .cl-name { font-weight: 600; color: var(--muted); }
+.tr-check-item { margin-left: 8px; }
+.tr-check-item.done { color: var(--muted); text-decoration: line-through; }
+.tr-activity { margin-top: 6px; }
+.tr-activity summary { cursor: pointer; font-size: 12px; color: var(--accent); }
+.tr-act-row { font-size: 12px; margin: 4px 0 0 8px; }
+.tr-act-row .who { font-weight: 600; }
+.tr-act-row .when { color: var(--muted); }
+.tr-act-row.comment { background: var(--panel-2); border-left: 3px solid var(--accent); border-radius: 4px; padding: 4px 8px; white-space: pre-wrap; }
+
+/* wiki 情報取得 */
+.gw-head { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+.gw-head .p { color: var(--fg); font-weight: 600; word-break: break-all; }
+.gw-section { margin-top: 16px; }
+.gw-section > h3 { font-size: 13px; margin: 0 0 8px; color: var(--fg); border-bottom: 2px solid var(--accent); padding-bottom: 5px; }
+.gw-body { white-space: pre-wrap; word-break: break-word; font-family: "Consolas", "Courier New", monospace; font-size: 12.5px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; max-height: 480px; overflow: auto; }
+.gw-row { font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+.gw-row .who { font-weight: 600; }
+.gw-row .when { color: var(--muted); margin-left: 8px; }
+.gw-comment { border-left: 3px solid var(--accent); background: var(--panel-2); border-radius: 4px; padding: 6px 10px; margin: 6px 0; font-size: 13px; }
+.gw-comment.reply { margin-left: 24px; }
+.gw-comment .text { white-space: pre-wrap; word-break: break-word; margin-top: 4px; }
+
+/* GitHub 情報取得 */
+.gh-section { margin-top: 18px; }
+.gh-section > h3 { font-size: 14px; margin: 0 0 8px; color: var(--fg); border-bottom: 2px solid var(--accent); padding-bottom: 5px; }
+.gh-item { border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; background: var(--panel); }
+.gh-item > summary { list-style: none; cursor: pointer; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.gh-item > summary::-webkit-details-marker { display: none; }
+.gh-item > summary::before { content: "▸"; color: var(--muted); }
+.gh-item[open] > summary::before { content: "▾"; }
+.gh-item[open] > summary { border-bottom: 1px solid var(--border); }
+.gh-name { font-weight: 700; }
+.gh-sub { font-size: 12px; color: var(--muted); }
+.gh-badge { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); }
+.gh-badge.open { color: #1a7f37; border-color: #1a7f37; background: #eaf6ec; }
+.gh-badge.merged { color: #6639ba; border-color: #6639ba; background: #f2ecfb; }
+.gh-badge.closed { color: #6b7787; }
+.gh-badge.prot { color: #b45309; border-color: #f0d3a6; background: #fdf1e0; }
+.gh-body { padding: 8px 12px 12px; }
+.gh-row { font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--border); display: flex; gap: 10px; flex-wrap: wrap; }
+.gh-row .who { font-weight: 600; }
+.gh-row .when { color: var(--muted); }
+.gh-row .msg { flex: 1 1 260px; word-break: break-word; }
+.gh-meta { font-size: 12px; margin: 4px 0 8px; }
+.gh-comment { border-left: 3px solid var(--accent); background: var(--panel-2); border-radius: 4px; padding: 6px 10px; margin: 6px 0; font-size: 13px; }
+.gh-comment.review { border-left-color: var(--learned); }
+.gh-comment .text { white-space: pre-wrap; word-break: break-word; margin-top: 4px; }
+
+/* 設計書情報取得 */
+.dsg-file { border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; background: var(--panel); }
+.dsg-file > summary { list-style: none; cursor: pointer; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.dsg-file > summary::-webkit-details-marker { display: none; }
+.dsg-file > summary::before { content: "▸"; color: var(--muted); }
+.dsg-file[open] > summary::before { content: "▾"; }
+.dsg-file[open] > summary { border-bottom: 1px solid var(--border); }
+.dsg-name { font-weight: 700; word-break: break-all; }
+.dsg-size { font-size: 11px; color: var(--muted); }
+.dsg-file .gw-body { margin: 10px 12px 12px; }
+/* 機能分析(2回目のやり取り)の詳細仕様表示 */
+.dsg-feat-overview { margin: 10px 12px; color: var(--muted); font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+.dsg-spec-sec { margin: 10px 12px; }
+.dsg-spec-sec > h4 { font-size: 13px; margin: 0 0 6px; color: var(--fg); border-bottom: 2px solid var(--accent); padding-bottom: 4px; }
+.dsg-spec-body { white-space: pre-wrap; word-break: break-word; font-size: 13px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+.dsg-feat-error { color: var(--problem); font-size: 13px; margin: 8px 12px; }

@@ -1,0 +1,18 @@
+/* 設定画面(カードをやめて直接ページ表示)。 */
+.settings-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 4px; }
+.set-item { margin: 26px 0; }
+.set-item:first-of-type { margin-top: 14px; }
+.set-item > h2 { border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 12px; }
+.set-sub { margin: 16px 0 16px 2px; }
+.set-sub > h3 { margin: 0 0 6px; color: var(--fg); }
+.set-input { width: 100%; max-width: 520px; }
+.set-input.wide { max-width: 900px; }
+.check-group { margin-top: 14px; }
+.check-group > .grp-title { font-weight: 700; font-size: 12px; color: var(--muted); margin-bottom: 6px; border-left: 3px solid var(--accent); padding-left: 8px; }
+.check-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px 18px; }
+.check-grid label { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; font-size: 13px; min-width: 0; }
+.check-grid label input { margin: 0; flex: 0 0 auto; }
+.check-grid label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) { .check-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.field-hint { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+.field-error { color: var(--problem); font-size: 12px; margin-top: 6px; min-height: 1em; }

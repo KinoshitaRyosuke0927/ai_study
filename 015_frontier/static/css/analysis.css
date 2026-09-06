@@ -1,0 +1,67 @@
+/* 分析結果まわり(KPT ボード / 実装差分テーブル / 定期実行フロー図)。 */
+
+.kpt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.kpt-col h3 { border-bottom: 2px solid var(--border); padding-bottom: 6px; }
+.kpt-col.keep h3 { border-color: var(--keep); }
+.kpt-col.problem h3 { border-color: var(--problem); }
+.kpt-col.try h3 { border-color: var(--try); }
+.kpt-col.done h3 { border-color: var(--done); }
+.kpt-col.learned h3 { border-color: var(--learned); }
+.kpt-col { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+.kpt-col h3 { margin: 2px 4px 8px; font-size: 14px; }
+.kpt-col.drop-hint { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.kpt-item { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+.kpt-item:last-child { margin-bottom: 0; }
+.kpt-item.draggable { cursor: grab; }
+.kpt-item.dragging { opacity: .4; }
+.kpt-item .kpt-head { display: flex; align-items: flex-start; gap: 8px; }
+.kpt-item .kpt-head .t { flex: 1; font-weight: 600; }
+.kpt-item .d { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.kpt-item .e { margin-top: 6px; }
+.kpt-stars { flex: none; white-space: nowrap; font-size: 15px; line-height: 1; user-select: none; }
+.kpt-star { cursor: pointer; color: var(--border); padding: 0 1px; }
+.kpt-star.on { color: var(--try); }
+.kpt-col-empty { color: var(--muted); font-size: 12px; padding: 10px 4px; text-align: center; }
+.kpt-dash-list { padding-left: 0; margin: 4px 0 0; }
+.kpt-dash-list li { list-style: none; margin: 4px 0; font-size: 13px; }
+.kpt-dash-tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; margin-right: 6px; color: #fff; vertical-align: 1px; }
+.kpt-dash-tag.keep { background: var(--keep); }
+.kpt-dash-tag.problem { background: var(--problem); }
+.kpt-dash-tag.try { background: var(--try); }
+.kpt-dash-star { color: var(--try); font-size: 11px; margin-right: 4px; letter-spacing: -1px; }
+
+.sev-high { background: #fdecec; color: #b91c1c; border-color: #f2b8b8; }
+.sev-mid { background: #fdf1e0; color: #b45309; border-color: #f0d3a6; }
+.sev-low { background: #e9f1ff; color: #1d4ed8; border-color: #c3d6fb; }
+
+/* ダッシュボード: 実装差分(機能別)テーブル */
+.sd-panel { cursor: pointer; }
+.sd-sum { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.sd-sum b { font-weight: 700; }
+.sd-table { table-layout: fixed; }
+.sd-table th.num, .sd-table td.num { text-align: right; width: 64px; }
+.sd-table th.bar, .sd-table td.bar { width: 168px; }
+.sd-table td:first-child { word-break: break-word; }
+.sd-table tbody tr:hover { background: var(--panel-2); }
+.sd-feat { color: var(--accent); cursor: pointer; }
+.sd-feat:hover { text-decoration: underline; }
+/* 定期実行パイプラインのフロー図 */
+.pl-phase-label { font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
+.pl-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.pl-step { border: 2px solid var(--border); border-radius: 10px; padding: 10px 12px; min-width: 210px; flex: 0 1 230px; background: var(--panel); }
+.pl-step-hd { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.pl-step .pl-err { color: var(--problem); font-size: 11px; margin-top: 6px; white-space: pre-wrap; word-break: break-word; }
+.pl-pending { opacity: .65; }
+.pl-running { border-color: var(--accent); }
+.pl-success { border-color: var(--keep); }
+.pl-error { border-color: var(--problem); }
+.sd-table tfoot th { font-weight: 700; color: var(--fg); border-top: 2px solid var(--border); }
+.sd-bar { display: flex; height: 10px; width: 150px; border-radius: 3px; overflow: hidden; background: var(--panel-2); }
+.sd-bar > span { display: block; height: 100%; }
+.sd-h { color: #dc2626; font-weight: 700; }
+.sd-m { color: #d97706; font-weight: 700; }
+.sd-l { color: #2563eb; font-weight: 700; }
+.sd-z { color: var(--muted); }
+.sd-seg-h { background: #dc2626; }
+.sd-seg-m { background: #d97706; }
+.sd-seg-l { background: #2563eb; }
