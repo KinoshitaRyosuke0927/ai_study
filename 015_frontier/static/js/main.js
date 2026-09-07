@@ -3,6 +3,7 @@
 
 import { $ } from "./core.js";
 import "./nav.js";  // サイドメニュー / ブランドのクリック配線(副作用 import)
+import "./qa.js";   // Q&A タブのチャット配線(副作用 import)
 import { loadHealth } from "./health.js";
 import { saveSettings } from "./settings.js";
 import { fetchMattermost, analyzeMattermost } from "./mattermost.js";
@@ -14,7 +15,8 @@ import { fetchCode, analyzeCode } from "./code.js";
 import { fetchChangelog, analyzeChangelog } from "./changelog.js";
 import { runPipeline } from "./pipeline.js";
 import { saveKpt } from "./kpt.js";
-import { loadDiffCard, loadKptCard } from "./dashboard.js";
+import { extractTacit, trainTacit } from "./tacit.js";
+import { loadDiffCard, loadKptCard, loadTacitCard } from "./dashboard.js";
 
 // ダッシュボードのカード類 + ヘルスバッジを最新化する
 async function refreshAll() {
@@ -22,6 +24,7 @@ async function refreshAll() {
     loadHealth(),
     loadDiffCard().catch(() => {}),
     loadKptCard().catch(() => {}),
+    loadTacitCard().catch(() => {}),
   ]);
 }
 
@@ -44,5 +47,7 @@ $("#plRunBtn").addEventListener("click", runPipeline);
 $("#clFetchBtn").addEventListener("click", fetchChangelog);
 $("#clAnalyzeBtn").addEventListener("click", analyzeChangelog);
 $("#kptSaveBtn").addEventListener("click", saveKpt);
+$("#tacitExtractBtn").addEventListener("click", extractTacit);
+$("#tacitTrainBtn").addEventListener("click", trainTacit);
 
 refreshAll();

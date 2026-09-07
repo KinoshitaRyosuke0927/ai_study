@@ -3,3 +3,6 @@ acquisition_settings.json
 
 # ローカル venv
 .venv/
+
+# 暗黙知の評価値学習で保存する学習済みモデル(ローカルファイル。DB の tacit_training_runs から参照)
+storage/

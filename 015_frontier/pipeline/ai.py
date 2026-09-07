@@ -25,12 +25,15 @@ class AiAnalyzer:
         self._client = None
         if self.enabled:
             try:
-                from openai import AzureOpenAI
+                from openai import OpenAI
 
-                self._client = AzureOpenAI(
-                    azure_endpoint=settings.azure_openai_endpoint,
+                # settings.azure_openai_endpoint は新形式(".../openai/v1")のため、
+                # 他機能(kpt_analysis 等)と同じく OpenAI(base_url=...) で呼び出す。
+                # AzureOpenAI(azure_endpoint=..., api_version=...) は旧形式のエンドポイント
+                # (".../openai.azure.com")向けで、新形式と組み合わせるとパスが二重になり 404 になる。
+                self._client = OpenAI(
+                    base_url=settings.azure_openai_endpoint,
                     api_key=settings.azure_openai_api_key,
-                    api_version=settings.azure_openai_api_version,
                 )
                 logger.info("Azure OpenAI クライアント初期化完了")
             except Exception as exc:  # pragma: no cover - 初期化失敗時

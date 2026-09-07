@@ -2,6 +2,8 @@
 
 SQLAlchemy 2.x(同期)を使用。プロトタイプのため Alembic は使わず、
 起動時に schema.sql を CREATE TABLE IF NOT EXISTS で適用する。
+既存テーブルへの列追加(ALTER TABLE ADD COLUMN)は MySQL に IF NOT EXISTS 句が無いため、
+「列が既に存在する」エラー(1060)はここで無視して冪等化する。
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from typing import Iterator
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
 
 from config.settings import Settings, get_settings
@@ -84,15 +87,26 @@ def _split_sql_statements(sql: str) -> list[str]:
     return [s.strip() for s in joined.split(";") if s.strip()]
 
 
+_MYSQL_ERR_DUP_COLUMN = 1060  # Duplicate column name
+
+
 def apply_schema(settings: Settings | None = None) -> None:
-    """schema.sql を読み込み、各 CREATE TABLE を実行する。"""
+    """schema.sql を読み込み、各 CREATE TABLE / ALTER TABLE を実行する。"""
     settings = settings or get_settings()
     engine = get_engine(settings)
     statements = _split_sql_statements(_SCHEMA_PATH.read_text(encoding="utf-8"))
-    # 1 ステートメントずつ実行(IF NOT EXISTS のため再実行しても安全)
+    # 1 ステートメントずつ実行(CREATE TABLE は IF NOT EXISTS のため再実行しても安全。
+    # ALTER TABLE ADD COLUMN は「列が既に存在する」エラーだけ無視して冪等化する)
     with engine.begin() as conn:
         for stmt in statements:
-            conn.execute(text(stmt))
+            try:
+                conn.execute(text(stmt))
+            except DBAPIError as exc:
+                orig_code = getattr(exc.orig, "args", (None,))[0]
+                if stmt.strip().upper().startswith("ALTER TABLE") and orig_code == _MYSQL_ERR_DUP_COLUMN:
+                    logger.info("スキーマ適用: 列は既に追加済みのためスキップ: %s", stmt.strip()[:100])
+                    continue
+                raise
     logger.info("スキーマ適用完了: %d ステートメント / db=%s", len(statements), settings.mysql_database)
 
 

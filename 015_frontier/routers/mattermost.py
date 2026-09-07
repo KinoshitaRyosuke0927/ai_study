@@ -106,6 +106,10 @@ async def api_mattermost_analyze(
     アカウントごとにチャンネル横断の発言・活動を AI で分析して返す。
 
     - mm_posts へ post_id で冪等に蓄積(期間が重複しても増えない)。
+    - mode=current は、チャンネルごとに前回取り込み済みの投稿日以降だけを Mattermost から
+      取得する(取得開始日〜今日をまるごと再取得すると運用が長くなるほど遅くなるため)。
+      分析(チャンク化・アカウント別コンテキスト)自体は、取得を増分化した後も DB に蓄積された
+      対象期間の全投稿を対象にする(取得の高速化が分析対象の縮小にならないようにする)。
     - 会話はスレッド単位でチャンク化し、embeddings へ source='mattermost' で埋め込み
       (既存 /api/search の RAG がそのまま Mattermost も検索対象にする)。
     - 同一入力(content_hash)の成功済み分析があれば再利用(force=true で無視)。
@@ -120,15 +124,35 @@ async def api_mattermost_analyze(
     )
     channel_ids = list(rc.mattermost_channel_ids or [])
 
-    # --- 取得 ---
+    # --- 増分取得(mode=current のみ): チャンネルごとの前回取り込み済み投稿日を起点にする ---
+    start_overrides: dict[str, Any] = {}
+    if body.mode == "current":
+        start_overrides = await asyncio.to_thread(mm_store.get_channel_last_post_dates, channel_ids)
+
     try:
         fetched = await asyncio.to_thread(
-            mattermost_view.fetch_posts, settings, channel_ids, start_d, end_d
+            mattermost_view.fetch_posts, settings, channel_ids, start_d, end_d, start_overrides
         )
     except mattermost_view.MattermostViewError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    posts = mm_ingest.flatten_posts(fetched)
+    # --- 新規取得分を DB へ蓄積(冪等。新規 0 件でも ingest_run は記録する) ---
+    new_posts = mm_ingest.flatten_posts(fetched)
+    new_content_hash = mm_ingest.compute_content_hash(
+        channel_ids, start_d.isoformat(), end_d.isoformat(), new_posts
+    )
+    ing = await asyncio.to_thread(
+        mm_store.ingest_posts,
+        mode=body.mode,
+        channel_ids=channel_ids,
+        window_start=start_d,
+        window_end=end_d,
+        posts=new_posts,
+        content_hash=new_content_hash,
+    )
+
+    # --- 分析対象: DB に蓄積された対象期間の全投稿(増分取得後も全期間ベースで分析する) ---
+    posts = await asyncio.to_thread(mm_store.get_posts_for_window, channel_ids, start_d, end_d)
     if not posts:
         raise HTTPException(status_code=422, detail="対象期間に分析できる投稿がありませんでした")
 
@@ -140,17 +164,6 @@ async def api_mattermost_analyze(
         cached = await asyncio.to_thread(mm_store.find_cached_account_analysis, content_hash)
         if cached:
             return _mm_analysis_response(cached, cached=True)
-
-    # --- 蓄積(mm_channels / mm_users / mm_posts) ---
-    ing = await asyncio.to_thread(
-        mm_store.ingest_posts,
-        mode=body.mode,
-        channel_ids=channel_ids,
-        window_start=start_d,
-        window_end=end_d,
-        posts=posts,
-        content_hash=content_hash,
-    )
 
     # --- チャンク化 + 埋め込み(RAG 用。失敗しても分析は継続) ---
     try:
@@ -190,7 +203,8 @@ async def api_mattermost_analyze(
         else:
             accounts_out.append({**base, "overview": res["overview"], "sections": res["sections"]})
 
-    # --- 保存して、保存後の分析を返す ---
+    # --- 保存して、保存後の分析を返す(件数は分析対象=全期間の posts を基準にする) ---
+    channel_count = len({p["channel_id"] for p in posts if p["channel_id"]})
     saved = await asyncio.to_thread(
         mm_store.save_account_analysis,
         ingest_run_id=ing["ingest_run_id"],
@@ -202,8 +216,8 @@ async def api_mattermost_analyze(
         topics=topics,
         stats={
             "mode": body.mode,
-            "post_count": ing["post_count"],
-            "channel_count": ing["channel_count"],
+            "post_count": len(posts),
+            "channel_count": channel_count,
             "account_count": len(contexts),
             "chunk_count": emb["chunk_count"],
             "embedded_chunks": emb["embedded_chunks"],

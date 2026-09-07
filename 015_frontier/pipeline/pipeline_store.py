@@ -23,6 +23,8 @@ STEPS: list[tuple[str, str, str]] = [
     ("spec_diff", "実装差分解析", "sequential"),
     ("user_activity", "アクティビティ分析", "sequential"),
     ("kpt", "KPT分析", "sequential"),
+    ("tacit_extract", "暗黙知抽出", "sequential"),
+    ("tacit_train", "暗黙知評価値学習", "final"),
 ]
 
 

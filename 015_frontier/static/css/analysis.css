@@ -28,6 +28,16 @@
 .kpt-dash-tag.keep { background: var(--keep); }
 .kpt-dash-tag.problem { background: var(--problem); }
 .kpt-dash-tag.try { background: var(--try); }
+
+/* 暗黙知共有: 表示フィルタ(クリックで表示/非表示を切り替えるトグルチップ) */
+.tacit-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 24px; }
+.tacit-filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tacit-filter-chip {
+  display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--muted); background: var(--panel);
+  cursor: pointer; user-select: none;
+}
+.tacit-filter-chip.active { color: #fff; background: var(--accent); border-color: var(--accent); }
 .kpt-dash-star { color: var(--try); font-size: 11px; margin-right: 4px; letter-spacing: -1px; }
 
 .sev-high { background: #fdecec; color: #b91c1c; border-color: #f2b8b8; }

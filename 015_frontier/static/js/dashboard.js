@@ -4,6 +4,7 @@ import { $, api, esc } from "./core.js";
 import { selectTab } from "./nav.js";
 import { openSpecDiffFeature } from "./specdiff.js";
 import { KPT_SOURCE_LABEL } from "./kpt.js";
+import { SOURCE_LABEL as TACIT_SOURCE_LABEL } from "./tacit.js";
 
 // ダッシュボード: 保存済みの最新の差分を「機能別 × 重大度別」に集計した強化テーブル
 export async function loadDiffCard() {
@@ -124,4 +125,26 @@ export async function loadKptCard() {
       </div>`;
     cont.querySelector(".panel").addEventListener("click", () => selectTab("kpt"));
   } catch (e) { cont.innerHTML = '<span class="muted">KPTの状況を取得できませんでした。</span>'; }
+}
+
+// ダッシュボード: 暗黙知(★5)の件数をソース別に集計したカード
+export async function loadTacitCard() {
+  const cont = $("#tacitCards");
+  try {
+    const r = await api("/api/tacit/items?rating=5");
+    const items = r.items || [];
+    const sources = Object.keys(TACIT_SOURCE_LABEL);
+    const counts = {};
+    sources.forEach((s) => { counts[s] = 0; });
+    items.forEach((it) => { if (counts[it.source] != null) counts[it.source]++; });
+
+    cont.innerHTML = `
+      <div class="panel sd-panel" style="flex:1 1 100%;margin-top:0" title="暗黙知共有へ">
+        <h2 style="margin-bottom:6px">暗黙知 ★5 <span class="muted" style="font-size:12px;font-weight:400">ソース別件数</span></h2>
+        <p class="sd-sum">
+          ${sources.map((s) => `<b>${esc(TACIT_SOURCE_LABEL[s])} ${counts[s]}</b>`).join(" ・ ")}
+          ／ 計 <b>${items.length}</b></p>
+      </div>`;
+    cont.querySelector(".panel").addEventListener("click", () => selectTab("tacit"));
+  } catch (e) { cont.innerHTML = '<span class="muted">暗黙知の状況を取得できませんでした。</span>'; }
 }

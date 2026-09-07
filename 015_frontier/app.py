@@ -30,8 +30,10 @@ from routers import (
     health,
     kpt,
     mattermost,
+    qa,
     settings as settings_router,
     spec_diff,
+    tacit,
     trello,
     user_activity,
 )
@@ -52,6 +54,7 @@ from routers.kpt import (  # noqa: E402
 )
 from routers.mattermost import MattermostAnalyzeBody, api_mattermost_analyze  # noqa: E402
 from routers.spec_diff import api_spec_diff_analyze  # noqa: E402
+from routers.tacit import api_tacit_extract, run_training_for_pipeline  # noqa: E402
 from routers.trello import api_trello_analyze  # noqa: E402
 from routers.user_activity import api_user_activity_analyze  # noqa: E402
 
@@ -90,6 +93,8 @@ app.include_router(analysis.router)
 app.include_router(spec_diff.router)
 app.include_router(user_activity.router)
 app.include_router(kpt.router)
+app.include_router(tacit.router)
+app.include_router(qa.router)
 
 
 # ----------------------------------------------------------------------
@@ -116,6 +121,20 @@ def _pipeline_step_summary(key: str, res: Any) -> dict[str, Any]:
             "keep": st.get("keep_count"),
             "problem": st.get("problem_count"),
             "try": st.get("try_count"),
+        }
+    if key == "tacit_extract":
+        st = res.get("stats") or {}
+        return {
+            "inserted_count": res.get("inserted_count"),
+            "extracted_total": sum((st.get("extracted") or {}).values()),
+        }
+    if key == "tacit_train":
+        # スキップ時は {"run_id", "status":"skipped", "cached":True}、
+        # 実行時は tacit_store.get_training_run() の dict(id キー)が返る。
+        return {
+            "run_id": res.get("run_id", res.get("id")),
+            "training_item_count": res.get("training_item_count"),
+            "cached": bool(res.get("cached")),
         }
     return {}
 
@@ -159,11 +178,19 @@ async def _run_pipeline(run_id: int, force: bool) -> None:
         )
 
         # --- フェーズ 2: 解析(並列)---
+        # 暗黙知抽出は Mattermost/Trello/GitHub の生データ取り込み(フェーズ1)後に実行する必要がある。
         await asyncio.gather(
             _step("spec_diff", lambda: api_spec_diff_analyze()),
             _step("user_activity", lambda: api_user_activity_analyze(force=force)),
             _step("kpt", lambda: api_kpt_analyze(force=force)),
+            _step("tacit_extract", lambda: api_tacit_extract(force=force)),
         )
+
+        # --- フェーズ 3: 評価値学習 ---
+        # フェーズ2の暗黙知抽出で今回追加された未評価アイテムも、この学習結果で
+        # まとめて再スコアリングされるよう、抽出の完了後に実行する。
+        # 前回成功時から★評価に変更が無ければ内部でスキップされる(force で強制再学習)。
+        await _step("tacit_train", lambda: run_training_for_pipeline(force=force))
 
         run = pstore.get_run(run_id) or {"steps": []}
         has_error = any(s["status"] == "error" for s in run["steps"])

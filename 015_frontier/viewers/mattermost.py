@@ -94,24 +94,33 @@ class _MattermostApi:
         return result
 
     def posts_since(self, channel_id: str, since_ms: int) -> dict[str, dict]:
-        """since_ms 以降の投稿をページングで全取得し、id -> post のマップで返す。
+        """since_ms 以降の投稿を全取得し、id -> post のマップで返す。
 
         Mattermost はスレッドのルート投稿を since より前でも同梱するため、
         戻り値には期間外のルート投稿が含まれることがある。
+
+        注意: since 指定時、Mattermost は page パラメータを無視して常に同じ結果を返す
+        (since はページング用ではなく「差分同期」用のクエリのため)。そのため対象が
+        per_page 件を超える場合、page を進めても終了条件(len(order) < per_page)に
+        決して到達せず無限ループになる。ここでは page ではなく、受け取った投稿の
+        create_at の最大値 + 1ms を次の since に使う「時刻カーソル」でページングする。
         """
         posts: dict[str, dict] = {}
-        page = 0
+        cursor = since_ms
         while True:
             data = self._http.get_json(
                 f"{self._base}/api/v4/channels/{channel_id}/posts",
-                params={"since": since_ms, "page": page, "per_page": PER_PAGE},
+                params={"since": cursor, "per_page": PER_PAGE},
             )
             order: list[str] = data.get("order", [])
             page_posts: dict[str, dict] = data.get("posts", {})
             posts.update(page_posts)
             if len(order) < PER_PAGE:
                 break
-            page += 1
+            max_create_at = max((page_posts[pid].get("create_at", 0) for pid in order if pid in page_posts), default=0)
+            if max_create_at <= cursor:
+                break  # 進捗が無ければ打ち切る(同一ミリ秒に per_page 超の投稿がある等の異常系)
+            cursor = max_create_at + 1
         return posts
 
 
@@ -144,8 +153,12 @@ def fetch_posts(
     channel_ids: list[str],
     start_d: date,
     end_d: date,
+    start_overrides: dict[str, date] | None = None,
 ) -> dict[str, Any]:
     """設定チャンネルの [start_d, end_d] の投稿をチャンネル別・スレッド構造で返す。
+
+    start_overrides を渡すと、該当チャンネルは start_d の代わりにその日付から取得する
+    (start_d より前には遡らない)。前回取り込み済みの投稿日時を起点にした増分取得に使う。
 
     Raises:
         MattermostViewError: 取得条件が不正 / Mattermost にアクセスできない場合。
@@ -158,7 +171,6 @@ def fetch_posts(
         raise MattermostViewError("開始日が終了日より後になっています")
 
     tzinfo = _tz(settings)
-    start_ms, _ = _day_bounds_ms(start_d, tzinfo)
     _, end_ms = _day_bounds_ms(end_d, tzinfo)
 
     api = _MattermostApi(settings)
@@ -166,6 +178,9 @@ def fetch_posts(
     total_posts = 0
 
     for channel_id in channel_ids:
+        ch_start_d = max(start_d, (start_overrides or {}).get(channel_id, start_d))
+        start_ms, _ = _day_bounds_ms(ch_start_d, tzinfo)
+
         try:
             ch = api.channel(channel_id)
             channel_name = ch.get("display_name") or ch.get("name") or channel_id

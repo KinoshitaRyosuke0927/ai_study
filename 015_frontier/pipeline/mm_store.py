@@ -11,7 +11,7 @@ import json
 from datetime import date, datetime, timezone
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 from common.vectors import to_blob
@@ -53,6 +53,15 @@ def ingest_posts(
         channels = {p["channel_id"]: p["channel_name"] for p in posts if p["channel_id"]}
         users = {p["user_id"]: p["username"] for p in posts if p["user_id"]}
 
+        # チャンネルごとの最新投稿日時(次回の mode=current 増分取得の起点にする)
+        latest_by_channel: dict[str, datetime] = {}
+        for p in posts:
+            if not p["channel_id"]:
+                continue
+            dt = datetime.fromtimestamp(p["create_at"] / 1000, tz=timezone.utc).replace(tzinfo=None)
+            if p["channel_id"] not in latest_by_channel or dt > latest_by_channel[p["channel_id"]]:
+                latest_by_channel[p["channel_id"]] = dt
+
         res = session.execute(
             text(
                 """
@@ -76,18 +85,21 @@ def ingest_posts(
         run_id = int(res.lastrowid)
 
         for cid, cname in channels.items():
+            lpa = latest_by_channel.get(cid)
             session.execute(
                 text(
                     """
-                    INSERT INTO mm_channels (channel_id, name, display_name, first_seen_at, last_seen_at)
-                    VALUES (:id, :n, :n, :t, :t)
+                    INSERT INTO mm_channels
+                      (channel_id, name, display_name, first_seen_at, last_seen_at, last_post_at)
+                    VALUES (:id, :n, :n, :t, :t, :lpa)
                     ON DUPLICATE KEY UPDATE
                       display_name = VALUES(display_name),
                       first_seen_at = LEAST(COALESCE(first_seen_at, :t), :t),
-                      last_seen_at = GREATEST(COALESCE(last_seen_at, :t), :t)
+                      last_seen_at = GREATEST(COALESCE(last_seen_at, :t), :t),
+                      last_post_at = GREATEST(COALESCE(last_post_at, :lpa), :lpa)
                     """
                 ),
-                {"id": cid, "n": cname, "t": now},
+                {"id": cid, "n": cname, "t": now, "lpa": lpa},
             )
 
         for uid, uname in users.items():
@@ -147,6 +159,75 @@ def ingest_posts(
     except Exception:
         session.rollback()
         raise
+    finally:
+        session.close()
+
+
+def get_posts_for_window(channel_ids: list[str], window_start: date, window_end: date) -> list[dict[str, Any]]:
+    """指定チャンネル・期間の投稿を DB から全件読み出す(mm_ingest.flatten_posts と同じ形)。
+
+    mode=current の投稿取得を増分化したため、チャンク化・アカウント別コンテキスト作成などの
+    分析処理は、今回ネットワークから新規取得した差分だけでなく、蓄積済みの対象期間全体を
+    DB から読み出して対象にする(取得を増分化しても分析対象は従来どおり全期間のままにする)。
+    """
+    if not channel_ids:
+        return []
+    session = _new_session()
+    try:
+        start_dt = datetime.combine(window_start, datetime.min.time())
+        end_dt = datetime.combine(window_end, datetime.max.time())
+        rows = session.execute(
+            text(
+                """
+                SELECT p.post_id, p.channel_id,
+                       COALESCE(c.display_name, c.name, p.channel_id) AS channel_name,
+                       p.user_id, COALESCE(u.username, p.user_id) AS username,
+                       p.root_id, p.is_reply, p.created_at, p.message, p.reactions, p.reaction_count
+                FROM mm_posts p
+                LEFT JOIN mm_channels c ON c.channel_id = p.channel_id
+                LEFT JOIN mm_users u ON u.user_id = p.user_id
+                WHERE p.channel_id IN :ids AND p.created_at BETWEEN :s AND :e
+                """
+            ).bindparams(bindparam("ids", expanding=True)),
+            {"ids": channel_ids, "s": start_dt, "e": end_dt},
+        ).all()
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            out.append({
+                "post_id": r.post_id,
+                "channel_id": r.channel_id,
+                "channel_name": r.channel_name,
+                "user_id": r.user_id,
+                "username": r.username,
+                "root_id": r.root_id or "",
+                "is_reply": bool(r.is_reply),
+                "create_at": int(r.created_at.replace(tzinfo=timezone.utc).timestamp() * 1000),
+                "message": r.message,
+                "reactions": _json_col(r.reactions) or {},
+                "reaction_count": r.reaction_count,
+            })
+        return out
+    finally:
+        session.close()
+
+
+def get_channel_last_post_dates(channel_ids: list[str]) -> dict[str, date]:
+    """チャンネルごとの最終取り込み投稿日(mode=current の増分取得の起点)。
+
+    未取り込みのチャンネルはキーに含まれない(呼び出し側で取得開始日にフォールバックする)。
+    """
+    if not channel_ids:
+        return {}
+    session = _new_session()
+    try:
+        rows = session.execute(
+            text(
+                "SELECT channel_id, last_post_at FROM mm_channels "
+                "WHERE channel_id IN :ids AND last_post_at IS NOT NULL"
+            ).bindparams(bindparam("ids", expanding=True)),
+            {"ids": channel_ids},
+        ).all()
+        return {r.channel_id: r.last_post_at.date() for r in rows}
     finally:
         session.close()
 

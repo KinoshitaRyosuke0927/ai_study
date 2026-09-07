@@ -650,3 +650,77 @@ CREATE TABLE IF NOT EXISTS pipeline_run_steps (
   UNIQUE KEY uq_prs (run_id, step_key),
   INDEX idx_prs_run (run_id)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- ------------------------------------------------------------------
+-- 暗黙知抽出(Mattermost投稿 / Trelloカード内容・コメント / GitHub PRコメント・レビュー
+-- から、ドキュメント化されていないプロジェクト固有の知見を AI で抽出し、画面で★評価する。
+-- 評価値(rating)は今後追加する学習機能の教師データになる想定。
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tacit_extract_runs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  model VARCHAR(100) NOT NULL,
+  stats JSON NOT NULL,                    -- {scanned:{source:件数}, extracted:{source:件数}}
+  status VARCHAR(20) NOT NULL,            -- success / error
+  detail TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_tacit_run_created (created_at)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS tacit_knowledge_items (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  run_id BIGINT NOT NULL,
+  source VARCHAR(12) NOT NULL,            -- mattermost / trello / github
+  source_ref VARCHAR(255) NOT NULL,       -- post_id / "card:<id>" / "comment:<id>" / gh_activity.event_id
+  source_detail JSON NOT NULL,            -- 出典表示 + 将来の RAG 引き当て用(channel/card/PR等の情報)
+  title VARCHAR(255) NOT NULL,
+  content MEDIUMTEXT NOT NULL,
+  content_hash CHAR(64) NOT NULL,         -- (source, source_ref, content) の重複登録防止
+  rating TINYINT NULL,                    -- 星0〜5(画面で評価。NULL = 未評価)
+  rated_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_tacit_item (source, source_ref, content_hash),
+  INDEX idx_tacit_run (run_id),
+  INDEX idx_tacit_rating (rating)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- どの生データ(投稿/カード/コメント)まで抽出処理をしたかを記録し、次回実行時に
+-- 同じ内容を再抽出しない(内容が変わったものだけ再抽出する)。
+CREATE TABLE IF NOT EXISTS tacit_processed_refs (
+  source VARCHAR(12) NOT NULL,
+  source_ref VARCHAR(255) NOT NULL,
+  content_hash CHAR(64) NOT NULL,         -- 原文のハッシュ
+  processed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (source, source_ref)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- 人による★評価(rating)を教師データに学習したモデルによる、AI予測評価値。
+-- MySQL の ALTER TABLE ADD COLUMN に IF NOT EXISTS 句は無いため、
+-- 「列が既に存在する」エラー(1060)は infra/db.apply_schema 側で無視して冪等化している。
+ALTER TABLE tacit_knowledge_items ADD COLUMN predicted_rating FLOAT NULL;
+
+-- ------------------------------------------------------------------
+-- 暗黙知の評価値学習(★評価済みアイテムを教師データに回帰モデルを学習し、
+-- 未評価アイテムに predicted_rating を付与する)。学習は時間がかかるため
+-- バックグラウンドタスクとして実行し、進捗はこのテーブルをポーリングして確認する。
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tacit_training_runs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  status VARCHAR(20) NOT NULL,            -- running / success / error
+  algorithm VARCHAR(50) NOT NULL DEFAULT '',
+  training_item_count INT NOT NULL DEFAULT 0,
+  feature_dim INT NOT NULL DEFAULT 0,
+  metrics JSON NULL,                      -- {val_mae / train_mae, val_count, embedding_model, ...}
+  model_path VARCHAR(512) NULL,           -- 学習済みモデルファイル(joblib)のパス
+  detail TEXT NULL,                       -- エラー時の詳細
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  finished_at DATETIME NULL,
+  INDEX idx_ttr_started (started_at)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- 学習に使った評価内容(id×rating)のハッシュ。定期実行パイプラインから呼ばれた際、
+-- 前回成功時から評価内容に変更が無ければ学習をスキップする(他の分析と同じキャッシュ運用)。
+ALTER TABLE tacit_training_runs ADD COLUMN ratings_hash CHAR(64) NULL;
+
+-- チャンネルごとに最後に取り込んだ投稿の create_at。mode=current(定期実行含む)の
+-- Mattermost取得を、取得開始日からの全期間ではなく、ここからの増分取得にするために使う。
+ALTER TABLE mm_channels ADD COLUMN last_post_at DATETIME NULL;
