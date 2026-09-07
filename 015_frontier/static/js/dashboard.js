@@ -47,6 +47,7 @@ export async function loadDiffCard() {
           <b class="sd-h">High ${tot.high}</b> ・
           <b class="sd-m">Mid ${tot.mid}</b> ・
           <b class="sd-l">Low ${tot.low}</b> ／ 計 <b>${tot.total}</b>(差分あり ${rows.length} 機能)</p>
+        <div class="dash-scroll">
         <table class="sd-table">
           <thead><tr>
             <th>機能</th>
@@ -70,6 +71,7 @@ export async function loadDiffCard() {
             <th class="num">${tot.total}</th>
           </tr></tfoot>
         </table>
+        </div>
       </div>`;
     // 機能名クリック: その機能のアコーディオンを開いた状態で差分画面へ
     cont.querySelectorAll(".sd-feat").forEach((el) => {
@@ -115,7 +117,7 @@ export async function loadKptCard() {
     const src = ((r.stats && r.stats.available_sources) || [])
       .map((s) => KPT_SOURCE_LABEL[s] || s).join("、 ");
     cont.innerHTML = `
-      <div class="panel sd-panel" style="flex:1 1 100%;margin-top:0" title="KPT分析へ">
+      <div class="panel sd-panel" style="margin-top:0" title="KPT分析へ">
         <h2 style="margin-bottom:6px">KPT分析(最新 ${esc(at)})</h2>
         <p class="sd-sum">
           <b style="color:var(--keep)">Keep ${counts.keep}</b> ・
@@ -139,7 +141,7 @@ export async function loadTacitCard() {
     items.forEach((it) => { if (counts[it.source] != null) counts[it.source]++; });
 
     cont.innerHTML = `
-      <div class="panel sd-panel" style="flex:1 1 100%;margin-top:0" title="暗黙知共有へ">
+      <div class="panel sd-panel" style="margin-top:0" title="暗黙知共有へ">
         <h2 style="margin-bottom:6px">暗黙知 ★5 <span class="muted" style="font-size:12px;font-weight:400">ソース別件数</span></h2>
         <p class="sd-sum">
           ${sources.map((s) => `<b>${esc(TACIT_SOURCE_LABEL[s])} ${counts[s]}</b>`).join(" ・ ")}
@@ -147,4 +149,98 @@ export async function loadTacitCard() {
       </div>`;
     cont.querySelector(".panel").addEventListener("click", () => selectTab("tacit"));
   } catch (e) { cont.innerHTML = '<span class="muted">暗黙知の状況を取得できませんでした。</span>'; }
+}
+
+const PL_STATUS_LABEL = { success: "成功", running: "実行中", error: "エラー" };
+const PL_STATUS_COLOR = { success: "var(--keep)", running: "var(--accent)", error: "var(--problem)" };
+
+// ダッシュボード: 定期実行パイプラインの最終実行状況(成功/実行中/エラー + 失敗ステップ)
+export async function loadPipelineCard() {
+  const cont = $("#pipelineCard");
+  try {
+    const r = await api("/api/pipeline/latest");
+    if (!r.id) {
+      cont.innerHTML = '<span class="muted">パイプラインはまだ実行されていません。「定期実行設定」から実行してください。</span>';
+      return;
+    }
+    const at = (r.started_at || "").replace("T", " ").slice(0, 16);
+    const errorSteps = (r.steps || []).filter((s) => s.status === "error");
+    const statusLabel = PL_STATUS_LABEL[r.status] || r.status;
+    const statusColor = PL_STATUS_COLOR[r.status] || "var(--muted)";
+    const errHtml = errorSteps.length
+      ? `<ul class="kpt-dash-list">${errorSteps.map((s) =>
+          `<li><span class="kpt-dash-tag problem">${esc(s.label)}</span>${esc((s.error || "").slice(0, 80))}</li>`).join("")}</ul>`
+      : "";
+    cont.innerHTML = `
+      <div class="panel sd-panel" style="margin-top:0" title="定期実行設定へ">
+        <h2 style="margin-bottom:6px">パイプライン状況 <span class="muted">(run #${r.id})</span></h2>
+        <p class="sd-sum">
+          <b style="color:${statusColor}">${esc(statusLabel)}</b> / 開始 ${esc(at)}
+          ${errorSteps.length ? ` / <b style="color:var(--problem)">エラー ${errorSteps.length} 件</b>` : ""}</p>
+        ${errHtml}
+      </div>`;
+    cont.querySelector(".panel").addEventListener("click", () => selectTab("pipeline"));
+  } catch (e) { cont.innerHTML = '<span class="muted">パイプライン状況を取得できませんでした。</span>'; }
+}
+
+// ダッシュボード: アクティビティ分析(対象メンバー数 + メンバー一覧)
+export async function loadActivityCard() {
+  const cont = $("#activityCard");
+  try {
+    const r = await api("/api/user-activity/latest");
+    if (!r.analysis_id) {
+      cont.innerHTML = '<span class="muted">アクティビティ分析はまだ実行されていません。「定期実行設定」から実行してください。</span>';
+      return;
+    }
+    const at = (r.saved_at || "").replace("T", " ").slice(0, 16);
+    const members = r.members || [];
+    const badges = members.map((m) => `<span class="badge">${esc(m.display_name || "?")}</span>`).join("");
+    cont.innerHTML = `
+      <div class="panel sd-panel" style="margin-top:0" title="アクティビティ分析へ">
+        <h2 style="margin-bottom:6px">アクティビティ分析 <span class="muted">(最新 ${esc(at)})</span></h2>
+        <p class="sd-sum">対象メンバー <b>${r.member_count ?? members.length}</b> 名 / その他 <b>${r.other_count ?? 0}</b> 名</p>
+        <div>${badges}</div>
+      </div>`;
+    cont.querySelector(".panel").addEventListener("click", () => selectTab("useractivity"));
+  } catch (e) { cont.innerHTML = '<span class="muted">アクティビティ分析の状況を取得できませんでした。</span>'; }
+}
+
+// ダッシュボード上部: 主要指標を一目で確認できる数値タイル行
+export async function loadDashMetrics() {
+  const wrap = $("#dashMetrics");
+  const tile = (label, value, color, tab) =>
+    `<div class="card metric-card"${tab ? ` data-tab="${tab}"` : ""}>
+      <div class="l">${esc(label)}</div>
+      <div class="v" style="color:${color || "var(--fg)"}">${esc(value)}</div>
+    </div>`;
+
+  const results = await Promise.allSettled([
+    api("/api/spec-diff/latest"),
+    api("/api/kpt/latest"),
+    api("/api/tacit/items?rating=5"),
+    api("/api/pipeline/latest"),
+    api("/api/user-activity/latest"),
+    api("/api/tacit/train/latest"),
+  ]);
+  const [sd, kpt, tacit5, pl, ua, tr] = results.map((r) => (r.status === "fulfilled" ? r.value : null));
+
+  const highCount = sd && sd.diff_id ? (sd.items || []).filter((it) => it.severity === "high").length : null;
+  const problemCount = kpt && kpt.analysis_id ? (kpt.problem || []).length : null;
+  const tacit5Count = tacit5 ? (tacit5.items || []).length : 0;
+  const plLabel = pl && pl.id ? (PL_STATUS_LABEL[pl.status] || pl.status) : "未実行";
+  const plColor = pl && pl.id ? (PL_STATUS_COLOR[pl.status] || "var(--muted)") : "var(--muted)";
+  const memberCount = ua && ua.analysis_id ? (ua.member_count ?? (ua.members || []).length) : null;
+  const mae = tr && tr.metrics ? (tr.metrics.val_mae ?? tr.metrics.train_mae) : null;
+
+  wrap.innerHTML = [
+    tile("実装差分 High", highCount ?? "-", highCount ? "var(--problem)" : null, "specdiff"),
+    tile("KPT Problem", problemCount ?? "-", problemCount ? "var(--try)" : null, "kpt"),
+    tile("暗黙知 ★5", tacit5Count, "var(--accent)", "tacit"),
+    tile("パイプライン", plLabel, plColor, "pipeline"),
+    tile("アクティビティ対象", memberCount != null ? `${memberCount}名` : "-", "var(--keep)", "useractivity"),
+    tile("学習モデルMAE", mae != null ? mae.toFixed(2) : "未学習", "var(--learned)", "tacit"),
+  ].join("");
+  wrap.querySelectorAll(".metric-card[data-tab]").forEach((el) => {
+    el.addEventListener("click", () => selectTab(el.dataset.tab));
+  });
 }

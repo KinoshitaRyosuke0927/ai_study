@@ -16,15 +16,20 @@ import { fetchChangelog, analyzeChangelog } from "./changelog.js";
 import { runPipeline } from "./pipeline.js";
 import { saveKpt } from "./kpt.js";
 import { extractTacit, trainTacit } from "./tacit.js";
-import { loadDiffCard, loadKptCard, loadTacitCard } from "./dashboard.js";
+import {
+  loadDiffCard, loadKptCard, loadTacitCard, loadPipelineCard, loadActivityCard, loadDashMetrics,
+} from "./dashboard.js";
 
 // ダッシュボードのカード類 + ヘルスバッジを最新化する
 async function refreshAll() {
   await Promise.all([
     loadHealth(),
+    loadDashMetrics().catch(() => {}),
     loadDiffCard().catch(() => {}),
     loadKptCard().catch(() => {}),
     loadTacitCard().catch(() => {}),
+    loadPipelineCard().catch(() => {}),
+    loadActivityCard().catch(() => {}),
   ]);
 }
 

@@ -63,18 +63,34 @@ body {
 
 /* --- メインコンテンツ(左右の余白は合計で画面の 10% = 各 5vw)--- */
 .app-content { flex: 1 1 auto; overflow-y: auto; padding: 24px 5vw; }
-.app-content > .inner { max-width: none; margin: 0; }
+.app-content > .inner { max-width: none; margin: 0; min-height: 100%; }
 
 .tab { display: none; }
 .tab.active { display: block; }
+
+/* ダッシュボードのみ: ページ全体をスクロールさせず、実装差分カードが余白を
+   埋めるように縦方向に伸縮させる(他のタブの表示・スクロールには影響しない)。 */
+#tab-dashboard.active { display: flex; flex-direction: column; height: 100%; }
+#tab-dashboard #dashMetrics, #tab-dashboard #dashTiles { flex: 0 0 auto; }
+#tab-dashboard #diffCards { flex: 1 1 auto; min-height: 0; }
+#tab-dashboard #diffCards .panel { height: 100%; display: flex; flex-direction: column; }
+#tab-dashboard #diffCards .dash-scroll { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
 .row { display: flex; flex-wrap: wrap; gap: 14px; }
 .card {
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
   padding: 16px 18px;
 }
-.metric-card { flex: 1 1 150px; min-width: 150px; }
+.metric-card { flex: 1 1 150px; min-width: 150px; cursor: default; }
+.metric-card[data-tab] { cursor: pointer; }
+.metric-card[data-tab]:hover { border-color: var(--accent); }
 .metric-card .v { font-size: 26px; font-weight: 700; margin-top: 4px; color: var(--fg); }
 .metric-card .l { font-size: 12px; color: var(--muted); }
+
+/* ダッシュボード下段の詳細カード群(2カラムで折り返す) */
+.dash-tile { flex: 1 1 460px; min-width: 0; }
+/* ダッシュボードのカード内で表・一覧が長くなっても、ページ全体の高さを膨らませず
+   カード内だけでスクロールさせる(ダッシュボードは一覧性を優先するため)。 */
+.dash-scroll { max-height: 280px; overflow-y: auto; }
 .panel {
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
   padding: 18px; margin-top: 16px; box-shadow: 0 1px 2px rgba(16,24,40,.04);

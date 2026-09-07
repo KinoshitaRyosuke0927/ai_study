@@ -44,11 +44,17 @@
 
     <main class="app-content">
       <div class="inner">
-        <!-- ダッシュボード -->
+        <!-- ダッシュボード: 上段は主要指標の数値タイル、下段は詳細カード(2カラム) -->
         <section class="tab active" id="tab-dashboard">
+          <div class="row" id="dashMetrics"><span class="muted">読み込み中...</span></div>
+          <!-- 実装差分は列数が多く 2カラムでは崩れるため、単独で全幅表示する -->
           <div class="row" id="diffCards"><span class="muted">読み込み中...</span></div>
-          <div class="row" id="kptCards"><span class="muted">読み込み中...</span></div>
-          <div class="row" id="tacitCards"><span class="muted">読み込み中...</span></div>
+          <div class="row" id="dashTiles">
+            <div class="dash-tile" id="kptCards"><span class="muted">読み込み中...</span></div>
+            <div class="dash-tile" id="tacitCards"><span class="muted">読み込み中...</span></div>
+            <div class="dash-tile" id="pipelineCard"><span class="muted">読み込み中...</span></div>
+            <div class="dash-tile" id="activityCard"><span class="muted">読み込み中...</span></div>
+          </div>
         </section>
 
 

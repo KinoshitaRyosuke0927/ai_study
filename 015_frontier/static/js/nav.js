@@ -13,7 +13,9 @@ import { loadLatestSpecDiff } from "./specdiff.js";
 import { loadLatestUserActivity } from "./useractivity.js";
 import { loadLatestKpt } from "./kpt.js";
 import { loadLatestTacit } from "./tacit.js";
-import { loadDiffCard, loadKptCard, loadTacitCard } from "./dashboard.js";
+import {
+  loadDiffCard, loadKptCard, loadTacitCard, loadPipelineCard, loadActivityCard, loadDashMetrics,
+} from "./dashboard.js";
 import { pollPipeline } from "./pipeline.js";
 import {
   loadChangelogMeta,
@@ -48,7 +50,14 @@ export function selectTab(name) {
   // 暗黙知共有: 未表示なら保存済みの抽出結果を復元
   if (name === "tacit") loadLatestTacit().catch(() => {});
   // ダッシュボード: カード類を最新化
-  if (name === "dashboard") { loadDiffCard().catch(() => {}); loadKptCard().catch(() => {}); loadTacitCard().catch(() => {}); }
+  if (name === "dashboard") {
+    loadDashMetrics().catch(() => {});
+    loadDiffCard().catch(() => {});
+    loadKptCard().catch(() => {});
+    loadTacitCard().catch(() => {});
+    loadPipelineCard().catch(() => {});
+    loadActivityCard().catch(() => {});
+  }
   // 定期実行設定: 最新のパイプライン進捗を取得(実行中なら自動でポーリング継続)
   if (name === "pipeline") pollPipeline().catch(() => {});
   // 変更履歴取得: 対象ヒント更新 + 保存済みサマリ・分析を復元
