@@ -1,8 +1,16 @@
 /* Q&A画面: 左に AI とのチャット、右は今後コード/設計書/各種抽出データ/生成物を
    表示する予定のプレースホルダー。他の画面と同じく白カード(.panel)の上に配置する。 */
-.qa-layout { display: flex; gap: 24px; height: calc(100vh - 280px); min-height: 440px; }
-.qa-chat, .qa-side { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
-.qa-side { border-left: 1px solid var(--border); padding-left: 24px; }
+.qa-layout { display: flex; height: calc(100vh - 280px); min-height: 440px; }
+.qa-chat { flex: 0 0 50%; min-width: 260px; max-width: 80%; display: flex; flex-direction: column; }
+.qa-side { flex: 1 1 auto; min-width: 200px; display: flex; flex-direction: column; }
+
+/* 中央のドラッグ可能な境界線(幅の調整用) */
+.qa-resizer {
+  flex: 0 0 auto; width: 9px; margin: 0 -1px; cursor: col-resize;
+  display: flex; align-items: stretch; justify-content: center;
+}
+.qa-resizer::before { content: ""; width: 1px; background: var(--border); }
+.qa-resizer:hover::before, .qa-resizer.dragging::before { width: 3px; background: var(--accent); }
 
 .qa-log { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
 .qa-row { display: flex; }

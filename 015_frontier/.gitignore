@@ -6,3 +6,7 @@ acquisition_settings.json
 
 # 暗黙知の評価値学習で保存する学習済みモデル(ローカルファイル。DB の tacit_training_runs から参照)
 storage/
+
+# 環境移行用のDBダンプ(実データを含むため、絶対にコミットしない。schema.sql は対象外)
+*_export.sql
+*_dump.sql

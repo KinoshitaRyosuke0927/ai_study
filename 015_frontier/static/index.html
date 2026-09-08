@@ -330,14 +330,15 @@
               <button class="act" id="qaResetBtn">会話をリセット</button>
             </div>
             <p class="field-hint">このプロジェクトについてAIに質問できます。右側には、回答の根拠にしたコード・設計書・分析結果を表示します(今後、図やコード例などの生成物もここに表示予定です)。</p>
-            <div class="qa-layout">
-              <div class="qa-chat">
+            <div class="qa-layout" id="qaLayout">
+              <div class="qa-chat" id="qaChatPane">
                 <div class="qa-log" id="qaLog"></div>
                 <div class="qa-input-row">
                   <textarea id="qaInput" rows="1" placeholder="質問を入力(Enterで送信、Shift+Enterで改行)"></textarea>
                   <button class="act primary" id="qaSendBtn">送信</button>
                 </div>
               </div>
+              <div class="qa-resizer" id="qaResizer" role="separator" aria-orientation="vertical" title="ドラッグして幅を調整"></div>
               <div class="qa-side">
                 <div id="qaSidePanel">
                   <div class="qa-placeholder">回答の根拠にした情報がここに表示されます</div>

@@ -303,3 +303,30 @@ $("#qaLog").addEventListener("click", (e) => {
   if (!btn) return;
   qaSendText(btn.dataset.q);
 });
+
+// --- 中央の境界線をドラッグしてチャット / 右エリアの幅を調整する ---
+(() => {
+  const layout = $("#qaLayout");
+  const chatPane = $("#qaChatPane");
+  const resizer = $("#qaResizer");
+  let dragging = false;
+
+  resizer.addEventListener("mousedown", (e) => {
+    dragging = true;
+    resizer.classList.add("dragging");
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const rect = layout.getBoundingClientRect();
+    const pct = ((e.clientX - rect.left) / rect.width) * 100;
+    chatPane.style.flexBasis = `${Math.min(80, Math.max(20, pct))}%`;
+  });
+  window.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    resizer.classList.remove("dragging");
+    document.body.style.userSelect = "";
+  });
+})();

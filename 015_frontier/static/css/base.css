@@ -61,20 +61,31 @@ body {
   border-left-color: var(--accent);
 }
 
-/* --- メインコンテンツ(左右の余白は合計で画面の 10% = 各 5vw)--- */
-.app-content { flex: 1 1 auto; overflow-y: auto; padding: 24px 5vw; }
-.app-content > .inner { max-width: none; margin: 0; min-height: 100%; }
+/* --- メインコンテンツ(左右の余白は合計で画面の 10% = 各 5vw)---
+   .inner を flex アイテムにし、内容が短いタブは画面の高さぴったりまで広がって
+   スクロールバーが出ず、内容が長いタブは本来の高さを保って .app-content 側で
+   スクロールする(%指定の min-height だと誤差で不要なスクロールバーが出るため、
+   flex の自動最小サイズに任せる)。 */
+.app-content { flex: 1 1 auto; overflow-y: auto; padding: 24px 5vw; display: flex; flex-direction: column; }
+.app-content > .inner { max-width: none; margin: 0; flex: 1 1 auto; }
 
 .tab { display: none; }
 .tab.active { display: block; }
 
 /* ダッシュボードのみ: ページ全体をスクロールさせず、実装差分カードが余白を
    埋めるように縦方向に伸縮させる(他のタブの表示・スクロールには影響しない)。 */
-#tab-dashboard.active { display: flex; flex-direction: column; height: 100%; }
+#tab-dashboard.active { display: flex; flex-direction: column; height: 100%; gap: 20px; }
+#tab-dashboard .row { gap: 18px; }
 #tab-dashboard #dashMetrics, #tab-dashboard #dashTiles { flex: 0 0 auto; }
 #tab-dashboard #diffCards { flex: 1 1 auto; min-height: 0; }
 #tab-dashboard #diffCards .panel { height: 100%; display: flex; flex-direction: column; }
 #tab-dashboard #diffCards .dash-scroll { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
+
+/* 下段の4枚のカード(KPT/暗黙知/パイプライン/アクティビティ)は、行の折り返し方に
+   関わらず高さを揃える。見出しは固定し、内容が多いカードだけ本文部分を内部スクロールさせる。 */
+.dash-tile { display: flex; }
+.dash-tile-panel { display: flex; flex-direction: column; height: 200px; flex: 1 1 auto; }
+.dash-tile-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .row { display: flex; flex-wrap: wrap; gap: 14px; }
 .card {
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px;

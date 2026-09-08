@@ -117,13 +117,15 @@ export async function loadKptCard() {
     const src = ((r.stats && r.stats.available_sources) || [])
       .map((s) => KPT_SOURCE_LABEL[s] || s).join("、 ");
     cont.innerHTML = `
-      <div class="panel sd-panel" style="margin-top:0" title="KPT分析へ">
+      <div class="panel sd-panel dash-tile-panel" style="margin-top:0" title="KPT分析へ">
         <h2 style="margin-bottom:6px">KPT分析(最新 ${esc(at)})</h2>
+        <div class="dash-tile-body">
         <p class="sd-sum">
           <b style="color:var(--keep)">Keep ${counts.keep}</b> ・
           <b style="color:var(--problem)">Problem ${counts.problem}</b> ・
           <b style="color:var(--try)">Try ${counts.try}</b> ／ 計 <b>${total}</b>${src ? ` / 対象ソース: ${esc(src)}` : ""}</p>
         ${topHtml}
+        </div>
       </div>`;
     cont.querySelector(".panel").addEventListener("click", () => selectTab("kpt"));
   } catch (e) { cont.innerHTML = '<span class="muted">KPTの状況を取得できませんでした。</span>'; }
@@ -141,11 +143,13 @@ export async function loadTacitCard() {
     items.forEach((it) => { if (counts[it.source] != null) counts[it.source]++; });
 
     cont.innerHTML = `
-      <div class="panel sd-panel" style="margin-top:0" title="暗黙知共有へ">
+      <div class="panel sd-panel dash-tile-panel" style="margin-top:0" title="暗黙知共有へ">
         <h2 style="margin-bottom:6px">暗黙知 ★5 <span class="muted" style="font-size:12px;font-weight:400">ソース別件数</span></h2>
+        <div class="dash-tile-body">
         <p class="sd-sum">
           ${sources.map((s) => `<b>${esc(TACIT_SOURCE_LABEL[s])} ${counts[s]}</b>`).join(" ・ ")}
           ／ 計 <b>${items.length}</b></p>
+        </div>
       </div>`;
     cont.querySelector(".panel").addEventListener("click", () => selectTab("tacit"));
   } catch (e) { cont.innerHTML = '<span class="muted">暗黙知の状況を取得できませんでした。</span>'; }
@@ -172,12 +176,14 @@ export async function loadPipelineCard() {
           `<li><span class="kpt-dash-tag problem">${esc(s.label)}</span>${esc((s.error || "").slice(0, 80))}</li>`).join("")}</ul>`
       : "";
     cont.innerHTML = `
-      <div class="panel sd-panel" style="margin-top:0" title="定期実行設定へ">
+      <div class="panel sd-panel dash-tile-panel" style="margin-top:0" title="定期実行設定へ">
         <h2 style="margin-bottom:6px">パイプライン状況 <span class="muted">(run #${r.id})</span></h2>
+        <div class="dash-tile-body">
         <p class="sd-sum">
           <b style="color:${statusColor}">${esc(statusLabel)}</b> / 開始 ${esc(at)}
           ${errorSteps.length ? ` / <b style="color:var(--problem)">エラー ${errorSteps.length} 件</b>` : ""}</p>
         ${errHtml}
+        </div>
       </div>`;
     cont.querySelector(".panel").addEventListener("click", () => selectTab("pipeline"));
   } catch (e) { cont.innerHTML = '<span class="muted">パイプライン状況を取得できませんでした。</span>'; }
@@ -196,10 +202,12 @@ export async function loadActivityCard() {
     const members = r.members || [];
     const badges = members.map((m) => `<span class="badge">${esc(m.display_name || "?")}</span>`).join("");
     cont.innerHTML = `
-      <div class="panel sd-panel" style="margin-top:0" title="アクティビティ分析へ">
+      <div class="panel sd-panel dash-tile-panel" style="margin-top:0" title="アクティビティ分析へ">
         <h2 style="margin-bottom:6px">アクティビティ分析 <span class="muted">(最新 ${esc(at)})</span></h2>
+        <div class="dash-tile-body">
         <p class="sd-sum">対象メンバー <b>${r.member_count ?? members.length}</b> 名 / その他 <b>${r.other_count ?? 0}</b> 名</p>
         <div>${badges}</div>
+        </div>
       </div>`;
     cont.querySelector(".panel").addEventListener("click", () => selectTab("useractivity"));
   } catch (e) { cont.innerHTML = '<span class="muted">アクティビティ分析の状況を取得できませんでした。</span>'; }

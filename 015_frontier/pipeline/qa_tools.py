@@ -415,6 +415,62 @@ def read_repo_file(file_path: str, start_line: int | None = None, end_line: int 
     }
 
 
+# ドキュメントらしいファイルの拡張子・除外したいディレクトリ(依存関係の同梱物などノイズ)
+_DOC_EXTENSIONS = (".md", ".mdx", ".rst", ".txt")
+_DOC_EXCLUDE_SEGMENTS = ("node_modules", "vendor", ".venv", "venv", "site-packages", "__pycache__")
+
+
+def list_repo_docs() -> dict[str, Any]:
+    """README・環境構築手順・CONTRIBUTING等、特定の機能に紐づかないドキュメントの
+    ファイル一覧をリポジトリ全体から取得する。
+
+    search_design_code は「機能単位」の分析結果しか対象にしないため、READMEのような
+    プロジェクト全体に関わる説明・セットアップ手順はそちらでは見つからない。
+    このツールで該当しそうなファイルを見つけたら、read_repo_file で中身を読むこと。
+    """
+    from urllib.parse import quote
+
+    from collectors.base import HttpClient
+    from config.settings import get_settings
+
+    settings = get_settings()
+    repo = _resolve_repo()
+    if not repo:
+        return {"error": "GitHub リポジトリが設定画面で設定されていません"}
+    if not settings.github_token or settings.github_token == "changeme":
+        return {"error": "GitHub トークンが未設定です(.env の GITHUB_TOKEN)"}
+
+    http = HttpClient({
+        "Authorization": f"Bearer {settings.github_token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    })
+    try:
+        repo_info = http.get_json(f"https://api.github.com/repos/{repo}")
+        branch = repo_info.get("default_branch") or "main"
+        tree = http.get_json(
+            f"https://api.github.com/repos/{repo}/git/trees/{quote(branch, safe='')}",
+            params={"recursive": "1"},
+        )
+    except Exception as exc:
+        return {"error": f"リポジトリのファイル一覧を取得できませんでした: {exc}"}
+
+    files: list[str] = []
+    for entry in tree.get("tree", []):
+        if entry.get("type") != "blob":
+            continue
+        path = entry.get("path", "")
+        low = path.lower()
+        if not low.endswith(_DOC_EXTENSIONS):
+            continue
+        if any(seg in low for seg in _DOC_EXCLUDE_SEGMENTS):
+            continue
+        files.append(path)
+
+    truncated = len(files) > 100
+    return {"repo": repo, "count": len(files), "files": files[:100], "truncated": truncated}
+
+
 def assess_impact(query: str, limit: int = MAX_RESULTS_DEFAULT) -> dict[str, Any]:
     """機能の追加・変更が既存アプリ全体に与える影響範囲を調べる(影響度調査)。
 
@@ -661,10 +717,24 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "list_repo_docs",
+            "description": (
+                "README・環境構築手順・CONTRIBUTING等、特定の機能に紐づかないドキュメントの"
+                "ファイル一覧をリポジトリ全体から取得する(引数なし)。search_design_code は"
+                "機能単位の分析結果しか対象にしないため、プロジェクト概要・セットアップ手順・"
+                "使い方など機能に紐づかない資料を探す場合はこちらを使う。見つけたファイルの"
+                "中身は read_repo_file で読むこと。"
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "read_repo_file",
             "description": (
                 "設計書・コードの実ファイルをリポジトリから直接読む。search_design_code の "
-                "refs に含まれる file_path(と、コードシンボルなら start_line/end_line)を"
+                "refs に含まれる file_path、または list_repo_docs が返すファイルパスを"
                 "そのまま渡せる。分析結果の概要だけでは不十分で、原文そのものを確認したい場合に使う。"
             ),
             "parameters": {
@@ -750,6 +820,7 @@ _DISPATCH = {
     "search_tacit_knowledge": search_tacit_knowledge,
     "search_user_activity": search_user_activity,
     "search_raw_data": search_raw_data,
+    "list_repo_docs": list_repo_docs,
     "read_repo_file": read_repo_file,
     "find_experts": find_experts,
     "assess_impact": assess_impact,
