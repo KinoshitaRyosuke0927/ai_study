@@ -24,6 +24,11 @@ COPY app/ ./app/
 COPY review_point.csv .
 COPY pp_check_points.csv .
 
+# 操作マニュアル（画面のアイコンから /manual で開く）を app/ の一つ上の docs/ に配置し、
+# app/main.py の MANUAL_DIR 解決（BASE_DIR.parent / "docs"）がローカル実行時と同じく機能するようにする
+COPY docs/user_manual.html ./docs/user_manual.html
+COPY docs/images ./docs/images
+
 # 非rootユーザーで実行
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
     && chown -R appuser:appuser /app

@@ -12,11 +12,20 @@
       <div class="header-title">
         <h1>AI PowerPoint レビュアー</h1>
         <button id="review-point-settings-btn" class="btn-settings">レビュー観点設定</button>
+        <a id="manual-link" class="btn-icon-link" href="/manual" target="_blank" rel="noopener"
+           title="操作マニュアルを開く" aria-label="操作マニュアルを開く">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+        </a>
       </div>
       <div class="header-actions">
         <button id="download-csv-btn" class="btn-download" disabled>指摘事項をダウンロード</button>
         <button id="download-suggestion-btn" class="btn-download" disabled>修正後スライドをダウンロード</button>
         <button id="download-qa-btn" class="btn-download" disabled>想定質問をダウンロード</button>
+        <button id="save-btn" class="btn-settings" disabled>保存する</button>
         <button id="share-btn" class="btn-settings" disabled>共有する</button>
       </div>
     </div>
@@ -219,6 +228,26 @@
         <div class="modal-footer-buttons">
           <button id="share-close-btn" class="btn-secondary">閉じる</button>
           <button id="share-copy-btn" class="btn-settings">URLをコピー</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 作業状況の保存リンク発行モーダル ========== -->
+  <div id="save-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="save-modal-title">作業状況を保存しました</h2>
+      </div>
+      <p class="hint-text">このURLを開くと、保存した時点の状態からレビューや修正方針の作成などを続けられます（最後に保存してから30日で自動的に削除されます）。</p>
+      <div class="form-group">
+        <input type="text" id="save-url-input" readonly>
+      </div>
+      <div id="save-message" class="message hidden"></div>
+      <div class="modal-footer">
+        <div class="modal-footer-buttons">
+          <button id="save-close-btn" class="btn-secondary">閉じる</button>
+          <button id="save-copy-btn" class="btn-settings">URLをコピー</button>
         </div>
       </div>
     </div>

@@ -46,6 +46,14 @@ const shareUrlInput           = document.getElementById("share-url-input");
 const shareMessage            = document.getElementById("share-message");
 const shareCloseBtn           = document.getElementById("share-close-btn");
 const shareCopyBtn            = document.getElementById("share-copy-btn");
+// 作業状況の保存リンク発行モーダル
+const saveBtn                 = document.getElementById("save-btn");
+const saveModal               = document.getElementById("save-modal");
+const saveModalTitle          = document.getElementById("save-modal-title");
+const saveUrlInput            = document.getElementById("save-url-input");
+const saveMessage             = document.getElementById("save-message");
+const saveCloseBtn            = document.getElementById("save-close-btn");
+const saveCopyBtn             = document.getElementById("save-copy-btn");
 // 右パネル
 const rightContent       = document.getElementById("right-content");
 const tabBtns               = document.querySelectorAll(".tab-btn");
@@ -93,6 +101,13 @@ let qaData                  = null;  // APIから返ってきた想定質問一�
 let activeTab               = "input"; // "input" | "summary" | "suggestion" | "qa"
 let activePerspectiveIndex  = 0;
 let suggestInProgress       = false; // 修正方針提案のストリーミング処理中かどうか
+let sessionId               = null;  // 作業状況の保存ID（/work/{id} から復元 or 新規保存で発行）。上書き保存の判定に使う
+let loadedFileName          = "";    // 保存データから復元した元PPTXのファイル名（currentFile が無いときの表示・保存用）
+
+// アップロード or 保存データ復元により、スライドが読み込み済みかどうか
+function slidesReady() {
+  return slideCount > 0;
+}
 
 // ============================================================
 // ファイル選択
@@ -173,6 +188,13 @@ uploadBtn.addEventListener("click", async () => {
     downloadSuggestionBtn.disabled = true;
     downloadQaBtn.disabled = true;
     shareBtn.disabled = true;
+    // 新しいPPTXを読み込んだので、以降の保存は新規保存（新しいURL発行）にする
+    sessionId = null;
+    loadedFileName = "";
+    saveBtn.disabled = false;
+    saveBtn.textContent = "保存する";
+    // /work/{id} を開いた後に新規アップロードした場合に備え、URLをトップに戻す
+    if (location.pathname.startsWith("/work/")) history.replaceState(null, "", "/");
 
     // 左パネルの各セクションを表示
     overallSection.classList.remove("hidden");
@@ -454,7 +476,7 @@ function saveCurrentInput() {
 }
 
 reviewBtn.addEventListener("click", async () => {
-  if (!currentFile) return;
+  if (!slidesReady()) return;
 
   saveCurrentInput();
   hideMessage(reviewMessage);
@@ -515,7 +537,7 @@ reviewBtn.addEventListener("click", async () => {
 // ============================================================
 
 qaBtn.addEventListener("click", async () => {
-  if (!currentFile) return;
+  if (!slidesReady()) return;
 
   saveCurrentInput();
   hideMessage(qaMessage);
@@ -600,7 +622,7 @@ async function readSSEStream(response, onEvent) {
 
 suggestBtn.addEventListener("click", () => {
   const perspectives = reviewData?.presentation_summary?.perspectives || [];
-  if (!currentFile || perspectives.length === 0) return;
+  if (!slidesReady() || perspectives.length === 0) return;
   openSuggestSelectionModal(perspectives);
 });
 
@@ -928,7 +950,7 @@ shareBtn.addEventListener("click", async () => {
     }));
 
     const payload = {
-      file_name: currentFile ? currentFile.name : "",
+      file_name: currentFile ? currentFile.name : loadedFileName,
       overall_intended_message: intendedMessage.value.trim(),
       slides,
       review: reviewData,
@@ -977,6 +999,216 @@ shareCopyBtn.addEventListener("click", async () => {
     showMessage(shareMessage, "自動コピーに失敗しました。選択されたURLを手動でコピーしてください", "error");
   }
 });
+
+// ============================================================
+// 作業状況の保存 / 復元
+// ============================================================
+
+// 現在の作業状況一式（スライド画像・伝えたいこと・レビュー結果・修正イメージ・想定質問）を保存用ペイロードに組み立てる
+function buildSessionPayload() {
+  const slides = [];
+  for (let i = 1; i <= slideCount; i++) {
+    slides.push({
+      slide_number: i,
+      image_png_b64: slidePngs[i - 1] || "",
+      image_jpeg_b64: thumbnails[i - 1] || "",
+      intended_message: perSlideMessages[i] || "",
+    });
+  }
+  return {
+    file_name: currentFile ? currentFile.name : loadedFileName,
+    render_method: renderMethod,
+    thumbnail_mime: thumbnailMime,
+    overall_intended_message: intendedMessage.value.trim(),
+    slides,
+    review: reviewData,
+    suggestions: suggestionBySlide,
+    qa: qaData,
+  };
+}
+
+saveBtn.addEventListener("click", async () => {
+  if (!slidesReady()) return;
+
+  // 入力タブのテキストエリアを保存対象に反映してからペイロードを作る
+  saveCurrentInput();
+  hideMessage(saveMessage);
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<span class="loading"></span>保存中...';
+
+  try {
+    const payload = buildSessionPayload();
+
+    // 既に保存IDがあれば同じIDへ上書き（PUT）、無ければ新規保存（POST）
+    let isUpdate = !!sessionId;
+    let res = await fetch(isUpdate ? `/api/session/${sessionId}` : "/api/session", {
+      method: isUpdate ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    // 上書き対象が消えていた（期限切れ・削除済み）場合は、新規保存にフォールバックする
+    let recreated = false;
+    if (isUpdate && res.status === 404) {
+      sessionId = null;
+      isUpdate = false;
+      recreated = true;
+      res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showMessage(saveMessage, `エラー: ${formatErrorDetail(data.detail)}`, "error");
+      saveModal.classList.remove("hidden");
+      return;
+    }
+
+    // 発行された保存IDを保持し、ブラウザのURLを /work/{id} に差し替える（リロードしても復元できる状態にする）
+    sessionId = data.session_id;
+    const workUrl = `${location.origin}/work/${sessionId}`;
+    history.replaceState(null, "", `/work/${sessionId}`);
+
+    saveModalTitle.textContent = isUpdate ? "作業状況を上書き保存しました" : "作業状況を保存しました";
+    saveUrlInput.value = workUrl;
+    if (recreated) {
+      showMessage(saveMessage, "元の保存データが見つからなかったため、新しいURLで保存しました", "error");
+    } else if (isUpdate) {
+      showMessage(saveMessage, "同じURLに上書き保存しました", "success");
+    }
+    saveModal.classList.remove("hidden");
+  } catch (err) {
+    showMessage(saveMessage, `ネットワークエラー: ${err.message}`, "error");
+    saveModal.classList.remove("hidden");
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = sessionId ? "上書き保存する" : "保存する";
+  }
+});
+
+saveCloseBtn.addEventListener("click", () => {
+  saveModal.classList.add("hidden");
+});
+
+saveModal.addEventListener("click", (e) => {
+  if (e.target === saveModal) saveModal.classList.add("hidden");
+});
+
+saveCopyBtn.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(saveUrlInput.value);
+    showMessage(saveMessage, "URLをコピーしました", "success");
+  } catch (err) {
+    saveUrlInput.select();
+    showMessage(saveMessage, "自動コピーに失敗しました。選択されたURLを手動でコピーしてください", "error");
+  }
+});
+
+// 保存データから作業状況を画面へ復元する
+function applySession(id, data) {
+  sessionId = id;
+  loadedFileName = data.file_name || "";
+
+  // スライド画像・サムネイルを復元
+  const slides = (data.slides || []).slice().sort((a, b) => a.slide_number - b.slide_number);
+  slideCount    = slides.length;
+  slidePngs     = slides.map((s) => s.image_png_b64 || "");
+  thumbnails    = slides.map((s) => s.image_jpeg_b64 || s.image_png_b64 || "");
+  thumbnailMime = data.thumbnail_mime || (slides.some((s) => s.image_jpeg_b64) ? "image/jpeg" : "image/png");
+  renderMethod  = data.render_method || "libre_office";
+
+  // 伝えたいこと（全体・スライド個別）を復元
+  intendedMessage.value = data.overall_intended_message || "";
+  perSlideMessages = {};
+  slides.forEach((s) => {
+    if (s.intended_message) perSlideMessages[s.slide_number] = s.intended_message;
+  });
+
+  // レビュー結果・修正イメージ・想定質問を復元（suggestions はキーが文字列で来るため数値キーに正規化）
+  reviewData = data.review || null;
+  const rawSuggestions = data.suggestions || {};
+  suggestionBySlide = {};
+  Object.keys(rawSuggestions).forEach((k) => {
+    suggestionBySlide[Number(k)] = rawSuggestions[k];
+  });
+  qaData = data.qa || null;
+
+  // 左パネルの各セクションを表示
+  overallSection.classList.remove("hidden");
+  slideListSection.classList.remove("hidden");
+  reviewAction.classList.remove("hidden");
+  if (loadedFileName) {
+    fileNameHint.textContent = loadedFileName;
+    fileNameHint.classList.add("selected");
+  }
+
+  buildSlideList(thumbnails, slideCount);
+
+  // 各ボタンの活性状態を、復元した内容に合わせて設定
+  const perspectives = reviewData?.presentation_summary?.perspectives || [];
+  const hasReview = perspectives.length > 0;
+  const suggestionEntries = Object.values(suggestionBySlide);
+  const hasSuggestion = suggestionEntries.some((s) => s && s.edited_image_b64);
+  downloadCsvBtn.disabled        = !hasReview;
+  suggestBtn.disabled            = !hasReview;
+  qaBtn.disabled                 = !slidesReady();
+  downloadSuggestionBtn.disabled = !hasSuggestion;
+  downloadQaBtn.disabled         = !(qaData && qaData.length > 0);
+  shareBtn.disabled              = !hasReview;
+  saveBtn.disabled              = !slidesReady();
+  saveBtn.textContent           = "上書き保存する";
+
+  // 復元済みの結果タブを描画しておく
+  if (hasReview) renderOverallSummary(reviewData.presentation_summary);
+  renderQaTab();
+
+  // 修正方針タブ: 保存済みの修正イメージがあれば、プレースホルダーではなく結果表示に切り替える
+  if (suggestionEntries.length > 0) {
+    suggestionPlaceholder.classList.add("hidden");
+    suggestionContent.classList.remove("hidden");
+    // 左パネルのスライド一覧に、各スライドの処理結果ステータス（完了/該当なし/失敗）を復元する
+    Object.keys(suggestionBySlide).forEach((num) => {
+      const entry = suggestionBySlide[num];
+      const status = entry?.error ? "error" : entry?.skipped ? "skipped" : entry?.edited_image_b64 ? "done" : null;
+      if (status) setSlideListSuggestStatus(Number(num), status);
+    });
+  }
+
+  if (slideCount > 0) selectSlide(1);
+}
+
+// URLが /work/{id} の場合は、保存済みの作業状況を読み込んで復元する
+async function loadSessionFromUrl() {
+  const match = location.pathname.match(/^\/work\/([^/]+)/);
+  if (!match) return;
+  const id = match[1];
+
+  uploadBtn.disabled = true;
+  showMessage(uploadMessage, "保存した作業状況を読み込み中...", "success");
+
+  try {
+    const res = await fetch(`/api/session/${id}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      showMessage(uploadMessage, `保存データを読み込めませんでした: ${formatErrorDetail(data.detail || res.status)}`, "error");
+      return;
+    }
+    const data = await res.json();
+    applySession(id, data);
+    showMessage(uploadMessage, "保存した作業状況を復元しました。続けて操作できます", "success");
+  } catch (err) {
+    showMessage(uploadMessage, `保存データの読み込みに失敗しました: ${err.message}`, "error");
+  } finally {
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = "スライドを表示";
+  }
+}
+
+loadSessionFromUrl();
 
 // ============================================================
 // 修正後スライドのPDFダウンロード
