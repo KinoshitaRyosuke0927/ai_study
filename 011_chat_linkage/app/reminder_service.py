@@ -44,8 +44,9 @@ def _escape_table_cell(text: str) -> str:
 
 def build_reminder_list_message(settings: dict) -> str:
     """
-    "/nightrain remind" コマンド用: settings.iniの[history]channel・read_dateで指定された
-    対象チャンネルからリマインド候補投稿を抽出し、Markdown表形式の一覧メッセージを組み立てる。
+    "/nightrain remind" コマンド用: settings.iniの[slash_watch]remind_channels(未設定時は
+    [history]channel)・read_dateで指定された対象チャンネルすべてを走査してリマインド候補投稿を
+    抽出し、Markdown表形式の一覧メッセージを組み立てる。
     画面から作成する場合と異なり、挨拶文・メンションは付けずメインコンテンツのみを返す。
 
     Args
@@ -57,22 +58,37 @@ def build_reminder_list_message(settings: dict) -> str:
     - message: str,  スレッド返信用の一覧メッセージ(対象投稿が無い場合はその旨のメッセージ)
 
     """
-    channel_name = settings.get("channel", "")
+    channel_names = settings.get("slash_watch_remind_channels", [])
     read_date = settings.get("read_date", 30)
     threshold = settings.get("slash_watch_reminder_threshold", 0.9)
 
-    name_to_id = {c["name"]: c["id"] for c in mm.list_my_channels()}
-    channel_id = name_to_id.get(channel_name)
-    if channel_id is None:
-        return f"settings.iniのhistory.channel「{channel_name}」が見つかりませんでした。"
+    if not channel_names:
+        return "settings.iniにリマインド対象チャンネルが設定されていません。"
 
+    name_to_id = {c["name"]: c["id"] for c in mm.list_my_channels()}
     end_ts = int(datetime.now().timestamp() * 1000)
     start_ts = end_ts - read_date * 24 * 60 * 60 * 1000
-    posts = mm.get_channel_posts_in_range(channel_id, start_ts, end_ts)
-    candidates = filter_posts_by_reminder_score(posts, threshold)
+
+    # 対象チャンネルごとに投稿を取得し、リマインド候補を1つのリストにまとめる
+    # (存在しないチャンネル名は警告を出しつつスキップし、他のチャンネルの処理は続行する)
+    candidates = []
+    not_found_names = []
+    for name in channel_names:
+        channel_id = name_to_id.get(name)
+        if channel_id is None:
+            not_found_names.append(name)
+            continue
+        posts = mm.get_channel_posts_in_range(channel_id, start_ts, end_ts)
+        candidates.extend(filter_posts_by_reminder_score(posts, threshold))
+
+    if not_found_names:
+        print(f"[警告] slash_watch.remind_channels のチャンネルが見つかりません: {', '.join(not_found_names)}")
 
     if not candidates:
         return "リマインドが必要な投稿は見つかりませんでした。"
+
+    # 複数チャンネル分が混在するため、投稿日時順に並べ替えてから表にする
+    candidates.sort(key=lambda p: p["create_at"])
 
     rows = ["| 投稿日時 | 元の投稿へのリンク | 投稿内容要約 |", "| --- | --- | --- |"]
     for post in candidates:

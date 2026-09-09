@@ -37,6 +37,13 @@ def load_settings() -> dict:
     watch_channels = [c.strip() for c in watch_channels_raw.split(",") if c.strip()]
     watch_dm_users_raw = config.get("slash_watch", "watch_dm_users", fallback="")
     watch_dm_users = [u.strip() for u in watch_dm_users_raw.split(",") if u.strip()]
+    # "/nightrain remind" の投稿走査対象チャンネル。未設定時は [history] channel の
+    # 1チャンネルのみを対象とする従来動作にフォールバックする
+    remind_watch_channels_raw = config.get("slash_watch", "remind_channels", fallback="")
+    remind_watch_channels = [c.strip() for c in remind_watch_channels_raw.split(",") if c.strip()]
+    if not remind_watch_channels:
+        history_channel = config.get("history", "channel", fallback="")
+        remind_watch_channels = [history_channel] if history_channel else []
     return {
         "channel": config.get("history", "channel", fallback=""),
         "read_date": config.getint("history", "read_date", fallback=30),
@@ -49,6 +56,7 @@ def load_settings() -> dict:
         "mattermost_target_username": config.get("mattermost", "target_username", fallback=""),
         "slash_watch_channels": watch_channels,
         "slash_watch_dm_users": watch_dm_users,
+        "slash_watch_remind_channels": remind_watch_channels,
         "slash_watch_poll_overlap_minutes": config.getint("slash_watch", "poll_overlap_minutes", fallback=2),
         "slash_watch_reminder_threshold": config.getfloat("slash_watch", "reminder_threshold", fallback=0.9),
     }
