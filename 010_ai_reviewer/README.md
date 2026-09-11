@@ -11,6 +11,7 @@
 - 技術者視点での想定質問の提案
 - 修正提案のPDFダウンロード・指摘事項/想定質問のダウンロード
 - レビュー結果を閲覧専用URLで共有（発行から30日で自動失効）
+- 作業状況（スライド画像・伝えたいこと・レビュー結果・修正イメージ・想定質問）をURLで保存し、その状態から操作を再開（同じURLへ上書き保存可能／最終保存から30日で自動失効）
 
 ## セットアップ
 
@@ -62,13 +63,16 @@ Azure Container Apps（スケールtoゼロ・IPアクセス制限付き）へ�
 
 ## 操作マニュアル
 
-社内向け操作マニュアル（[docs/user_manual.html](docs/user_manual.html)）は、Azure Blob Storage静的Webサイトとして公開しています: `https://staireviewerdocs.z11.web.core.windows.net/`（アプリ本体と同じIPアクセス制限あり）
+社内向け操作マニュアルは [docs/user_manual.html](docs/user_manual.html)（画像は [docs/images/](docs/images/)）です。ヘッダーの「レビュー観点設定」ボタン右の本アイコンをクリックすると、別タブで `/manual` が開きます。マニュアル一式はDockerイメージに同梱され、アプリ自身が配信します（ローカル実行でも表示可）。
+
+> 以前は専用ストレージアカウント `staireviewerdocs` の静的Webサイトでも公開していましたが、アプリ同梱に移行したため 2026/09 に削除しました。
 
 ## API エンドポイント
 
 | メソッド | パス | 説明 |
 |----------|------|------|
 | GET | `/` | フロントエンド（index.html） |
+| GET | `/manual` | 操作マニュアル（`docs/user_manual.html`）。画面ヘッダーの本アイコンから別タブで開く |
 | GET | `/api/health` | ヘルスチェック |
 | POST | `/api/upload` | PPTX アップロード・スライド画像化 |
 | GET | `/api/review-points` | レビュー観点設定一覧（apply_flag 状態を含む）を返す |
@@ -76,12 +80,20 @@ Azure Container Apps（スケールtoゼロ・IPアクセス制限付き）へ�
 | POST | `/api/review` | PPTX 解析 + AI レビュー実行（12カテゴリ）|
 | POST | `/api/suggest` | AIによるスライド修正提案（SSEストリーミング） |
 | POST | `/api/suggest/export-pdf` | 修正後スライド画像をまとめて PDF 出力 |
+| POST | `/api/share` | レビュー結果一式を保存し閲覧専用の共有URLを発行 |
+| GET | `/api/share/{id}` / `/share/{id}` | 共有データの取得 / 閲覧専用ページ |
+| POST | `/api/session` | 作業状況一式を新規保存し `/work/{id}` 用の保存IDを発行 |
+| PUT | `/api/session/{id}` | 同じ保存IDへ作業状況を上書き保存（URLは不変。不在・期限切れは404） |
+| GET | `/api/session/{id}` | 保存済み作業状況の取得（期限切れ・不在は404） |
+| GET | `/work/{id}` | 保存した作業状況の続きから操作するメイン画面 |
 
 ## ファイル構成
 - `app/main.py` — FastAPI エントリポイント
 - `app/renderer.py` — LibreOffice + pdf2image によるスライド画像化
 - `app/prompt.py` — AI レビュー用プロンプト定義・レビュー観点読み込み（`review_point.csv` / `pp_check_points.csv`）・出力スキーマ
 - `app/azure_ai_service.py` — Azure OpenAI 呼び出し（テキスト: `gpt-5.4-mini` / 画像編集: `gpt-image-2`）
+- `app/share_service.py` — レビュー結果の閲覧専用共有（Blob `shares` コンテナ／接続文字列が無ければ `_shares/` にローカル保存）
+- `app/session_service.py` — 作業状況の保存・復元（Blob `sessions` コンテナ／接続文字列が無ければ `_sessions/` にローカル保存）
 - `app/static/` — フロントエンド（HTML / CSS / JS）
 - `review_point.csv` — レビュー観点（資料内容の観点）
 - `pp_check_points.csv` — レビュー観点（資料デザイン・体裁の観点）

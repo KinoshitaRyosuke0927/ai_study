@@ -1,6 +1,9 @@
 dist/
 build/
-docs/
+# docs/ は原則除外だが、操作マニュアル（/manual で配信）に必要な user_manual.html と images/ だけは残す
+docs/*.md
+docs/*.pptx
+docs/appendix/
 manual.md
 __pycache__/
 *.pyc

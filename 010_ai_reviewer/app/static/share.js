@@ -87,7 +87,7 @@ function renderBanner(data) {
   const createdAt = data.created_at ? new Date(data.created_at) : null;
   const expiresAt = data.expires_at ? new Date(data.expires_at) : null;
   shareCreatedAt.textContent = createdAt ? `共有日: ${createdAt.toLocaleDateString("ja-JP")}` : "";
-  shareExpiresAt.textContent = expiresAt ? `　有効期限: ${expiresAt.toLocaleDateString("ja-JP")}まで` : "";
+  shareExpiresAt.textContent = expiresAt ? `有効期限: ${expiresAt.toLocaleDateString("ja-JP")}まで` : "";
   shareBanner.classList.remove("hidden");
 }
 

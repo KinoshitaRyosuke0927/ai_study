@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -31,6 +31,7 @@ from app.prompt import (
 from app.renderer import render_pptx_to_images, images_to_base64_dict
 from app.azure_ai_service import call_image_edit, call_qa, call_review
 from app.share_service import create_share, get_share
+from app.session_service import create_session, get_session, update_session
 
 
 class SlideInput(BaseModel):
@@ -91,6 +92,9 @@ class ReviewPointUpdateRequest(BaseModel):
 # フロントエンドのHTMLパス
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
+# 操作マニュアル（docs/user_manual.html + docs/images/）。ローカル・Dockerともに app/ の一つ上の docs/ を指す
+MANUAL_DIR = BASE_DIR.parent / "docs"
+MANUAL_FILE = MANUAL_DIR / "user_manual.html"
 # 観点一覧
 PTYPE_LABELS: dict[str, str] = {
     "overall":     "全体",
@@ -121,6 +125,9 @@ app.add_middleware(
 )
 # 静的ファイルをマウント
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+# 操作マニュアルの画像を配信（マニュアルHTML内の相対参照 images/xxx.png を /manual/images/ に解決させる）
+if (MANUAL_DIR / "images").is_dir():
+    app.mount("/manual/images", StaticFiles(directory=MANUAL_DIR / "images"), name="manual-images")
 
 
 @app.get("/")
@@ -131,6 +138,28 @@ def index() -> FileResponse:
     return FileResponse(
         STATIC_DIR / "index.html",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/manual")
+def manual_redirect() -> RedirectResponse:
+    """
+    操作マニュアルのトップ（/manual/）へリダイレクトする
+    末尾スラッシュを付けることで、マニュアルHTML内の相対パス（images/xxx.png）が /manual/images/ に解決される
+    """
+    return RedirectResponse(url="/manual/")
+
+
+@app.get("/manual/")
+def manual_page() -> FileResponse:
+    """
+    操作マニュアル（docs/user_manual.html）を返す
+    """
+    if not MANUAL_FILE.is_file():
+        raise HTTPException(status_code=404, detail="操作マニュアルが見つかりません。")
+    return FileResponse(
+        MANUAL_FILE,
+        headers={"Cache-Control": "no-cache"},
     )
 
 
@@ -512,6 +541,71 @@ def share_page(share_id: str) -> FileResponse:
     """
     return FileResponse(
         STATIC_DIR / "share.html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.post("/api/session")
+async def create_session_snapshot(payload: dict[str, Any]) -> dict:
+    """
+    現在の作業状況一式を新規保存し、続きから作業できるURL用の保存IDを発行する
+    """
+    try:
+        meta = await asyncio.to_thread(create_session, payload)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"作業状況の保存に失敗しました: {exc}") from exc
+
+    return {
+        "session_id": meta["session_id"],
+        "url": f"/work/{meta['session_id']}",
+        "created_at": meta["created_at"],
+        "updated_at": meta["updated_at"],
+        "expires_at": meta["expires_at"],
+    }
+
+
+@app.put("/api/session/{session_id}")
+async def update_session_snapshot(session_id: str, payload: dict[str, Any]) -> dict:
+    """
+    既存の保存IDに対して作業状況を上書き保存する（URL・保存IDは変わらない）
+    保存IDが存在しない、または有効期限切れの場合は404
+    """
+    try:
+        meta = await asyncio.to_thread(update_session, session_id, payload)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"作業状況の保存に失敗しました: {exc}") from exc
+
+    if meta is None:
+        raise HTTPException(status_code=404, detail="保存データが見つからないか、有効期限が切れています。")
+
+    return {
+        "session_id": meta["session_id"],
+        "url": f"/work/{meta['session_id']}",
+        "created_at": meta["created_at"],
+        "updated_at": meta["updated_at"],
+        "expires_at": meta["expires_at"],
+    }
+
+
+@app.get("/api/session/{session_id}")
+async def get_session_snapshot(session_id: str) -> dict:
+    """
+    保存された作業状況一式を取得する（期限切れ・存在しない場合は404）
+    """
+    record = await asyncio.to_thread(get_session, session_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="保存データが見つからないか、有効期限が切れています。")
+    return record
+
+
+@app.get("/work/{session_id}")
+def work_page(session_id: str) -> FileResponse:
+    """
+    保存した作業状況の続きから操作するためのメイン画面（index.html）を返す
+    フロントエンド側でURLの保存IDを読み取り、作業状況を復元する
+    """
+    return FileResponse(
+        STATIC_DIR / "index.html",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 

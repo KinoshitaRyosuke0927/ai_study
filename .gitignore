@@ -29,6 +29,10 @@ node_modules/
 */uploads/
 */outputs/
 
+# 010_ai_reviewer 保存機能・共有機能のローカルフォールバック保存先
+010_ai_reviewer/_sessions/
+010_ai_reviewer/_shares/
+
 # 002_graph_gui 生成データ
 002_graph_gui/data/flowcharts/
 002_graph_gui/data/graph.json

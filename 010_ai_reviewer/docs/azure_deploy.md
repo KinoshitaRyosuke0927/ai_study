@@ -153,53 +153,9 @@ az acr delete --name acraireviewer --resource-group test20251008 --yes
 
 ## 操作マニュアル（docs/user_manual.html）の公開
 
-アプリ本体とは別に、操作マニュアル（`docs/user_manual.html` と `docs/images/`）を **Azure Blob Storage の静的Webサイトホスティング機能** で公開しています。マニュアルはIPアクセス制限をかけず、誰でも閲覧できるようにしています。
+`docs/user_manual.html` と `docs/images/` は **Dockerイメージに同梱**され、アプリ自身が `/manual` で配信します（画面ヘッダーの本アイコンから別タブで開く）。Dockerfile で `COPY docs/user_manual.html ./docs/user_manual.html` と `COPY docs/images ./docs/images` を行い、`app/main.py` の `MANUAL_DIR`（`BASE_DIR.parent / "docs"`）から読み込みます。`.dockerignore` は `docs/*.md` / `docs/*.pptx` / `docs/appendix/` のみ除外し、この2つはビルドコンテキストに残します。マニュアルを更新したら通常の更新デプロイ（`az acr build` → `az containerapp update`）でイメージに反映されます。
 
-- ストレージアカウント: `staireviewerdocs`（`test20251008` / `japaneast`）
-- 公開URL: `https://staireviewerdocs.z11.web.core.windows.net/`
-- IPアクセス制限: ストレージアカウントのネットワークファイアウォールで、アプリ本体と同じ `221.117.124.90`（オフィス）・`122.220.62.58`（VPN）のみ許可し、それ以外は拒否する設定にしています
-
-コンテナ（Container Apps）を使わず、Blob Storageの`$web`コンテナに直接ファイルを置く方式のため、コンピューティング費用がかからず非常に低コストです。
-
-### 初回セットアップ
-
-```bash
-az storage account create \
-  --name staireviewerdocs --resource-group test20251008 \
-  --location japaneast --sku Standard_LRS --kind StorageV2 \
-  --allow-blob-public-access true
-
-az storage blob service-properties update \
-  --account-name staireviewerdocs \
-  --static-website --index-document user_manual.html
-
-# IPアクセス制限（アプリ本体と同じ許可IP）
-az storage account update \
-  --name staireviewerdocs --resource-group test20251008 \
-  --default-action Deny --bypass AzureServices
-az storage account network-rule add \
-  --account-name staireviewerdocs --resource-group test20251008 \
-  --ip-address 221.117.124.90
-az storage account network-rule add \
-  --account-name staireviewerdocs --resource-group test20251008 \
-  --ip-address 122.220.62.58
-```
-
-### マニュアル更新時のアップロード手順
-
-`docs/user_manual.html` やスクリーンショット（`docs/images/`）を更新した場合、以下で再アップロードします。
-
-```bash
-cd 010_ai_reviewer/docs
-az storage blob upload \
-  --account-name staireviewerdocs --container-name '$web' \
-  --name user_manual.html --file user_manual.html \
-  --content-type "text/html; charset=utf-8" --auth-mode key --overwrite
-
-az storage blob upload-batch \
-  --account-name staireviewerdocs --destination '$web/images' \
-  --source images --auth-mode key --overwrite
-```
+> **旧構成（廃止済み）**: 以前は操作マニュアルを専用ストレージアカウント `staireviewerdocs` の静的Webサイトホスティングで別途公開していましたが、アプリへの同梱に移行したため `staireviewerdocs` は削除しました（2026/09 廃止）。`https://staireviewerdocs.z11.web.core.windows.net/` は使用できません。
 
 ## レビュー結果の共有リンク機能用ストレージ
 
@@ -240,3 +196,53 @@ az storage blob list --account-name staireviewershare --container-name shares --
 az storage blob delete --account-name staireviewershare --container-name shares \
   --name "<share_id>.json" --auth-mode key
 ```
+
+## 作業状況の保存機能用ストレージ
+
+「保存する」ボタンで発行する作業状況（アップロード済みスライド画像・伝えたいこと・レビュー結果・生成した修正イメージ・想定質問）のスナップショットは、**共有リンク機能と同じストレージアカウント `staireviewershare` の別コンテナ `sessions`** に保存します。共有（閲覧専用）と違い、保存したURL（`/work/{session_id}`）を開くとその状態からレビューや修正イメージ作成などの操作を続けられます。
+
+- ストレージアカウント: `staireviewershare`（共有機能と共用）
+- コンテナ: `sessions`（非公開・匿名アクセス不可）
+- 接続文字列は共有機能と同じ `SHARE_STORAGE_CONNECTION_STRING` をそのまま使う（アプリ側で `SESSION_STORAGE_CONNECTION_STRING` があればそちらを優先。無ければ `SHARE_STORAGE_CONNECTION_STRING` にフォールバック）。**そのため `infra/containerapp.json` の変更は不要**
+- **同じURLへ再保存（上書き保存）すると Blob の最終更新日時が更新される**ため、ライフサイクル自動削除（最終更新から30日）の起点もリセットされる。作業を続けている限り消えない
+- 元の `.pptx` ファイル自体は保存しない（レンダリング済み画像＋JPEGサムネイルのみ）。原本ダウンロードや再レンダリングはできない
+
+### 初回セットアップ
+
+`staireviewershare` アカウントは共有機能のセットアップ時に作成済みの前提。コンテナとライフサイクルポリシーのみ追加します。
+
+> **状況**: 本番環境（`test20251008` / `staireviewershare`）では、`sessions` コンテナの作成とライフサイクルポリシーへの `delete-old-sessions` ルール追加を 2026/09 に実施済みです。以下は再構築時の参考手順です。
+
+```bash
+# 作業状況の保存用コンテナを追加
+az storage container create --account-name staireviewershare --name sessions --public-access off
+
+# ライフサイクルポリシーを shares/ と sessions/ の両方が対象になるよう更新
+# （既存の delete-old-shares ルールに sessions 用ルールを追加した状態で上書き）
+az storage account management-policy create --account-name staireviewershare --resource-group test20251008 \
+  --policy '{"rules":[
+    {"name":"delete-old-shares","type":"Lifecycle","definition":{
+      "filters":{"blobTypes":["blockBlob"],"prefixMatch":["shares/"]},
+      "actions":{"baseBlob":{"delete":{"daysAfterModificationGreaterThan":30}}}}},
+    {"name":"delete-old-sessions","type":"Lifecycle","definition":{
+      "filters":{"blobTypes":["blockBlob"],"prefixMatch":["sessions/"]},
+      "actions":{"baseBlob":{"delete":{"daysAfterModificationGreaterThan":30}}}}}
+  ]}'
+```
+
+> 既存のデプロイ済みコンテナアプリには `SHARE_STORAGE_CONNECTION_STRING` が既に設定されているため、コンテナ追加後は**再デプロイ不要**で保存機能が有効になります。
+
+### 保存データの手動削除・確認
+
+```bash
+# 保存されている作業状況の一覧
+az storage blob list --account-name staireviewershare --container-name sessions --auth-mode key --output table
+
+# 特定の保存データを即時削除したい場合（30日を待たず削除）
+az storage blob delete --account-name staireviewershare --container-name sessions \
+  --name "<session_id>.json" --auth-mode key
+```
+
+### ローカルでの動作確認
+
+接続文字列（`SESSION_STORAGE_CONNECTION_STRING` / `SHARE_STORAGE_CONNECTION_STRING`）が未設定の環境では、保存データは Blob ではなく **`010_ai_reviewer/_sessions/*.json`（Git管理対象外）** に書き出されます。`uvicorn app.main:app --reload --port 8000` で起動し、「保存する」→ 表示された `/work/{id}` を開く→続けてレビュー実行、まで確認できます。本番と同じ Blob 経路を確認したい場合は Azurite（Azure Storage エミュレータ）を起動し、その接続文字列を `SESSION_STORAGE_CONNECTION_STRING` に設定してください。
