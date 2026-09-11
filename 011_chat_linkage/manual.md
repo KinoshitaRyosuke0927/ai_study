@@ -8,7 +8,7 @@ Mattermost・GROUPSESSIONから投稿・記事を取得し、AIでリマイン�
 
 ```
 ai_reminder/
-├── chat_linkage.exe   ... アプリ本体
+├── ai_reminder.exe   ... アプリ本体
 ├── 起動.bat            ... ダブルクリックで起動＆ブラウザを開くショートカット
 ├── .env                ... Mattermost・GROUPSESSION・GROWI・Azure OpenAI の接続情報
 ├── settings.ini        ... 対象チャンネル・フォーラム・メンバー等の設定(自分で編集可能)
@@ -22,7 +22,7 @@ ai_reminder/
 
 ### 2-1. `.env` の設定
 
-`chat_linkage.exe` と同じフォルダの `.env` に、以下の接続情報が設定されている必要があります。
+`ai_reminder.exe` と同じフォルダの `.env` に、以下の接続情報が設定されている必要があります。
 
 ```
 AZURE_OPENAI_ENDPOINT=https://your-resource.services.ai.azure.com/openai/v1
@@ -89,7 +89,7 @@ root_path = /2000_開発者向け/2000_開発者向け/2YYY_組織/AIビジネ�
 
 `起動.bat` をダブルクリックしてください。自動的にアプリが起動し、既定のブラウザで `http://localhost:8000` が開きます。
 
-(`起動.bat` を使わず `chat_linkage.exe` を直接ダブルクリックした場合は、手動でブラウザから `http://localhost:8000` にアクセスしてください。)
+(`起動.bat` を使わず `ai_reminder.exe` を直接ダブルクリックした場合は、手動でブラウザから `http://localhost:8000` にアクセスしてください。)
 
 起動時に黒いコンソール画面が表示されますが、これはアプリのログ出力用の画面です。閉じるとアプリが終了するため、利用中は閉じないでください。
 

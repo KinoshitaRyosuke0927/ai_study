@@ -115,6 +115,48 @@ def test_fetch_posts_multiple_channels_kept_separate():
     assert out["channels"][1]["posts"][0]["message"] == "hello B"
 
 
+@responses.activate
+def test_fetch_posts_stops_on_repeated_page_from_mattermost():
+    s = _settings()
+    tz = mv._tz(s)
+    start_ms, _ = mv._day_bounds_ms(date(2026, 9, 1), tz)
+    order = [f"p{i}" for i in range(mv.PER_PAGE)]
+    posts = {
+        pid: {
+            "id": pid,
+            "user_id": "u1",
+            "create_at": start_ms + i,
+            "message": f"msg {i}",
+            "root_id": "",
+        }
+        for i, pid in enumerate(order)
+    }
+
+    def callback(request):
+        if len(responses.calls) >= 3:
+            raise AssertionError("Mattermost page fetch loop continued unexpectedly")
+        return (200, {}, {"order": order, "posts": posts})
+
+    responses.add(responses.GET, f"{MM}/api/v4/channels/ch1", json={"display_name": "業務連絡"})
+    responses.add_callback(
+        responses.GET,
+        f"{MM}/api/v4/channels/ch1/posts",
+        callback=callback,
+        content_type="application/json",
+    )
+    responses.add_callback(
+        responses.POST,
+        f"{MM}/api/v4/users/ids",
+        callback=lambda request: (200, {}, [{"id": "u1", "username": "alice"}]),
+        content_type="application/json",
+    )
+
+    out = fetch_posts(s, ["ch1"], date(2026, 9, 1), date(2026, 9, 2))
+    assert out["channel_count"] == 1
+    assert out["channels"][0]["post_count"] == mv.PER_PAGE
+    assert len(responses.calls) == 3
+
+
 def test_fetch_posts_validation_errors():
     with pytest.raises(MattermostViewError):
         fetch_posts(_settings(), [], date(2026, 9, 1), date(2026, 9, 2))

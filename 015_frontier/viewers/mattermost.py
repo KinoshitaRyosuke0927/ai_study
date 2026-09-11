@@ -99,15 +99,22 @@ class _MattermostApi:
         Mattermost はスレッドのルート投稿を since より前でも同梱するため、
         戻り値には期間外のルート投稿が含まれることがある。
 
-        注意: since 指定時、Mattermost は page パラメータを無視して常に同じ結果を返す
-        (since はページング用ではなく「差分同期」用のクエリのため)。そのため対象が
-        per_page 件を超える場合、page を進めても終了条件(len(order) < per_page)に
-        決して到達せず無限ループになる。ここでは page ではなく、受け取った投稿の
-        create_at の最大値 + 1ms を次の since に使う「時刻カーソル」でページングする。
+        since 指定時は page をずらしても同じ結果が返ることがあり、
+        len(order) >= per_page のまま進捗が止まると無限ループになる。
+        そこで、最後に取得した create_at の最大値が前回より進んでいない場合は
+        その時点で打ち切る。これにより、Mattermost の page 無視による反復を防ぐ。
         """
         posts: dict[str, dict] = {}
         cursor = since_ms
+        previous_max_create_at = -1
+        seen_pages: set[int] = set()
+
         while True:
+            key = cursor
+            if key in seen_pages:
+                break
+            seen_pages.add(key)
+
             data = self._http.get_json(
                 f"{self._base}/api/v4/channels/{channel_id}/posts",
                 params={"since": cursor, "per_page": PER_PAGE},
@@ -117,9 +124,14 @@ class _MattermostApi:
             posts.update(page_posts)
             if len(order) < PER_PAGE:
                 break
-            max_create_at = max((page_posts[pid].get("create_at", 0) for pid in order if pid in page_posts), default=0)
-            if max_create_at <= cursor:
-                break  # 進捗が無ければ打ち切る(同一ミリ秒に per_page 超の投稿がある等の異常系)
+
+            max_create_at = max(
+                (page_posts[pid].get("create_at", 0) for pid in order if pid in page_posts),
+                default=0,
+            )
+            if max_create_at <= previous_max_create_at or max_create_at <= cursor:
+                break  # 進捗がない / 同一時刻の再取得は打ち切る
+            previous_max_create_at = max_create_at
             cursor = max_create_at + 1
         return posts
 
