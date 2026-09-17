@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>形態素解析とAI・機械学習 — 初学者のための実務入門</title>
+<style>
+:root{--ink:#2a2620;--accent:#a33b20;--sub:#5a6b7a;--line:#e4ddd2;--paper:#fffdf8;}
+*{box-sizing:border-box}
+body{max-width:880px;margin:0 auto;padding:48px 72px;font-family:"Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif;color:var(--ink);line-height:2.0;font-size:15.5px;background:var(--paper)}
+h1,h2,h3,h4{font-family:"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif;color:#241f18;line-height:1.55}
+h1{font-size:27px}h2{font-size:22px;border-bottom:3px solid var(--accent);padding-bottom:6px;margin-top:60px}h3{font-size:18px;margin-top:34px}h4{font-size:16px;margin-top:22px}
+code,pre{font-family:"SF Mono",Consolas,"Hiragino Kaku Gothic ProN",monospace;font-size:13.5px}
+code{background:#f2eee6;padding:1px 6px;border-radius:3px}
+pre{background:#22201c;color:#f2ead9;padding:18px 22px;border-radius:8px;overflow-x:auto;line-height:1.7;white-space:pre}
+table{border-collapse:collapse;width:100%;margin:18px 0;font-size:14px;line-height:1.7}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:#f3eee5;font-weight:600}
+ul,ol{padding-left:1.6em}
+li{margin:4px 0}
+.tag{display:inline-block;background:#f3eee5;border:1px solid var(--line);border-radius:4px;padding:0 8px;font-size:13px;margin:0 4px 4px 0}
+.cover{border:2px solid var(--accent);border-radius:12px;padding:40px 44px;margin:0 0 40px;background:#fff}
+.cover h1{margin:0 0 8px}
+.cover .sub{font-size:16.5px;color:var(--sub);margin-bottom:26px}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:26px}
+.meta div{background:#f8f4ec;border:1px solid var(--line);border-radius:8px;padding:12px 16px}
+.meta b{display:block;font-size:13px;color:var(--sub);font-weight:600}
+.meta span{font-size:14px}
+.toc{background:#f8f4ec;border:1px solid var(--line);border-radius:10px;padding:22px 30px;margin:30px 0}
+.toc ol{margin:6px 0}
+.toc .sec{margin-top:16px;font-weight:600}
+a{color:#8a331c;text-decoration:underline;text-decoration-color:#c9b09f;text-underline-offset:3px}
+a:hover{color:#5e2213}
+.demo{margin:20px 0}
+.demo .label{display:inline-block;background:var(--accent);color:#fff;font-size:12.5px;padding:2px 12px;border-radius:4px 4px 0 0;letter-spacing:.05em}
+.demo pre{border-radius:0 8px 8px 8px;margin:0}
+.box{border:1px solid var(--line);border-left:5px solid var(--sub);background:#f6f8fa;border-radius:0 8px 8px 0;padding:14px 20px;margin:22px 0}
+.box.warn{border-left-color:#c07a1e;background:#fdf6ec}
+.box.tip{border-left-color:#3d7d50;background:#f1f7f2}
+.box b{font-size:14.5px}
+.point{color:var(--accent);font-weight:700}
+details{background:#f8f4ec;border:1px solid var(--line);border-radius:8px;padding:12px 18px;margin:12px 0}
+summary{cursor:pointer;font-weight:600}
+.timeline{list-style:none;padding-left:0;margin:20px 0}
+.timeline li{position:relative;padding:0 0 20px 34px;border-left:2px solid var(--line)}
+.timeline li::before{content:"";position:absolute;left:-7px;top:8px;width:12px;height:12px;border-radius:50%;background:var(--accent)}
+.timeline .yr{font-family:"Yu Mincho","Hiragino Mincho ProN",serif;font-size:16px;font-weight:700;color:var(--accent)}
+.timeline small{color:var(--sub)}
+figure{margin:24px 0;text-align:center}
+figure svg{width:100%;height:auto}
+figcaption{font-size:13px;color:var(--sub);margin-top:6px}
+.foot{margin-top:70px;padding-top:18px;border-top:1px solid var(--line);color:var(--sub);font-size:13px}
+@media (max-width:760px){body{padding:26px 18px;font-size:15px}.cover{padding:26px 22px}}
+</style>
+</head>
+<body>
+
+<div class="cover">
+<h1>形態素解析とAI・機械学習</h1>
+<p class="sub">辞書ベースの分割技術が、大規模言語モデルのトークナイザへとどう変遷してきたか — 歴史・仕組み・実装でたどる初学者向け実務入門</p>
+<div class="meta">
+  <div><b>対象読者</b><span>AI・機械学習の初学者。Pythonの基本文法(変数・for文・関数)が読める方</span></div>
+  <div><b>ゴール</b><span>形態素解析とサブワード分割を区別して説明でき、日本語テキストの前処理・分析ツールを実務で選べる・使える</span></div>
+  <div><b>作業環境</b><span>Python 3.8以降。本教材の実行例はすべて実際に動作確認した実測出力です(2026年9月)</span></div>
+  <div><b>想定時間</b><span>4〜6時間(第6章のハンズオンまで実行して)</span></div>
+</div>
+</div>
+
+<div class="toc">
+<b>目次</b>
+<ol>
+<li class="sec"><a href="#c1">第1章 形態素解析とは何か</a></li>
+<li class="sec"><a href="#c2">第2章 形態素解析の仕組み</a></li>
+<li class="sec"><a href="#c3">第3章 AI・機械学習における変遷の歴史</a></li>
+<li class="sec"><a href="#c4">第4章 サブワード分割 — LLM時代の分割技術</a></li>
+<li class="sec"><a href="#c5">第5章 現在のAIモデルでの使われ方</a></li>
+<li class="sec"><a href="#c6">第6章 ハンズオン — 実務で使えるようにする</a></li>
+<li class="sec"><a href="#c7">第7章 練習問題と解答</a></li>
+<li class="sec"><a href="#cA">付録A ツール・辞書早見表</a></li>
+<li class="sec"><a href="#cB">付録B 用語集</a></li>
+<li class="sec"><a href="#cC">付録C 参考文献・リンク</a></li>
+</ol>
+</div>
+
+<h2 id="c1">第1章 形態素解析とは何か</h2>
+
+<p><b>形態素解析(けいたいそかいせき、morphological analysis)</b>とは、文章を「意味を持つ最小の単位」である<b>形態素</b>に分割し、それぞれに品詞・読み・原形などの情報を付与する処理です。日本語の自然言語処理(NLP)のほぼすべての入口として使われてきた、最も基本的なテキスト解析技術です。</p>
+
+<h3>1.1 具体例 — 実際に分割してみると</h3>
+<p>例文「私は大学でコンピューターを勉強しています。」を、Pythonの形態素解析ライブラリ<span class="tag">Janome</span>で解析した実測結果が以下です。語の区切れ目と品詞が同時に得られます。</p>
+
+<div class="demo"><span class="label">実行例 1-1: Janomeによる形態素解析(実測)</span>
+<pre>文: 私は大学でコンピューターを勉強しています。
+
+私        名詞      大学      名詞
+は        助詞      で        助詞
+コンピューター  名詞   を        助詞
+勉強      名詞      し        動詞
+て        助詞      い        動詞
+ます      助動詞     。        記号
+※ 計12形態素</pre>
+</div>
+
+<p>ここで重要なのは、<b>「勉強しています」が5つの形態素「勉強 / し / て / い / ます」に分解される</b>点です。辞書にある「勉強」という語に、活用を持つ「する」(→し)、接続助詞「て」、補助動詞「いる」(→い)、助動詞「ます」がつながった文法的な構造として分解されています。これは単なる文字列分割ではなく、<b>文法的な知識を使った分割</b>です。</p>
+
+<h3>1.2 なぜ日本語では必須なのか</h3>
+<p>英語は I / have / a / pen のようにスペースで単語が区切られているため、split()すれば単語列が手に入ります。一方日本語は「今日は良い天気です」のように<b>語の間に区切りがありません</b>(分かち書きが存在しない)。機械にとって、どこからどこまでが1語なのかは自明ではありません。</p>
+
+<p>さらに日本語は、次のような難しさを持ちます。</p>
+<ul>
+<li><b>表記が同じでも語が異なる</b>: 「先」は名詞(優先の「先」)にも動詞の連用形(「先立つ」)にもなり得る。品詞は周辺文脈で決まる</li>
+<li><b>活用と複合語</b>: 「食べさせられた」「非ステロイド性抗炎症薬」のように、文法的な連接と長い複合語が重なる</li>
+<li><b>新語・固有名詞</b>: 「エージェント基盤」のような新語は辞書に登録されない限り未知語(前後の文脈からの推定)になる</li>
+</ul>
+
+<p>この「どこで切るか」と「それぞれの品詞は何か」を決めるのが形態素解析の仕事であり、その判断は<b>辞書と統計モデル</b>(後述)を使って自動的に行われます。</p>
+
+<h3>1.3 最小構成で動かしてみる</h3>
+<p>初学者が最初に触るのに向いているのは、純Pythonで動く<b>Janome</b>です(インストールが簡単で、ネイティブ依存がありません)。</p>
+
+<pre># ターミナル
+pip install janome
+</pre>
+<pre># parse.py
+from janome.tokenizer import Tokenizer
+
+t = Tokenizer()
+text = "私は大学でコンピューターを勉強しています。"
+for tok in t.tokenize(text):
+    print(tok.surface, tok.part_of_speech.split(",")[0])
+</pre>
+
+<div class="box tip"><b>ポイント</b><br>この段階で暗記することは何もありません。「<b>辞書を引いて、文法的につながりやすい切り方を選ぶ</b>」という2段構えの処理だ、というイメージだけ持ってください。詳細は第2章で扱います。</div>
+
+<h2 id="c2">第2章 形態素解析の仕組み</h2>
+
+<h3>2.1 3つの工程</h3>
+<p>市販の形態素解析器(MeCab、Sudachi、Janomeなど)は、いずれも次の3工程で動きます。</p>
+
+<ol>
+<li><b>辞書引き(ラティス生成)</b>: 文中の各位置から、辞書に登録された語をすべて列挙し、網目状(ラティス)の候補グラフを作る</li>
+<li><b>コスト計算</b>: 各候補の語に「この語が出やすいか」(生起コスト)と、隣り合う語の「つながりやすさ」(連接コスト)を付ける</li>
+<li><b>最適解の選択(ビタビアルゴリズム)</b>: 文全体のコスト合計が最小になる分割経路を動的計画法で探索する</li>
+</ol>
+
+<p>例として実測の「東京都に住む」をJanome(IPA辞書)で解析すると <b>東京 / 都 / に / 住む</b> と切れます。文字列上は「東京都」も辞書には存在しますが、「東京」+「都」の組み合わせの方が文全体として自然(コストが低い)と判定されている、というわけです。</p>
+
+<div class="demo"><span class="label">実行例 2-1: 辞書とコストの影響(実測)</span>
+<pre>文: 東京都に住む        →  東京 / 都 / に / 住む     (Janome・IPA辞書)
+文: エージェント基盤でRAGを実装する
+                        →  エージェント / 基盤 / で / RAG / を / 実装 / する
+                            (辞書に登録がある語は1語として切れる)</pre>
+</div>
+
+<div class="box warn"><b>実務の教訓</b><br>形態素解析の精度はアルゴリズムより<b>辞書の質</b>で決まります。「同じMeCabでも辞書が違えば結果が変わる」というのは実務で必ず遭遇する話です。</div>
+
+<h3>2.2 辞書の種類</h3>
+<table>
+<thead><tr><th>辞書</th><th>特徴</th><th>主に使うツール</th></tr></thead>
+<tbody>
+<tr><td>IPA辞書 (IPADIC)</td><td>古くから使われる定番辞書。語の単位は大きめ。コーパスに基づきCRFでパラメータ推定</td><td>MeCab・Janome</td></tr>
+<tr><td>UniDic</td><td>国立国語研究所が整備。言語学的に一貫した短単位。学術・言語処理研究に強い</td><td>MeCab(Sudachi)・fugashi</td></tr>
+<tr><td>NEologd</td><td>新語・固有名詞に強いIPA拡張。ただし近年は更新頻度が低下(2020年代半ば時点)</td><td>MeCab(+NEologd辞書)</td></tr>
+<tr><td>Sudachi辞書</td><td>UniDicベースに新語・固有名詞を追加。数か月ごとに更新され、最新性で実務的に優位</td><td>Sudachi / SudachiPy</td></tr>
+</tbody>
+</table>
+
+<h3>2.3 統計モデルの進化: HMMからCRFへ</h3>
+<p>「どの分割が自然か」をどう学ぶかは、時代とともに次のように進化しました。</p>
+
+<table>
+<thead><tr><th>手法</th><th>種類</th><th>考え方</th><th>代表実装</th></tr></thead>
+<tbody>
+<tr><td>ルールベース</td><td>人手</td><td>文法規則を人間が書く</td><td>黎明期の解析器</td></tr>
+<tr><td>HMM(隠れマルコフモデル)</td><td>生成モデル</td><td>「単語列と品詞列が一緒に出てくる確率」を最大化</td><td>ChaSen、JUMAN</td></tr>
+<tr><td>CRF(条件付き確率場)</td><td>識別モデル</td><td>前後の文脈を素性にして「与えられた文での品詞列の条件付き確率」を直接学習</td><td><b>MeCab</b>(CRF+L-BFGSによる学習、比較的高速)</td></tr>
+<tr><td>ニューラル</td><td>深層学習</td><td>BiLSTM-CRF、Transformerなどで文脈を分散表現として扱う</td><td>GiNZA(spaCyベース)、研究レベルの解析器</td></tr>
+</tbody>
+</table>
+
+<p>このうち実務で最も普及したのは<b>CRFベースのMeCab</b>です(京都大学情報学研究科とNTTコミュニケーション科学基礎研究所の共同研究プロジェクトとして開発され、2006年に初版公開。以降、動作の軽さと使用実績の多さで20年にわたり現役です)。ChaSenが採用したHMM(生成モデル)に比べ、文脈素性を柔軟に使える点が精度向上に効きました。</p>
+
+<h3>2.4 主要ツールの比較</h3>
+<table>
+<thead><tr><th>ツール</th><th>言語</th><th>強み</th><th>実務上の使いどころ</th></tr></thead>
+<tbody>
+<tr><td>MeCab</td><td>C++(Python: fugashi / mecab-python3)</td><td>軽量・高速・資料豊富。歴史的に最大の利用実績</td><td>バッチ解析、研究・分析の定番</td></tr>
+<tr><td>Sudachi / SudachiPy</td><td>Java / Python(Rust版Sudachi.rs)</td><td>辞書の最新性、長単位・短単位の切り替え(モードA/B/C)、同義語展開</td><td>検索インデックス、プロダクション</td></tr>
+<tr><td>Kuromoji</td><td>Java</td><td>Elasticsearch標準の日本語アナライザとして定着</td><td>Elasticsearch / OpenSearchの検索</td></tr>
+<tr><td>Janome</td><td>Python</td><td>純Pythonで環境構築が簡単。学習・試作に最適</td><td>プロトタイプ、学習教材、小規模集計</td></tr>
+<tr><td>GiNZA</td><td>Python(spaCy)</td><td>形態素解析に加えて固有表現抽出・係り受け解析まで一体提供</td><td>EUC(エンドユーザーコンピューティング)的な叙事テキスト解析</td></tr>
+<tr><td>JUMAN++</td><td>C++(RNNLM利用) / Python</td><td>高精度(特に未知語・口語)。辞書はJumanDIC</td><td>研究用途、高精度が必要な解析</td></tr>
+</tbody>
+</table>
+
+<h2 id="c3">第3章 AI・機械学習における変遷の歴史</h2>
+
+<p>本章がこの教材の核心です。形態素解析は「機械学習のタスクそのもの」として発展し、その後「機械学習パイプラインの前処理」として使われ、さらに「LLM時代には置き換えられる対象」へと位置づけが変わりました。全体像を先に示します。</p>
+
+<ul class="timeline">
+<li><span class="yr">1980年代〜90年代前半</span><br>ルールベースの解析。文法規則を人手で記述する。研究段階。<small>日本語解析の黎明期。</small></li>
+<li><span class="yr">1990年代後半〜2000年代</span><br><b>統計的HMMの時代</b>。コーパスから遷移確率を学習する ChaSen(奈良先端大)、JUMAN(京都大学)が登場し、ルールベースを置き換え。</li>
+<li><span class="yr">2001〜2006年</span><br><b>CRFの導入とMeCabの登場</b>。工藤拓氏が開発。2006年3月に初版公開。HMMのChaSenより精度・速度とも向上し、以後デファクトスタンダードに。<small>CRFパラメータ推定にはL-BFGSを使用。</small></li>
+<li><span class="yr">2013年頃</span><br><b>分散表現(word2vec)の時代</b>。Mikolovらが word2vec を発表。形態素解析の出力を単語ベクトル化して使う「形態素解析=機械学習の前処理」という形が標準化。テキスト分類・感情分析・検索の定番パイプラインになる。</li>
+<li><span class="yr">2016年</span><br><b>BPEの登場</b>。Sennrichらの論文で、機械翻訳の未知語対策として文字列の頻度ベース分割(Byte Pair Encoding)が提案される。後のLLMトークナイザの原型。</li>
+<li><span class="yr">2018年</span><br><b>Transformer / BERTとSentencePiece</b>。BERT(Devlinら)と SentencePiece(Kudo &amp; Richardson)が登場。日本語BERT(東北大BERTなど)では「<b>形態素解析で分かち書き → サブワード化</b>」の二段構成がとられた。この時期はまだ形態素解析が入口。</li>
+<li><span class="yr">2019〜2023年</span><br><b>LLMの時代</b>。GPT-2/3、Llamaなどは日本語も含め文を<b>形態素解析せず</b>、BPE / SentencePieceだけで直接サブワード化。日本語LLMのトークナイザ設計の試行錯誤が続く(LLM-jp Tokenizer など)。</li>
+<li><span class="yr">2025年</span><br><b>SB Intuitionsの日本語ModernBERT検証</b>: 約4.4Tトークンで事前学習した日本語ModernBERTのトークナイザに、事後的に形態素解析器(MeCab / Juman++ / Sudachi)を差し込む実験を公開。性能への影響は小さいと報告されつつ、<b>系列長は伸びる</b>(例: 9トークン→13トークン)というコスト増も明らかに。</li>
+<li><span class="yr">2026年(現在)</span><br><b>用途の分化が完了</b>。LLMの内部ではサブワード分割が標準。一方で、検索エンジン(ElasticsearchのKuromoji / Sudachiアナライザ)、テキストマイニング、RAGのハイブリッド検索など、<b>品詞や語単位が要る処理では形態素解析が現役</b>で使われ続けている。</li>
+</ul>
+
+<h3>3.1 3つの時代のイメージ</h3>
+
+<table>
+<thead><tr><th>時代</th><th>形態素解析の位置づけ</th><th>代表技術</th></tr></thead>
+<tbody>
+<tr><td>〜2010年代前半</td><td><b>タスクそのもの</b>(品詞タグ付けという機械学習問題)</td><td>HMM → CRF(MeCab)、コーパスと辞書</td></tr>
+<tr><td>2013〜2018年頃</td><td><b>機械学習の前処理</b>(分散表現に入れる前の入り口)</td><td>MeCab + word2vec / BERT(二段構成)</td></tr>
+<tr><td>2018年〜現在</td><td><b>LLMでは置き換え、実務の一部で現役継続</b></td><td>BPE / SentencePiece(Unigram)と併存</td></tr>
+</tbody>
+</table>
+
+<div class="box tip"><b>初学者の理解の要(かなめ)</b><br>「形態素解析はもう古い。LLMはトークナイザで分割する」という言説をよく見かけます。しかし正確には、<b>LLMのトークナイザが分割方式(SentencePiece等)を選んだだけで、形態素解析の技術(辞書+統計モデル)自体は検索・分析・辞書運用など別レイヤーとして今も現役</b>です。ものを捨てる話ではなく「レイヤーの分化」だと捉えるのが実務では正解です。</div>
+
+<h2 id="c4">第4章 サブワード分割 — LLM時代の分割技術</h2>
+
+<h3>4.1 なぜサブワードなのか</h3>
+<p>単語単位の語彙を持つと、次の問題が起きます。</p>
+<ul>
+<li>語彙が爆発する(英語だけでも数十万語)</li>
+<li>未登録語(OOV、未知語)を表現できない</li>
+<li>run / runs / running のような語形変化をすべて別語彙として持つのは非効率</li>
+</ul>
+<p>そこで登場したのが、<b>「頻度の高い文字列は1トークン、まれな文字列は細かく分解」</b>するサブワード分割です。語彙サイズ(例: 32,000〜128,000)を事前に固定でき、どんな未知語も<b>必ず</b>既知のトークン列に分解できるため、LLMの標準方式になりました。</p>
+
+<h3>4.2 3つの代表アルゴリズム</h3>
+<table>
+<thead><tr><th>手法</th><th>分割の決め方</th><th>主な採用例</th></tr></thead>
+<tbody>
+<tr><td>BPE (Byte Pair Encoding)</td><td>頻度の高い文字ペアを順にマージ(圧縮アルゴリズムに類似)</td><td>GPT系、Llama、Mistral</td></tr>
+<tr><td>WordPiece</td><td>コーパスの尤度(確率)を最も上げるペアを結合</td><td>BERT系(英語・多言語)</td></tr>
+<tr><td>Unigram (SentencePiece)</td><td>大きな候補語彙から不要な語を確率ベースで削る(逆方向)</td><td>T5、Gemma、日本語ModernBERT、LLM-jp</td></tr>
+</tbody>
+</table>
+
+<p>なお、<b>SentencePieceはソフトウェア名であり、アルゴリズム名ではありません</b>(BPEモードもUnigramモードも選択できます)。またSentencePieceは分かち書き済みテキストを要求せず、<b>生テキストから直接</b>学習できるため、日本語・中国語のような言語にとくに有利です。</p>
+
+<h3>4.3 実際に学習して分割してみる(実測)</h3>
+<p>青空文庫の2作品(走れメロス・吾輩は猫である、計約33万文字)で、SentencePiece(Unigram、語彙4000)を実際に学習させた結果を示します。同じ文を形態素解析(Janome)と比較してみましょう。</p>
+
+<div class="demo"><span class="label">実行例 4-1: 形態素解析 vs サブワード分割(実測)</span>
+<pre>文: 私は大学でコンピューターを勉強しています。
+
+【形態素解析 Janome】                12形態素
+私 / は / 大学 / で / コンピューター / を / 勉強 / し / て / い / ます / 。
+
+【サブワード分割 SentencePiece】     18トークン
+▁ / 私は / 大 / 学 / で / コ / ン / ピ / ュ / ー / タ / ー / を / 勉 / 強 / して / います / 。
+
+※ 「コンピューター」は学習コーパス(明治・大正の小説)に出現せず、
+  1文字ずつの片仮名トークンに分解された。
+※ 「私は」「して」「います」のように、頻度が高かった文字列は
+  語の境界をまたいで1トークンになる。</pre>
+</div>
+
+<p>形態素解析が「意味と文法の単位」で切るのに対し、サブワード分割は<b>「コーパス中での頻度」だけ</b>で切ります。そのため上の例のように「私は」が1トークンになったり、見慣れない語がバラバラになったりします。これは欠陥ではなく設計であり、モデルはトークン埋め込みと文脈で意味を復元します。</p>
+
+<div class="demo"><span class="label">実行例 4-2: 未知語の挙動(実測)</span>
+<pre>文: エージェント基盤でRAGを実装する
+
+【形態素解析】 エージェント / 基盤 / で / RAG / を / 実装 / する   (辞書に登録あり)
+【サブワード】 ▁ / エ / ー / ジ / ェ / ン / ト / 基 / 盤 / で / R / A / G / を / 実装 / する
+               (「エージェント」「RAG」は学習データに無く、文字(やアルファベット)単位まで分解)</pre>
+</div>
+
+<h3>4.4 形態素解析とサブワード分割の対比</h3>
+<table>
+<thead><tr><th>観点</th><th>形態素解析</th><th>サブワード分割</th></tr></thead>
+<tbody>
+<tr><td>原理</td><td>辞書+文法(接続コスト)</td><td>コーパスの統計(頻度・確率)のみ</td></tr>
+<tr><td>分割単位</td><td>意味を持つ最小単位(形態素)</td><td>頻度で決まる任意の文字列</td></tr>
+<tr><td>品詞・読み・原形</td><td><b>得られる</b></td><td>得られない</td></tr>
+<tr><td>未知語</td><td>辞書登録が必要(なければ推定)</td><td>自動的に細かく分解して必ず表現</td></tr>
+<tr><td>言語知識</td><td>言語ごとの辞書が必要(日本語専用)</td><td>言語非依存(同じ手順が全言語で動く)</td></tr>
+<tr><td>速度</td><td>辞書引き+最適化探索</td><td>高速な文字列パターンマッチ</td></tr>
+</tbody>
+</table>
+
+<h2 id="c5">第5章 現在のAIモデルでの使われ方</h2>
+
+<h3>5.1 LLMの標準トークナイザ</h3>
+<p>現在の主要LLM(GPT、Claude、Gemini、Llama、日本語LLMなど)は、文を<b>形態素解析せず</b>サブワード分割でトークン化します。英語・日本語とも同じ仕組みで、出力は「語彙IDの列」(例: <code>220 → 3012 → 7 → ...</code>)になり、そのまま埋め込み層に入ります。トークナイザの設計(語彙サイズ・分割方式)は、コスト(トークン数=計算量と料金)と性能の両方に効くため、今でもモデル開発の重要トピックです(日本語LLMでは、日本語テキストを少ないトークン数で表現できるかが熱心に研究されています。例: <a href="https://github.com/llm-jp/llm-jp-tokenizer">LLM-jp Tokenizer</a>)。</p>
+
+<h3>5.2 日本語特化モデル: 二段構成は今も残る</h3>
+<p>一方、日本語に特化したエンコーダ型モデル(BERT系)には、<b>「形態素解析で分かち書き → サブワード化」の二段構成</b>をとるものが今も多くあります。SB Intuitionsのブログ(2025年5月)による主要モデルの整理は次の通りです。</p>
+
+<table>
+<thead><tr><th>モデル</th><th>形態素解析器</th><th>辞書</th><th>サブワード化</th></tr></thead>
+<tbody>
+<tr><td>東北大bert-base-japanese</td><td>MeCab</td><td>IPA辞書</td><td>WordPiece</td></tr>
+<tr><td>東北大bert-base-japanese-v3</td><td>MeCab</td><td>UniDic Lite</td><td>WordPiece</td></tr>
+<tr><td>LINE distilbert-base-japanese</td><td>MeCab</td><td>UniDic Lite</td><td>SentencePiece(BPE)</td></tr>
+<tr><td>早稲田roberta-base-japanese</td><td>Juman++</td><td>JumanDIC</td><td>SentencePiece(Unigram)</td></tr>
+<tr><td>studio-ousia/luke-japanese</td><td>なし</td><td>—</td><td>SentencePiece(BPE)</td></tr>
+<tr><td>sbintuitions/modernbert-ja-130m</td><td>なし</td><td>—</td><td>SentencePiece(Unigram)</td></tr>
+</tbody>
+</table>
+
+<p>近年のモデルは「形態素解析なしのダイレクト分割」が主流になりましたが、HuggingFace <code>transformers</code>の <code>BertJapaneseTokenizer</code> はMeCab / Juman++ / Sudachi の3解析器に対応し、<b>「形態素解析を挟みたいユースケース」を今でも公式にサポート</b>しています。2025年に公開されたSB Intuitionsの日本語ModernBERTの検証では、学習済みモデルのトークナイザに事後的に形態素解析器を挟み込んでも下流タスクの性能低下は小さかった一方、<b>系列長が伸びる</b>(コスト増)ことも確認されています。</p>
+
+<div class="box"><b>実務で覚えるべき1点</b><br>トークン系列が長いほど計算コストとAPI料金が増えます。日本語テキストの処理効率を論じる場面では、「<b>トークナイザの分割方式</b>」が直接効いてくることを意識してください。</div>
+
+<h3>5.3 形態素解析が今も必須の現場</h3>
+<p>LLM時代の2026年現在、次のような実務では形態素解析が欠かせません(ai-soukenの2026年7月整理に基づく)。</p>
+
+<table>
+<thead><tr><th>用途</th><th>形態素解析の役割</th></tr></thead>
+<tbody>
+<tr><td>検索エンジン(Elasticsearch / OpenSearch)</td><td>Kuromoji / Sudachi アナライザが内部で形態素解析し、単語単位のインデックスを作る。型番・固有名詞の完全一致検索に強い</td></tr>
+<tr><td>テキストマイニング</td><td>アンケート・SNS・コールセンターログを形態素に分解し、単語頻度・共起・感情分析へ</td></tr>
+<tr><td>RAGのハイブリッド検索</td><td>ベクトル検索(意味)と形態素解析+BM25(キーワード)を統合。型番や固有名詞の取りこぼしを防ぐ</td></tr>
+<tr><td>読み上げ(TTS)・かな変換</td><td>送り仮名・読みの推定に品詞情報が有効</td></tr>
+<tr><td>辞書運用・データ整備</td><td>ユーザ辞書への新語登録、専用用語の分割制御</td></tr>
+</tbody>
+</table>
+
+<h3>5.4 「どちらを使うか」の判断基準</h3>
+<table>
+<thead><tr><th>状況</th><th>おすすめ</th><th>理由</th></tr></thead>
+<tbody>
+<tr><td>LLMや埋め込みモデルの入力を作る</td><td>サブワード分割(モデルに任せる)</td><td>モデルが設計したトークナイザを使うのが標準</td></tr>
+<tr><td>単語の意味的な単位・品詞が要る</td><td>形態素解析</td><td>品詞や原形はサブワードでは得られない</td></tr>
+<tr><td>検索インデックス・辞書ベースの照合</td><td>形態素解析(検索専用アナライザ)</td><td>完全一致に強い。ユーザ辞書で制御できる</td></tr>
+<tr><td>新しい語・口語が多い</td><td>Sudachi(辞書が最新) / ユーザ辞書追加</td><td>新語への追従性が実務的な精度を決める</td></tr>
+<tr><td>気軽な学習・小規模集計</td><td>Janome</td><td>環境構築が1コマンドで済む</td></tr>
+</tbody>
+</table>
+
+<h2 id="c6">第6章 ハンズオン — 実務で使えるようにする</h2>
+
+<p>実際に手を動かして、本章の内容を自分の道具にしてください。以降の出力はすべて本教材の環境(Python 3.12、2026年9月)での実測です。</p>
+
+<h3>演習0: 環境の準備</h3>
+<pre>pip install janome sudachipy sudachidict-core sentencepiece
+</pre>
+<div class="box tip"><b>確認</b><br><code>python -c "import janome"</code> がエラーなく動けばOK。以降の演習はこれを前提にします。</div>
+
+<h3>演習1: Janomeで形態素解析し、名詞だけ抽出する</h3>
+<p><b>目的</b>: 形態素解析の基本出力と品詞フィルタを習得する。</p>
+<pre>from janome.tokenizer import Tokenizer
+from collections import Counter
+
+t = Tokenizer()
+text = "今日は良い天気です。明日は雨が降るかもしれません。"
+
+tokens = t.tokenize(text)
+for tok in tokens:
+    surface = tok.surface
+    pos = tok.part_of_speech.split(",")
+    print(f"{surface}\t{pos[0]}_{pos[1]}")
+
+# 名詞だけ取り出して頻度集計
+nouns = [tok.surface for tok in t.tokenize(text)
+         if tok.part_of_speech.startswith("名詞")]
+print("名詞:", Counter(nouns))
+</pre>
+<div class="demo"><span class="label">実行例 6-0(実測)</span>
+<pre>今日  名詞_副詞可能
+は   助詞_係助詞
+良い  形容詞_自立
+天気  名詞_一般
+です  助動詞_*
+。   記号_句点
+明日  名詞_副詞可能
+は   助詞_係助詞
+雨   名詞_一般
+が   助詞_格助詞
+降る  動詞_自立
+かも  助詞_副助詞
+しれ  動詞_自立
+ませ  助動詞_*
+ん   助動詞_*
+。   記号_句点
+名詞: {'今日': 1, '天気': 1, '明日': 1, '雨': 1}</pre>
+</div>
+<p><b>落とし穴</b>: <code>part_of_speech</code> は「名詞,一般」のようなCSV文字列です。<code>.split(",")</code> してから比較しましょう。「名詞,固有名詞」のように細分類を意識すると抽出精度が上がります。</p>
+
+<h3>演習2: SudachiPyで辞書の新しさを体感する</h3>
+<p><b>目的</b>: 辞書が最新の解析器と、分割モード(A/B/C)の概念を知る。</p>
+<pre>from sudachipy import tokenizer
+from sudachipy.dictionary import Dictionary
+
+tok = Dictionary().create()
+text = "私は大学でコンピューターを勉強しています。"
+
+for m in tok.tokenize(text, tokenizer.Tokenizer.SplitMode.C):
+    print(m.surface(), m.part_of_speech()[0])
+</pre>
+<div class="demo"><span class="label">実行例 6-1(実測)</span>
+<pre>私  代名詞    大学  名詞      コンピューター  名詞
+は  助詞      で    助詞      を              助詞
+勉強 名詞     し    動詞      て              助詞
+い  動詞      ます  助動詞    。              補助記号</pre>
+</div>
+<p><b>ポイント</b>: <code>SplitMode.C</code> は最小単位(文節をまたぐ複合語も分解)、<code>A</code> は最大単位(複合語をまとめる)、<code>B</code> は中間です。検索インデックスではC、意味単位が欲しいときはA、と用途で切り替えます。</p>
+
+<h3>演習3: 生テキストのクリーニングと名詞頻度集計(実務!)</h3>
+<p><b>目的</b>: 「データをきれいにしてから解析する」実務の流れを体験する。青空文庫(著作権フリー)の本文を形態素解析し、頻出名詞を調べます。</p>
+<pre>import re, urllib.request, collections
+from janome.tokenizer import Tokenizer
+
+url = "https://www.aozora.gr.jp/cards/000148/files/789_ruby_5639.zip"  # 吾輩は猫である
+# (zipの展開・文字コード変換は省略。手元のテキストファイルを text に入れる想定)
+text = open("wagahai.txt", encoding="shift_jis").read()
+
+# 1) クリーニング: ルビ《》と注記を除去
+text = re.sub(r"《[^》]*》", "", text)
+lines = [l for l in text.splitlines() if not l.startswith("-----")]
+
+# 2) 形態素解析→名詞だけ集計
+t = Tokenizer()
+cnt = collections.Counter()
+for line in lines:
+    for tok in t.tokenize(line):
+        pos = tok.part_of_speech.split(",")
+        if pos[0] == "名詞" and pos[1] in ("一般", "固有名詞"):
+            cnt[tok.surface] += 1
+for w, c in cnt.most_common(15):
+    print(f"{c:>5}  {w}")
+</pre>
+<div class="demo"><span class="label">実行例 6-2(実測: 走れメロス+吾輩は猫である 計約33万文字から抽出)</span>
+<pre>  933  主人
+  376  人
+  318  傍点          ← 注意! 青空文庫の注記(傍点の打ち方)がそのまま残ったノイズ
+  286  寒月
+  277  顔
+  275  人間
+  249  猫
+  233  先生
+  229  迷亭
+  213  細君
+  203  鼻
+  180  自分
+  168  頭
+  161  気
+  159  男</pre>
+</div>
+<p><b>実務の教訓</b>: 上位に「傍点」が入っています。これは元データ(青空文庫)のマークアップが残った<b>ノイズ</b>です。実務では、<b>データのクレンジング(除去・フィルタ・辞書運用)が分析の成否の半分</b>を決めます。「解析ツールが悪い」のではなく「前処理が足りない」ケースが大半です。</p>
+
+<h3>演習4: SentencePieceを学習して、LLMのトークナイザを体験する</h3>
+<p><b>目的</b>: LLMの内部で何が起きているかを、数百行の学習で体感する。</p>
+<pre>import sentencepiece as spm
+
+# 自前のコーパスでUnigramモデルを学習(語彙4000)
+spm.SentencePieceTrainer.train(input="corpus.txt", model_prefix="sp",
+                               vocab_size=4000, model_type="unigram")
+
+sp = spm.SentencePieceProcessor(model_file="sp.model")
+text = "私は大学でコンピューターを勉強しています。"
+print(sp.encode(text, out_type=str))   # トークン列
+print(len(sp.encode(text, out_type=str)))  # トークン数
+</pre>
+<div class="demo"><span class="label">実行例 6-3(実測: 青空文庫2作品で学習した場合)</span>
+<pre>['▁', '私は', '大', '学', 'で', 'コ', 'ン', 'ピ', 'ュ', 'ー', 'タ', 'ー',
+ 'を', '勉', '強', 'して', 'います', '。']
+→ 18トークン(形態素解析では12)
+</pre>
+</div>
+<p><b>ポイント</b>: <code>▁</code>は空白の代用記号です。コーパスに無い語(「コンピューター」)は1文字ずつに分解されます。「モデルがトークナイザに合わせて学習している」という視点が重要です。</p>
+
+<h3>演習5(チャレンジ): 「形態素解析→サブワード化」の二段構成を体験する</h3>
+<p><b>目的</b>: 日本語BERT系で使われた二段構成(第5章)の意味を理解する。</p>
+<pre>from janome.tokenizer import Tokenizer
+
+# ① 形態素解析で分かち書き(単語ごとの列を作る)
+t = Tokenizer()
+text = "私は大学でコンピューターを勉強しています。"
+words = [tok.surface for tok in t.tokenize(text)]
+print("形態素列:", words)
+
+# ② 各語をさらに細かく分割する(簡易サブワード化=先頭の2文字で切る)
+def subword(w):
+    return [w[:2], w[2:]] if len(w) > 2 else [w]
+
+tokens = [sw for w in words for sw in subword(w)]
+print("サブワード列:", tokens)
+</pre>
+<p>本物のBERTでは②にWordPieceやSentencePieceを使い、品詞タグ付け・固有表現抽出などのタスクで「語の境界を意識したトークン列」を利用します。二段構成の「系列長が伸びる」というコストとのトレードオフ(第5章)も、自分でトークン数を数えて確認してみましょう。</p>
+
+<div class="box tip"><b>この章のゴール確認</b><br>4つのライブラリ(Janome / SudachiPy / SentencePiece / 標準ライブラリの組み合わせ)を一度動かせたら、あなたはもう「日本語テキストの前処理」を0から組める状態です。現場ではこの4つ+クリーニングで、かなりの分析タスクが始められます。</div>
+
+<h2 id="c7">第7章 練習問題と解答</h2>
+
+<h3>基礎問題</h3>
+<p><b>Q1.</b> 形態素解析によって得られる情報を、具体例とともに3つ挙げなさい。</p>
+<p><b>Q2.</b> 英語にはスペース区切りがあるのに、日本語で形態素解析が(ほぼ)必須な理由を説明しなさい。</p>
+<p><b>Q3.</b> ChaSen(HMM)とMeCab(CRF)の違いを、機械学習の観点で1文で説明しなさい。</p>
+<p><b>Q4.</b> 形態素解析とサブワード分割の違いを、「辞書」「品詞」「未知語」「言語依存量」の4点で表にしなさい。</p>
+<p><b>Q5.</b> 近年のLLMが日本語を形態素解析せずサブワード分割する理由を2つ挙げなさい。</p>
+
+<details><summary>解答</summary>
+<p><b>A1.</b> ① 分割(どこで語が区切れるか。例:「勉強しています」→「勉強/し/て/い/ます」)② 品詞(例:「は」は助詞)③ 読み・原形(例:「スモモ」の読み、辞書形の推定)。</p>
+<p><b>A2.</b> 日本語には分かち書き(語の間の空白)がなく、文字列だけでは「どこからどこまでが1語か」が機械に自明でないため。「東京都」が「東京+都」か1語かといった曖昧性も、文法的な接続の自然さで判定する必要がある。</p>
+<p><b>A3.</b> HMMは「単語列と品詞列が共起する確率」を最大化する生成モデル、CRFは「文が与えられたときの品詞列の条件付き確率」を文脈素性付きで直接学習する識別モデルであり、CRFの方が素性を柔軟に使えて精度が高い。</p>
+<p><b>A4.</b> 辞書: 必要(形態素解析)/不要・統計から構築(サブワード)。品詞: 得られる/得られない。未知語: 辞書登録が要る/自動で細かく分解。言語依存量: 高い(言語ごとに辞書)/低い(同一手順が全言語で動く)。</p>
+<p><b>A5.</b> ① 辞書・言語知識が不要で、言語非依存のパイプラインを全言語で共用できる(データ効率・運用コストの面で有利)② 頻度ベースで未知語を必ず表現でき、語彙サイズを固定して系列長と計算コストを制御できる。加えてトークナイザを事前学習の一部として設計・最適化できる。</p>
+</details>
+
+<h3>応用問題</h3>
+<p><b>Q6.</b> 社内文書検索で「エージェント基盤」という社内用語が正しく1語としてヒットしない。対処法を2つ提案しなさい。</p>
+<p><b>Q7.</b> アンケート20,000件の自由記述から名詞頻度を出したところ、「円」「様」「ご」のような不自然な語が上位に来た。原因と対策を述べなさい。</p>
+
+<details><summary>解答</summary>
+<p><b>A6.</b> ① 形態素解析器のユーザ辞書(システム辞書)に「エージェント基盤」を登録し、分割を固定する ② 検索エンジンのアナライザも含め、新語に強いSudachi辞書へ切り替える(もしくはNEologd由来の辞書と比較する)。分析対象の検索が「完全一致のキーワード検索」であれば、ベクトル検索とのハイブリッド化も検討する。</p>
+<p><b>A7.</b> 原因: 敬語・依頼文(「〜してください」「ご検討のほど」)の語が名詞扱いされている、カタカナ語・助詞相当の残り、「様」(宛名)を含む住所データの混入など、データの性質と品詞フィルタの甘さ。対策: ①品詞フィルタを「名詞,一般/固有名詞」に絞る ②除外語リスト(ストップワード)で「円」「様」「ご」等を除く ③テキストの正規化(全角半角、記号、改行)とマークアップ除去を前処理に追加する。</p>
+</details>
+
+<h2 id="cA">付録A ツール・辞書早見表</h2>
+<table>
+<thead><tr><th>使いたい場面</th><th>第一候補</th><th>備考</th></tr></thead>
+<tbody>
+<tr><td>とにかく簡単に試す</td><td>Janome</td><td>pip install janome だけ</td></tr>
+<tr><td>バッチ解析・研究</td><td>MeCab(+IPA / UniDic)</td><td>fugashi 経由がメンテナンス良好</td></tr>
+<tr><td>プロダクション・検索</td><td>Sudachi(rs) / Kuromoji</td><td>辞書更新が続くSudachi辞書を推奨</td></tr>
+<tr><td>固有表現・係り受けまで</td><td>GiNZA</td><td>spaCyベースの統合パイプライン</td></tr>
+<tr><td>LLMのトークナイザを自作</td><td>SentencePiece</td><td>BPE / Unigramを選べる</td></tr>
+<tr><td>HuggingFaceモデルの日本語トークナイザ</td><td>transformers の BertJapaneseTokenizer</td><td>mecab / jumanpp / sudachi に対応</td></tr>
+</tbody>
+</table>
+
+<h2 id="cB">付録B 用語集</h2>
+<table>
+<thead><tr><th>用語</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td>形態素 (morpheme)</td><td>意味を持つ最小の言語単位。「勉強しています」は「勉強/し/て/い/ます」</td></tr>
+<tr><td>分かち書き</td><td>語の間に空白を入れて単語列にすること。日本語は通常しない</td></tr>
+<tr><td>ラティス</td><td>辞書引きで列挙された分割候補の網目状グラフ</td></tr>
+<tr><td>生起コスト / 連接コスト</td><td>「その語の出やすさ」/「隣り合う語のつながりやすさ」のコスト値</td></tr>
+<tr><td>ビタビアルゴリズム</td><td>コスト最小の分割経路を効率的に探す動的計画法</td></tr>
+<tr><td>HMM / CRF</td><td>品詞タグ付けに使われた統計モデル(生成/識別)</td></tr>
+<tr><td>OOV (未知語)</td><td>辞書や語彙に無い語。out-of-vocabulary</td></tr>
+<tr><td>トークナイザ / トークン</td><td>文を分割する器 / 分割された単位(サブワード含む)</td></tr>
+<tr><td>BPE</td><td>頻度ベースで文字ペアをマージするサブワード分割(GPT系)</td></tr>
+<tr><td>WordPiece</td><td>尤度ベースのサブワード分割(BERT系)</td></tr>
+<tr><td>Unigram / SentencePiece</td><td>確率ベースのサブワード分割。SentencePieceは学習・分割ソフトウェア</td></tr>
+<tr><td>二段構成</td><td>形態素解析→サブワード化の順に分割する、日本語BERT系の方式</td></tr>
+<tr><td>ハイブリッド検索</td><td>ベクトル検索(意味)とキーワード検索(完全一致)を組み合わせるRAGの検索方式</td></tr>
+<tr><td>BM25</td><td>キーワード検索の代表的なランキング関数</td></tr>
+</tbody>
+</table>
+
+<h2 id="cC">付録C 参考文献・リンク</h2>
+<ul>
+<li>MeCab公式(<a href="https://taku910.github.io/mecab/">taku910.github.io/mecab</a>) — 作者サイト。CRF採用・L-BFGS学習・2006年初版などの一次情報</li>
+<li>MeCabフォーク版ドキュメント(<a href="https://shogo82148.github.io/mecab/">shogo82148.github.io/mecab</a>) — リリース履歴・バージョン管理の現状(2025年12月時点で0.996.13)</li>
+<li>Sennrich et al., "Neural Machine Translation of Rare Words with Subword Units" (2016) — BPE原論文(arXiv:1508.07909)</li>
+<li>Kudo &amp; Richardson, "SentencePiece: A simple and language independent subword tokenizer" (2018) — SentencePiece原論文(arXiv:1808.06226)</li>
+<li>Devlin et al., "BERT: Pre-training of Deep Bidirectional Transformers..." (2018) (arXiv:1810.04805)</li>
+<li>Mikolov et al., "Efficient Estimation of Word Representations in Vector Space" (2013) — word2vec原論文(arXiv:1310.4546)</li>
+<li>Schuster &amp; Nakajima, "Japanese and Korean voice search" (ICASSP 2012) — WordPieceの提案</li>
+<li>SB Intuitions技術ブログ「日本語ModernBERTの開発: トークナイザと性能の関係編」(<a href="https://www.sbintuitions.co.jp/blog/entry/2025/05/26/115839">2025年5月26日</a>) — 日本語モデルのトークナイザ比較表・事後的な形態素解析器の追加実験</li>
+<li>SB Intuitions 日本語ModernBERTモデルカード(<a href="https://huggingface.co/sbintuitions/modernbert-ja-130m">huggingface.co/sbintuitions/modernbert-ja-130m</a>)</li>
+<li>東北大BERT v3(<a href="https://huggingface.co/tohoku-nlp/bert-base-japanese-v3">tohoku-nlp/bert-base-japanese-v3</a>) — MeCab+UniDic+WordPieceの二段構成の代表例</li>
+<li>AI総研「形態素解析とは?」(<a href="https://www.ai-souken.com/article/what-is-morphological-analysis">2026年7月更新</a>) — 2026年時点の実務での使われ方・辞書比較・RAGハイブリッド検索の位置づけ</li>
+<li>LLM-jp Tokenizer(<a href="https://github.com/llm-jp/llm-jp-tokenizer">github.com/llm-jp/llm-jp-tokenizer</a>) — 日本語LLM向けトークナイザ研究</li>
+<li>Elastic Portal「Kuromoji・Sudachi・MeCab・Janome・LLMの性能検証」(<a href="https://elastic.sios.jp/blog/comparison-of-japanese-language-analyzers-performance-verification-of-kuromoji-sudachi-mecab-and-llm/">2026年7月</a>) — 検索アナライザの実務比較</li>
+<li>Janome(<a href="https://mocobeta.github.io/janome/">mocobeta.github.io/janome</a>)、SudachiPy(<a href="https://github.com/WorksApplications/SudachiPy">github.com/WorksApplications/SudachiPy</a>)、SentencePiece(<a href="https://github.com/google/sentencepiece">github.com/google/sentencepiece</a>)</li>
+</ul>
+
+<div class="foot">
+本教材は学習目的で作成したものです。実行例はすべて執筆環境(Python 3.12、2026年9月)での実測出力です。出典は付録Cを参照ください。コーパスは青空文庫(著作権フリー)の「走れメロス」(太宰治)および「吾輩は猫である」(夏目漱石)を使用しました。
+</div>
+
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>

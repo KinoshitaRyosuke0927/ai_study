@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>データサイエンス基礎ドリル</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button class="toc-toggle" id="tocToggle" type="button" aria-expanded="false" aria-controls="sidebar">目次</button>
+  <a class="brand" href="#/" aria-label="トップへ">
+    <span class="brand-ja">データサイエンス</span>
+    <span class="brand-drill">基礎ドリル</span>
+  </a>
+  <div class="course-progress" title="全ドリルの達成状況">
+    <span id="headerRuntime" class="runtime-badge" title="コードの実行環境">起動中…</span>
+    <span class="course-progress-label" id="courseProgressLabel">0 / 0 問</span>
+    <div class="bar"><div class="bar-fill" id="courseProgressFill" style="width:0%"></div></div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="講座の目次">
+    <nav class="sidebar-inner" id="lessonNav"></nav>
+  </aside>
+
+  <main class="main" id="main" tabindex="-1"></main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
