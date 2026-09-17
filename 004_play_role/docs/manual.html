@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>プレゼン練習AIレビューアプリ 操作マニュアル</title>
+<style>
+  :root {
+    --main-color: #4a90e2;
+    --bg-color: #f5f7fb;
+    --text-color: #2c3244;
+    --border-color: #e0e4ec;
+    --accent-bg: #eef4fd;
+    --shot-bg: #fafbfd;
+    --code-bg: #eef1f6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    background: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    line-height: 1.75;
+  }
+  /* 画面幅の左右5%を余白として確保し、残り90%を本文領域とする */
+  .page {
+    padding: 0 5%;
+  }
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 32px;
+  }
+  nav.toc {
+    flex: 0 0 220px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    background: #fff;
+    border-right: 1px solid var(--border-color);
+    padding: 24px 16px;
+  }
+  nav.toc h2 {
+    font-size: 14px;
+    color: #888;
+    margin: 0 0 12px;
+    letter-spacing: 0.05em;
+  }
+  nav.toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  nav.toc li { margin-bottom: 4px; }
+  nav.toc a {
+    display: block;
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: var(--text-color);
+    text-decoration: none;
+    font-size: 13.5px;
+  }
+  nav.toc a:hover { background: var(--accent-bg); color: var(--main-color); }
+  nav.toc ul { list-style: none; margin: 0; padding-left: 12px; }
+  nav.toc ul a { font-size: 12.5px; color: #666; padding: 3px 10px; }
+
+  main {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 32px 0 80px;
+  }
+  header.page-header {
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 3px solid var(--main-color);
+  }
+  header.page-header h1 {
+    font-size: 26px;
+    margin: 0 0 8px;
+  }
+  header.page-header p {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+  }
+  section {
+    margin-bottom: 44px;
+    scroll-margin-top: 16px;
+  }
+  h2 {
+    font-size: 20px;
+    border-left: 6px solid var(--main-color);
+    padding-left: 12px;
+    margin: 0 0 16px;
+  }
+  h3 {
+    font-size: 16px;
+    margin: 28px 0 10px;
+    color: var(--main-color);
+  }
+  p { margin: 0 0 12px; }
+  ul, ol { padding-left: 22px; margin: 0 0 12px; }
+  li { margin-bottom: 6px; }
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: Consolas, "SF Mono", monospace;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 16px;
+    font-size: 13.5px;
+  }
+  th, td {
+    border: 1px solid var(--border-color);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--accent-bg); }
+
+  .note, .warn {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 0 0 16px;
+    font-size: 13.5px;
+  }
+  .note { background: var(--accent-bg); border-left: 4px solid var(--main-color); }
+  .warn { background: #fff4e5; border-left: 4px solid #e2a04a; }
+
+  .shot {
+    border: 2px dashed #b9c3d6;
+    background: var(--shot-bg);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 14px 0 20px;
+  }
+  .shot .shot-label {
+    display: inline-block;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--main-color);
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+  .shot .shot-caption {
+    font-size: 13.5px;
+    color: #444;
+  }
+  .shot .shot-caption strong { color: var(--text-color); }
+  .shot .shot-frame {
+    margin-top: 10px;
+    max-width: 100%;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .shot .shot-frame img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+  }
+  .shot .shot-placeholder {
+    display: none;
+    background: repeating-linear-gradient(45deg, #eef1f6, #eef1f6 10px, #f7f8fb 10px, #f7f8fb 20px);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    min-height: 60px;
+    align-items: center;
+    justify-content: center;
+    color: #9aa4ba;
+    font-size: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  .role-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    margin: 0 0 16px;
+  }
+  .role-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: #fff;
+    font-size: 13px;
+  }
+  .role-card b { display: block; font-size: 13.5px; }
+  .role-card span { color: #777; font-size: 12px; }
+
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    padding-left: 0;
+  }
+  .steps > li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 40px;
+    margin-bottom: 18px;
+  }
+  .steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--main-color);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  footer {
+    padding: 20px 0 60px;
+    border-top: 1px solid var(--border-color);
+    color: #999;
+    font-size: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    nav.toc { position: static; height: auto; width: 100%; border-right: none; border-bottom: 1px solid var(--border-color); }
+    main { padding: 24px 0 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+<div class="layout">
+  <nav class="toc">
+    <h2>目次</h2>
+    <ol>
+      <li><a href="#overview">1. このアプリについて</a></li>
+      <li><a href="#access">2. アプリへのアクセス方法</a></li>
+      <li><a href="#screen">3. 画面構成</a></li>
+      <li>
+        <a href="#tab-record">4. 文字起こし機能</a>
+        <ul>
+          <li><a href="#tab-record-1">4-1. マイク録音</a></li>
+          <li><a href="#tab-record-2">4-2. 音声ファイル</a></li>
+          <li><a href="#tab-record-3">4-3. 動画解析</a></li>
+        </ul>
+      </li>
+      <li><a href="#reviewer-add">5. AIレビュアーの追加</a></li>
+      <li><a href="#reviewer-review">6. AIレビューを受ける</a></li>
+      <li><a href="#reviewer-manage">7. レビュアーの管理（名前変更・削除）</a></li>
+      <li><a href="#memory">8. レビュアーの記憶（プロファイル）機能</a></li>
+      <li><a href="#roles">9. 役割（キャラクター）一覧</a></li>
+      <li><a href="#faq">10. よくあるトラブル</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="page-header">
+      <h1>プレゼン練習AIレビューアプリ 操作マニュアル</h1>
+      <p>録音・録画したプレゼン内容を文字起こしし、役割になりきったAIレビュアーからフィードバックを受けられる社内向けアプリケーションです。</p>
+    </header>
+
+    <section id="overview">
+      <h2>1. このアプリについて</h2>
+      <p>
+        このアプリは、発表（プレゼンテーション）練習を支援するツールです。ブラウザでの録音・音声ファイル・動画ファイルのいずれかから発表内容を文字起こしし、
+        「大学教授」「上司」「初学者」など様々な役割になりきったAIレビュアーに発表内容を読ませて、フィードバックコメントをもらうことができます。
+      </p>
+      <ul>
+        <li>音声・動画から発表内容を自動で文字起こしし、読みやすい文章に整えて表示</li>
+        <li>役割（ペルソナ）ごとにAIレビュアーを複数人追加し、それぞれの視点でコメントをもらえる</li>
+        <li>レビュアーごとに過去のフィードバック傾向を記憶し、次回以降のコメントに反映（成長の記録）</li>
+        <li>動画をアップロードすると、スライド切り替わりを自動検出し、スライドごとの発話内容を確認できる</li>
+      </ul>
+    </section>
+
+    <section id="access">
+      <h2>2. アプリへのアクセス方法</h2>
+      <ol class="steps">
+        <li>
+          社内ネットワーク（またはVPN接続）の状態で、ブラウザから本アプリのURLにアクセスします。
+        </li>
+        <li>
+          ページが表示されたら、そのまま利用を開始できます。
+        </li>
+      </ol>
+      <div class="note">
+        録音機能を使う場合、ブラウザからマイクの使用許可を求められることがあります。「許可」を選択してください（詳しくは <a href="#tab-record-1">4-1. マイク録音</a> を参照）。
+      </div>
+      <div class="note">
+        アクセス後、最初の文字起こし・動画解析はサーバー側の初期化処理により通常より時間がかかる場合があります。2回目以降は短縮されます。
+      </div>
+    </section>
+
+    <section id="screen">
+      <h2>3. 画面構成</h2>
+      <p>画面は左右2カラムのレイアウトです。</p>
+      <ul>
+        <li><b>左パネル</b>：録音・音声アップロード・動画解析のタブ、文字起こし結果の編集エリア、レビュアー追加／記憶リセットボタン</li>
+        <li><b>右パネル</b>：追加したAIレビュアーのカードが並び、各レビュアーごとにコメント取得・記憶確認ができる</li>
+      </ul>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/01_top_screen.png" alt="アプリ全体画面" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/01_top_screen.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+    </section>
+
+    <section id="tab-record">
+      <h2>4. 文字起こし機能</h2>
+      <p>左パネル上部の3つのタブで、発表内容の入力方法を切り替えられます。</p>
+
+      <h3 id="tab-record-1">4-1. マイク録音で文字起こしする</h3>
+      <ol class="steps">
+        <li>「Whisper 文字起こし」タブを選択します。</li>
+        <li><code>録音開始</code> ボタンを押すと、ブラウザがマイクの使用許可を求めるので許可します。</li>
+        <li>発表内容を話します。</li>
+        <li><code>録音終了</code> ボタンを押すと録音が停止し、録音した音声を再生して確認できます。</li>
+        <li><code>文字起こし開始</code> ボタンを押すと、文字起こし＋文章の整形が行われ、下部の「文字起こし結果」欄にテキストが表示されます。</li>
+      </ol>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/02_recording_start.png" alt="録音タブ（録音中の状態）" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/02_recording_start.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/03_transcription_result.png" alt="文字起こし結果表示" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/03_transcription_result.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+      <div class="note">
+        「文字起こし結果」欄は直接編集できます。文字起こし結果を手直ししたり、テキストを直接貼り付けてレビューに使うことも可能です。
+      </div>
+
+      <h3 id="tab-record-2">4-2. 音声ファイルをアップロードして文字起こしする</h3>
+      <ol class="steps">
+        <li>「音声レビュー」タブを選択します。</li>
+        <li><code>ファイルを選択</code> から音声ファイル（例: 事前に録音したものやスマホの録音データ）を選びます。選択すると自動でプレビュー再生できます。</li>
+        <li><code>文字起こし開始</code> ボタンを押すと、マイク録音時と同様に文字起こし結果が表示されます。</li>
+      </ol>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/04_audio_tab.png" alt="音声レビュータブ" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/04_audio_tab.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+
+      <h3 id="tab-record-3">4-3. 動画をアップロードしてスライド解析する</h3>
+      <p>
+        動画（<code>mp4</code> / <code>webm</code> / <code>mov</code>）をアップロードすると、音声の文字起こしに加えて、スライドの切り替わりを自動検出し、
+        「どのスライドで何を話していたか」を一覧で確認できます。
+      </p>
+      <ol class="steps">
+        <li>「動画レビュー」タブを選択します。</li>
+        <li><code>動画を選択</code> から発表動画ファイルを選びます。選択すると動画プレビューが表示されます。</li>
+        <li><code>解析開始</code> ボタンを押します。動画の長さによっては解析に数分かかる場合があります（状態欄にその旨のメッセージが表示されます）。</li>
+        <li>
+          解析完了後、以下が表示されます。
+          <ul>
+            <li>下部の「文字起こし結果」欄に発表全文（整形済み）</li>
+            <li>「スライド解析結果」に、検出されたスライドごとのサムネイル画像・表示時間・そのスライド区間で話した内容</li>
+          </ul>
+        </li>
+      </ol>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/05_video_tab_uploading.png" alt="動画レビュータブ（解析中）" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/05_video_tab_uploading.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/06_slide_analysis_result.png" alt="スライド解析結果一覧" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/06_slide_analysis_result.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+    </section>
+
+    <section id="reviewer-add">
+      <h2>5. AIレビュアーの追加</h2>
+      <p>文字起こし結果が用意できたら、AIレビュアーを追加してフィードバックをもらいます。</p>
+      <ol class="steps">
+        <li>左パネル下部の <code>＋ レビュアーを追加</code> ボタンを押すと、モーダルウィンドウが開きます。</li>
+        <li>「名前」欄にレビュアーの名前（任意の呼び名、例: 田中先生）を入力します。</li>
+        <li>「役割」プルダウンから、レビュアーに演じさせたい役割（大学教授・上司・初学者など）を選択します。役割の一覧は <a href="#roles">9. 役割（キャラクター）一覧</a> を参照してください。</li>
+        <li><code>追加</code> ボタンを押すと、右パネルにそのレビュアーのカードが追加されます。</li>
+      </ol>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/07_add_reviewer_modal.png" alt="レビュアー追加モーダル" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/07_add_reviewer_modal.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/08_reviewer_panel_list.png" alt="レビュアー追加後の右パネル" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/08_reviewer_panel_list.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+    </section>
+
+    <section id="reviewer-review">
+      <h2>6. AIレビューを受ける</h2>
+      <ol class="steps">
+        <li>「文字起こし結果」欄に発表テキストが入っていることを確認します（空の場合はレビューできません）。</li>
+        <li>右パネルの各レビュアーカードにある <code>コメントをもらう</code> ボタンを押します。</li>
+        <li>
+          生成中は「コメント生成中...」と表示され、完了すると以下の内容がカード内に表示されます。
+          <ul>
+            <li><b>総評</b></li>
+            <li><b>良かった点</b> / <b>改善点</b>（それぞれ箇条書き）</li>
+            <li><b>特に気になった点</b>（その役割ならではの視点）</li>
+            <li><b>質問</b> / <b>次のアクション</b>（それぞれ箇条書き）</li>
+          </ul>
+        </li>
+      </ol>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/09_comment_generating.png" alt="コメント生成中の状態" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/09_comment_generating.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/10_comment_result.png" alt="コメント表示結果" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/10_comment_result.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+      <div class="note">
+        レビュアーは複数人同時に登録でき、それぞれ独立してコメントを取得できます。同じ発表内容に対して複数の視点からフィードバックを集めることで、多角的に発表を見直せます。
+      </div>
+    </section>
+
+    <section id="reviewer-manage">
+      <h2>7. レビュアーの管理（名前変更・削除）</h2>
+      <ul>
+        <li><b>名前変更</b>：レビュアーカードの名前部分、または横の✏️アイコンをクリックすると入力欄に切り替わります。名前を編集して <code>Enter</code>（またはフォーカスを外す）と保存されます。</li>
+        <li><b>削除</b>：カード内の <code>削除</code> ボタンを押すと、そのレビュアーとそれに紐づく記憶（プロファイル・フィードバック履歴）が削除されます。</li>
+      </ul>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/11_rename_reviewer.png" alt="名前編集中の状態" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/11_rename_reviewer.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+    </section>
+
+    <section id="memory">
+      <h2>8. レビュアーの記憶（プロファイル）機能</h2>
+      <p>
+        各レビュアーは、コメントを生成するたびに過去のフィードバック傾向を記憶し、次回のコメント生成時にその記憶を踏まえた発言をします。
+        レビューを重ねるほど「同じ指摘を繰り返していないか」「前回から改善された点」などが蓄積されていきます。
+      </p>
+      <ol class="steps">
+        <li>レビュアーが一度でもコメントを生成すると、カード下部に「この人の記憶」という折りたたみセクションが表示されるようになります。</li>
+        <li>クリックして展開すると、以下の情報が確認できます。
+          <ul>
+            <li>記憶の要約（サマリー文）</li>
+            <li>繰り返し指摘してきた点</li>
+            <li>前回から改善された点</li>
+            <li>気になっている弱み</li>
+            <li>よく褒める点</li>
+            <li>前回のアドバイス</li>
+          </ul>
+        </li>
+        <li>
+          左パネル下部の <code>記憶をリセット</code> ボタンを押すと、確認ダイアログの後、<b>全レビュアーの記憶（フィードバック履歴）</b>がリセットされます。レビュアー自体（名前・役割）は削除されません。
+        </li>
+      </ol>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/12_reviewer_memory.png" alt="「この人の記憶」展開表示" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/12_reviewer_memory.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+      <div class="shot">
+        <div class="shot-frame">
+          <img src="images/13_reset_memory_dialog.png" alt="記憶リセットの確認ダイアログ" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="shot-placeholder">images/13_reset_memory_dialog.png が見つかりません</div>
+        </div>
+        <p class="shot-caption">
+        </p>
+      </div>
+    </section>
+
+    <section id="roles">
+      <h2>9. 役割（キャラクター）一覧</h2>
+      <p>レビュアー追加時に選べる役割は以下の12種類です。実務寄りの役割と、個性的なキャラクター役割があります。</p>
+      <div class="role-grid">
+        <div class="role-card"><b>大学教授</b><span>論理性・根拠・定義の厳密さを重視</span></div>
+        <div class="role-card"><b>同僚</b><span>実務での伝わりやすさを重視</span></div>
+        <div class="role-card"><b>初学者</b><span>専門知識がなくても理解できるかを重視</span></div>
+        <div class="role-card"><b>上司</b><span>結論の明確さ・判断材料の十分さを重視</span></div>
+        <div class="role-card"><b>開発者</b><span>実装品質・保守性・レビュー観点で評価</span></div>
+        <div class="role-card"><b>PM</b><span>要件の妥当性・進行上のリスクを重視</span></div>
+        <div class="role-card"><b>PO</b><span>プロダクト価値・優先順位の妥当性を重視</span></div>
+        <div class="role-card"><b>友人</b><span>面白さ・熱量など率直な感想を重視</span></div>
+        <div class="role-card"><b><a href="https://hololive.hololivepro.com/talents/sakuramiko/" >さくらみこ</a></b><span>個性的な口調でストレートな感想を伝えるキャラクター</span></div>
+        <div class="role-card"><b><a href="https://hololive.hololivepro.com/talents/usada-pekora/" >兎田ぺこら</a></b><span>元気でユーモラスな口調のキャラクター</span></div>
+        <div class="role-card"><b><a href="https://hololive.hololivepro.com/talents/oozora-subaru/" >大空スバル</a></b><span>感情豊かでテンポの良いツッコミ口調のキャラクター</span></div>
+        <div class="role-card"><b><a href="https://hololive.hololivepro.com/talents/azki/" >AZKi</a></b><span>音楽的な比喩を交えた穏やかな口調のキャラクター</span></div>
+      </div>
+      <div class="note">
+        キャラクター役割（さくらみこ・兎田ぺこら・大空スバル・AZKi）は口調こそ個性的ですが、評価内容自体は建設的なフィードバックになるよう設計されています。堅い評価に疲れたときの気分転換や、楽しみながら練習を続けたいときにおすすめです。
+      </div>
+    </section>
+
+    <section id="faq">
+      <h2>10. よくあるトラブル</h2>
+      <table>
+        <thead>
+          <tr><th>症状</th><th>対処方法</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>録音開始ボタンを押しても録音が始まらない</td>
+            <td>ブラウザのマイク使用許可がブロックされていないか確認してください。ブラウザのアドレスバー付近のアイコンからサイトの権限設定を見直せます。</td>
+          </tr>
+          <tr>
+            <td>文字起こし・動画解析に時間がかかる</td>
+            <td>利用開始直後や、長い動画・音声を扱う場合は処理に数分かかることがあります。状態欄のメッセージが変わるまでそのままお待ちください。</td>
+          </tr>
+          <tr>
+            <td>「コメントをもらう」を押しても反応がない／エラーになる</td>
+            <td>「文字起こし結果」欄が空でないか確認してください。空の場合はエラーメッセージが表示されます。</td>
+          </tr>
+          <tr>
+            <td>動画解析で対応形式エラーが出る</td>
+            <td>対応形式は <code>mp4</code> / <code>webm</code> / <code>mov</code> のみです。別形式の場合は変換してからアップロードしてください。</td>
+          </tr>
+          <tr>
+            <td>上記以外のエラーが繰り返し発生する</td>
+            <td>時間をおいて再度お試しいただくか、解消しない場合はMattermostにて @r-kinoshita までお問い合わせください。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</div>
+</div>
+
+<div class="page">
+  <footer>
+    プレゼン練習AIレビューアプリ 操作マニュアル
+  </footer>
+</div>
+</body>
+</html>

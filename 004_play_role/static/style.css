@@ -317,11 +317,32 @@ textarea {
 
 /* AIレビューセクション */
 .reviewer-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 16px;
 }
 
 .reviewer-section-header h2 {
   margin: 0;
+}
+
+.manual-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #eef4fd;
+  color: #4a90e2;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.manual-link:hover {
+  background: #4a90e2;
+  color: #fff;
 }
 
 /* レビュアーパネルを横並びに */

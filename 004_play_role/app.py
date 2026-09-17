@@ -84,6 +84,7 @@ def get_model() -> whisper.Whisper:
 app = FastAPI(title="Whisper Minimal App")  # FastAPI アプリケーションのインスタンスを作成
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 app.mount("/outputs", StaticFiles(directory=str(OUTPUTS_DIR)), name="outputs")  # サムネイル配信
+app.mount("/docs", StaticFiles(directory=str(BASE_DIR / "docs")), name="docs")  # 操作マニュアル配信
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))  # テンプレートファイルの検索先ディレクトリを設定
 
 

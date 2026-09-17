@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.git/
+.gitignore
+.env
+.env.*
+uploads/*
+outputs/*
+report.md
+speech_to_text_comparison.md
+README.md
