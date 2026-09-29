@@ -1,0 +1,44 @@
+{
+  "slug": "statistics-basics",
+  "title": "統計の基礎",
+  "summary": "データ分析の出発点となる記述統計を、pandas で手を動かしながら学びます。データの種類から代表値、散らばり、相関までを扱い、実データを要約して読み解けるようになることを目指します。",
+  "level": "basic",
+  "tags": [
+    "統計",
+    "pandas"
+  ],
+  "outcomes": [
+    "データの種類に応じた集計方法を選べる",
+    "代表値と散らばりでデータを要約できる",
+    "相関を計算し、正しく解釈できる"
+  ],
+  "libraries": [
+    "pandas",
+    "numpy",
+    "matplotlib"
+  ],
+  "prerequisites": [],
+  "status": "published",
+  "units": [
+    {
+      "file": "01_data_types.ipynb",
+      "minutes": 20
+    },
+    {
+      "file": "02_frequency.ipynb",
+      "minutes": 25
+    },
+    {
+      "file": "03_central_tendency.ipynb",
+      "minutes": 20
+    },
+    {
+      "file": "04_dispersion.ipynb",
+      "minutes": 25
+    },
+    {
+      "file": "05_correlation.ipynb",
+      "minutes": 25
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+# Web / ASGI
+fastapi==0.142.0
+uvicorn[standard]==0.54.0
+itsdangerous==2.2.0
+
+# DB (MySQL 8: cryptography is required for caching_sha2_password)
+SQLAlchemy==2.1.1
+PyMySQL==1.2.3
+cryptography==50.0.1
+alembic==1.20.0
+
+# Settings
+pydantic==2.13.5
+pydantic-settings==2.15.0
+
+# Notebook import
+nbformat==5.11.1
+
+# Tests
+pytest==9.1.1
+httpx==0.28.1
