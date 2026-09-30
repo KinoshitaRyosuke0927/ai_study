@@ -1,0 +1,194 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "AI学習ポータル(016_ai_learning_portal):Log Analytics・Container Apps 環境・Container App・DB 自動停止ジョブ。手順は docs/azure_deploy.md を参照。"
+  },
+  "parameters": {
+    "location": { "type": "string", "defaultValue": "japaneast" },
+    "logAnalyticsName": { "type": "string", "defaultValue": "log-ai-learning-portal" },
+    "environmentName": { "type": "string", "defaultValue": "cae-ai-learning-portal" },
+    "containerAppName": { "type": "string", "defaultValue": "ca-ai-learning-portal" },
+    "idleStopJobName": { "type": "string", "defaultValue": "caj-ai-learning-portal-db-stop" },
+    "acrLoginServer": { "type": "string" },
+    "acrUsername": { "type": "string" },
+    "acrPassword": { "type": "securestring" },
+    "imageName": { "type": "string" },
+    "appSecretKey": { "type": "securestring" },
+    "mysqlServerName": { "type": "string", "defaultValue": "mysql-ai-learning-portal" },
+    "mysqlUser": { "type": "string", "defaultValue": "ai_learning_portal" },
+    "mysqlPassword": { "type": "securestring" },
+    "mysqlDatabase": { "type": "string", "defaultValue": "ai_learning_portal" },
+    "azureOpenAiEndpoint": { "type": "string" },
+    "azureOpenAiKey": { "type": "securestring" },
+    "aiModelOutline": { "type": "string", "defaultValue": "gpt-5.4-mini" },
+    "aiModelDraft": { "type": "string", "defaultValue": "gpt-5.4" },
+    "dbIdleStopMinutes": { "type": "int", "defaultValue": 60 },
+    "idleStopCron": {
+      "type": "string",
+      "defaultValue": "*/15 * * * *",
+      "metadata": { "description": "DB 自動停止ジョブの実行間隔(cron、UTC)" }
+    },
+    "allowedIpRanges": {
+      "type": "array",
+      "defaultValue": [
+        { "name": "office", "ipAddressRange": "221.117.124.90/32", "action": "Allow" },
+        { "name": "vpn", "ipAddressRange": "122.220.62.58/32", "action": "Allow" }
+      ]
+    }
+  },
+  "variables": {
+    "mysqlHost": "[concat(parameters('mysqlServerName'), '.mysql.database.azure.com')]",
+    "secrets": [
+      { "name": "acr-password", "value": "[parameters('acrPassword')]" },
+      { "name": "app-secret-key", "value": "[parameters('appSecretKey')]" },
+      { "name": "mysql-password", "value": "[parameters('mysqlPassword')]" },
+      { "name": "azure-openai-key", "value": "[parameters('azureOpenAiKey')]" }
+    ],
+    "registries": [
+      {
+        "server": "[parameters('acrLoginServer')]",
+        "username": "[parameters('acrUsername')]",
+        "passwordSecretRef": "acr-password"
+      }
+    ],
+    "env": [
+      { "name": "APP_ENV", "value": "azure" },
+      { "name": "APP_SECRET_KEY", "secretRef": "app-secret-key" },
+      { "name": "MYSQL_HOST", "value": "[variables('mysqlHost')]" },
+      { "name": "MYSQL_PORT", "value": "3306" },
+      { "name": "MYSQL_USER", "value": "[parameters('mysqlUser')]" },
+      { "name": "MYSQL_PASSWORD", "secretRef": "mysql-password" },
+      { "name": "MYSQL_DATABASE", "value": "[parameters('mysqlDatabase')]" },
+      { "name": "MYSQL_SSL_CA", "value": "/etc/ssl/certs/ca-certificates.crt" },
+      { "name": "AZURE_OPENAI_ENDPOINT", "value": "[parameters('azureOpenAiEndpoint')]" },
+      { "name": "AZURE_OPENAI_KEY", "secretRef": "azure-openai-key" },
+      { "name": "AI_MODEL_OUTLINE", "value": "[parameters('aiModelOutline')]" },
+      { "name": "AI_MODEL_DRAFT", "value": "[parameters('aiModelDraft')]" },
+      { "name": "DB_AUTOSTART_ENABLED", "value": "true" },
+      { "name": "AZURE_SUBSCRIPTION_ID", "value": "[subscription().subscriptionId]" },
+      { "name": "AZURE_RESOURCE_GROUP", "value": "[resourceGroup().name]" },
+      { "name": "MYSQL_SERVER_NAME", "value": "[parameters('mysqlServerName')]" },
+      { "name": "DB_IDLE_STOP_MINUTES", "value": "[string(parameters('dbIdleStopMinutes'))]" }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[parameters('logAnalyticsName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": { "name": "PerGB2018" },
+        "retentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('environmentName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": ["[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName'))]"],
+      "properties": {
+        "appLogsConfiguration": {
+          "destination": "log-analytics",
+          "logAnalyticsConfiguration": {
+            "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName')), '2022-10-01').customerId]",
+            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName')), '2022-10-01').primarySharedKey]"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('containerAppName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": ["[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]"],
+      "identity": { "type": "SystemAssigned" },
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
+        "configuration": {
+          "activeRevisionsMode": "Single",
+          "ingress": {
+            "external": true,
+            "targetPort": 8000,
+            "transport": "auto",
+            "allowInsecure": false,
+            "ipSecurityRestrictions": "[parameters('allowedIpRanges')]"
+          },
+          "registries": "[variables('registries')]",
+          "secrets": "[variables('secrets')]"
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "ai-learning-portal",
+              "image": "[parameters('imageName')]",
+              "resources": { "cpu": 0.5, "memory": "1Gi" },
+              "env": "[variables('env')]",
+              "probes": [
+                {
+                  "type": "Startup",
+                  "tcpSocket": { "port": 8000 },
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 5,
+                  "failureThreshold": 24
+                }
+              ]
+            }
+          ],
+          "scale": { "minReplicas": 0, "maxReplicas": 1 }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.App/jobs",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('idleStopJobName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": ["[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]"],
+      "identity": { "type": "SystemAssigned" },
+      "properties": {
+        "environmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
+        "configuration": {
+          "triggerType": "Schedule",
+          "replicaTimeout": 300,
+          "replicaRetryLimit": 0,
+          "scheduleTriggerConfig": {
+            "cronExpression": "[parameters('idleStopCron')]",
+            "parallelism": 1,
+            "replicaCompletionCount": 1
+          },
+          "registries": "[variables('registries')]",
+          "secrets": "[variables('secrets')]"
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "db-idle-stop",
+              "image": "[parameters('imageName')]",
+              "command": ["python", "-m", "app.cli", "db-idle-stop"],
+              "resources": { "cpu": 0.25, "memory": "0.5Gi" },
+              "env": "[variables('env')]"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "fqdn": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('containerAppName')), '2024-03-01').configuration.ingress.fqdn]"
+    },
+    "appPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('containerAppName')), '2024-03-01', 'full').identity.principalId]"
+    },
+    "jobPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.App/jobs', parameters('idleStopJobName')), '2024-03-01', 'full').identity.principalId]"
+    }
+  }
+}

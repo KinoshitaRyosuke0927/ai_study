@@ -14,11 +14,17 @@ from app.schemas import (
     CodeSubmitRequest,
     CourseDetailOut,
     CourseSummaryOut,
+    HomeOut,
+    MyPageOut,
+    QuizOut,
+    QuizResultOut,
+    QuizSubmitRequest,
     SubmitResultOut,
     UnitDetailOut,
 )
-from app.services import course_service, submission_service
+from app.services import course_service, dashboard_service, quiz_service, submission_service
 from app.services.course_service import NotFoundError
+from app.services.quiz_service import QuizLockedError
 
 router = APIRouter(prefix="/api", tags=["learning"])
 
@@ -166,3 +172,97 @@ def submit_code(
         return submission_service.submit_code(db, user, problem_id, req)
     except NotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "問題が見つかりません")
+
+
+@router.get("/courses/{slug}/quiz", response_model=QuizOut)
+def get_quiz(
+    slug: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> QuizOut:
+    """
+    小テストの表示内容を返す
+
+    Args
+    -----------------
+    - slug: str,                        講座の識別名
+    - user: User,                       ログイン中のユーザ
+    - db: Session,                      DB セッション
+
+    Returns
+    -----------------
+    - quiz: QuizOut,                    小テストの表示内容(未完了の単元があれば問題は含めない)
+
+    """
+    # 小テストを取得(講座が見つからなければ 404)
+    try:
+        return quiz_service.get_quiz(db, user, slug)
+    except NotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "講座が見つかりません")
+
+
+@router.post("/courses/{slug}/quiz/attempts", response_model=QuizResultOut)
+def submit_quiz(
+    slug: str,
+    req: QuizSubmitRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> QuizResultOut:
+    """
+    小テストを提出して採点する
+
+    Args
+    -----------------
+    - slug: str,                        講座の識別名
+    - req: QuizSubmitRequest,           回答(コード問題はブラウザで実行した結果を含む)
+    - user: User,                       ログイン中のユーザ
+    - db: Session,                      DB セッション
+
+    Returns
+    -----------------
+    - result: QuizResultOut,            採点結果
+
+    """
+    # 採点して記録(未完了の単元があれば 403、講座が見つからなければ 404)
+    try:
+        return quiz_service.submit_quiz(db, user, slug, req)
+    except QuizLockedError:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "すべての単元を完了すると小テストを受けられます")
+    except NotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "講座が見つかりません")
+
+
+@router.get("/home", response_model=HomeOut)
+def home(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> HomeOut:
+    """
+    ホーム画面の表示内容を返す
+
+    Args
+    -----------------
+    - user: User,                       ログイン中のユーザ
+    - db: Session,                      DB セッション
+
+    Returns
+    -----------------
+    - home: HomeOut,                    ホーム画面の表示内容
+
+    """
+    # ホーム画面の表示内容を返却
+    return dashboard_service.get_home(db, user)
+
+
+@router.get("/me/summary", response_model=MyPageOut)
+def my_page(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> MyPageOut:
+    """
+    マイページの表示内容を返す(ログイン中のユーザ本人の分のみ)
+
+    Args
+    -----------------
+    - user: User,                       ログイン中のユーザ
+    - db: Session,                      DB セッション
+
+    Returns
+    -----------------
+    - page: MyPageOut,                  マイページの表示内容
+
+    """
+    # マイページの表示内容を返却
+    return dashboard_service.get_my_page(db, user)

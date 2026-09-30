@@ -18,8 +18,15 @@ export function Header({ breadcrumb }: { breadcrumb?: ReactNode }) {
       ) : (
         <nav className="main-nav">
           <NavLink to="/" end>
-            講座一覧
+            ホーム
           </NavLink>
+          <NavLink to="/catalog">講座カタログ</NavLink>
+          <NavLink to="/me">マイ学習</NavLink>
+          {user?.is_admin && (
+            <NavLink to="/admin" className={({ isActive }) => `nav-admin${isActive ? ' active' : ''}`}>
+              管理
+            </NavLink>
+          )}
         </nav>
       )}
       {user && (

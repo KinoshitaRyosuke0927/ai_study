@@ -16,13 +16,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/ ディレクトリ(.env とフロントエンドのビルド成果物の基準位置)
 BACKEND_DIR = Path(__file__).resolve().parents[2]
+# リポジトリ直下(AI の接続情報など、ほかのアプリと共通の .env がある)
+REPO_ROOT = BACKEND_DIR.parents[1]
 
 
 class Settings(BaseSettings):
     """.env / 環境変数から読み込むアプリ設定。"""
 
+    # リポジトリ直下の .env → backend/.env の順に読む(後に読んだ方が優先)
     model_config = SettingsConfigDict(
-        env_file=BACKEND_DIR / ".env",
+        env_file=(REPO_ROOT / ".env", BACKEND_DIR / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -53,7 +56,38 @@ class Settings(BaseSettings):
         default="https://cdn.jsdelivr.net/pyodide/v314.0.7/full/", alias="PYODIDE_BASE_URL"
     )
 
+    # --- AI(Azure OpenAI。010_ai_reviewer と同じ接続方式) ---
+    azure_openai_endpoint: str = Field(default="", alias="AZURE_OPENAI_ENDPOINT")
+    azure_openai_key: str = Field(default="", alias="AZURE_OPENAI_KEY")
+    # 構成案の生成に使うモデル(デプロイ名)
+    ai_model_outline: str = Field(default="gpt-5.4-mini", alias="AI_MODEL_OUTLINE")
+    # 単元・小テストの下書き生成に使うモデル(デプロイ名)
+    ai_model_draft: str = Field(default="gpt-5.4", alias="AI_MODEL_DRAFT")
+    ai_timeout_seconds: int = Field(default=300, alias="AI_TIMEOUT_SECONDS")
+
+    # --- DB の自動起動・停止(Azure Database for MySQL フレキシブルサーバー) ---
+    # 有効にすると、DB が停止中のアクセスで DB を起動し、使われていなければ停止できる
+    db_autostart_enabled: bool = Field(default=False, alias="DB_AUTOSTART_ENABLED")
+    azure_subscription_id: str = Field(default="", alias="AZURE_SUBSCRIPTION_ID")
+    azure_resource_group: str = Field(default="", alias="AZURE_RESOURCE_GROUP")
+    mysql_server_name: str = Field(default="", alias="MYSQL_SERVER_NAME")
+    # この時間(分)アクセスが無ければ、停止ジョブが DB を停止する
+    db_idle_stop_minutes: int = Field(default=60, alias="DB_IDLE_STOP_MINUTES")
+
     # --- 派生プロパティ ---
+    @property
+    def ai_enabled(self) -> bool:
+        """
+        AI の接続情報が設定されているかを判定する
+
+        Returns
+        -----------------
+        - enabled: bool,                    エンドポイントとキーが両方あれば True
+
+        """
+        # エンドポイントとキーの両方がそろっていれば利用できる
+        return bool(self.azure_openai_endpoint.strip() and self.azure_openai_key.strip())
+
     @property
     def sqlalchemy_url(self) -> str:
         """

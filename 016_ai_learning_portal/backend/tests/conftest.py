@@ -42,6 +42,14 @@ def engine():
     Base.metadata.create_all(eng)
     db.configure(eng)
     yield eng
+    # 差し替えた AI・DB 操作・アクセス記録の状態を元に戻す
+    from app.ai.client import set_ai_client
+    from app.infra.db_power import set_db_power
+    from app.services.activity_service import reset_throttle
+
+    set_ai_client(None)
+    set_db_power(None)
+    reset_throttle()
     eng.dispose()
 
 

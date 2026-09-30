@@ -30,7 +30,7 @@ export function CourseDetailPage() {
       <section className="course-hero">
         <div className="course-hero-main">
           <div className="muted small">
-            <Link to="/">講座一覧</Link> / {course.title}
+            <Link to="/catalog">講座カタログ</Link> / {course.title}
           </div>
           <div className="tag-row">
             <LevelTag level={course.level} />
@@ -47,6 +47,7 @@ export function CourseDetailPage() {
             <span>全{course.unit_count}単元</span>
             <span>目安 約{Math.round((course.estimated_minutes / 60) * 10) / 10}時間</span>
             <span>演習 {course.exercise_count}問</span>
+            <span>小テスト {course.quiz_question_count}問</span>
             {course.author_name && <span>作成者 {course.author_name}</span>}
           </div>
         </div>
@@ -58,16 +59,21 @@ export function CourseDetailPage() {
             </span>
           </div>
           <ProgressBar done={course.completed_unit_count} total={course.unit_count} />
-          {nextUnit ? (
+          {course.completed ? (
+            <div className="verdict verdict-pass">
+              <CheckIcon size={18} />
+              <div>この講座を修了しました</div>
+            </div>
+          ) : nextUnit ? (
             <Link className="btn btn-primary btn-block" to={`/units/${nextUnit.id}`}>
               <PlayIcon />
               {course.completed_unit_count > 0 ? '続きから' : '受講を始める'}:単元{nextUnit.position} {nextUnit.title}
             </Link>
           ) : (
-            <div className="verdict verdict-pass">
-              <CheckIcon size={18} />
-              <div>すべての単元を完了しました</div>
-            </div>
+            <Link className="btn btn-primary btn-block" to={`/courses/${course.slug}/quiz`}>
+              <PlayIcon />
+              小テストを受ける(満点で修了)
+            </Link>
           )}
         </div>
       </section>
@@ -102,12 +108,33 @@ export function CourseDetailPage() {
               </Link>
             )
           })}
-          <div className="unit-row unit-row-quiz" aria-disabled="true">
-            <span className="unit-row-main">
-              <span className="unit-row-title">小テスト</span>
-              <span className="small">満点で講座修了。フェーズ2で提供予定です。</span>
-            </span>
-          </div>
+          {course.quiz_unlocked ? (
+            <Link to={`/courses/${course.slug}/quiz`} className="unit-row unit-row-quiz">
+              <span className="unit-row-main">
+                <span className="unit-row-title">小テスト</span>
+                <span className="small">
+                  全{course.quiz_question_count}問。満点で講座修了。何度でも受け直せます
+                </span>
+              </span>
+              <span className="unit-row-meta small warm">
+                {course.completed
+                  ? '修了済み'
+                  : course.best_quiz_score === null
+                    ? '受験する'
+                    : `最高 ${course.best_quiz_score} / ${course.quiz_question_count}`}
+              </span>
+            </Link>
+          ) : (
+            <div className="unit-row unit-row-quiz unit-row-locked" aria-disabled="true">
+              <span className="unit-row-main">
+                <span className="unit-row-title">小テスト</span>
+                <span className="small">全{course.quiz_question_count}問。すべての単元を完了すると受験できます</span>
+              </span>
+              <span className="unit-row-meta small muted">
+                あと {course.unit_count - course.completed_unit_count} 単元
+              </span>
+            </div>
+          )}
         </section>
 
         <aside className="side">

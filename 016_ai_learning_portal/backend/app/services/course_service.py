@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from dataclasses import dataclass
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.common.constants import CellType, CourseStatus, Grading, ProblemKind
@@ -16,6 +18,7 @@ from app.models import (
     CoursePrerequisite,
     Dataset,
     Problem,
+    QuizAttempt,
     Submission,
     Unit,
     UnitProgress,
@@ -38,7 +41,65 @@ class NotFoundError(Exception):
     """対象が存在しない、または閲覧権限がない。"""
 
 
-def _visible_course_query(user: User):
+@dataclass
+class ProgressContext:
+    """講座の要約を作るための、ユーザの進捗と問題数の集計。"""
+
+    completed_units: set[int]  # 完了済み単元 ID
+    completed_courses: set[int]  # 修了済み講座 ID
+    exercise_counts: dict[int, int]  # 単元 ID → 演習数
+    quiz_counts: dict[int, int]  # 講座 ID → 小テストの問題数
+    best_scores: dict[int, int]  # 講座 ID → 小テストの最高得点
+
+
+def load_progress(session: Session, user: User, course_ids: list[int]) -> ProgressContext:
+    """
+    講座の要約に必要な進捗と問題数をまとめて取得する
+
+    Args
+    -----------------
+    - session: Session,                 DB セッション
+    - user: User,                       ログイン中ユーザ
+    - course_ids: list[int],            対象の講座 ID
+
+    Returns
+    -----------------
+    - context: ProgressContext,         集計結果
+
+    """
+    # 入れ物用意
+    exercise_counts: dict[int, int] = {}
+    quiz_counts: dict[int, int] = {}
+    # 対象講座の問題を種類ごとに数える
+    rows = session.execute(
+        select(Problem.course_id, Problem.unit_id, Problem.kind).where(Problem.course_id.in_(course_ids))
+    )
+    for course_id, unit_id, kind in rows:
+        # 単元内の演習は単元ごとに数える
+        if kind == ProblemKind.EXERCISE and unit_id is not None:
+            exercise_counts[unit_id] = exercise_counts.get(unit_id, 0) + 1
+        # 小テストの問題は講座ごとに数える
+        elif kind == ProblemKind.QUIZ:
+            quiz_counts[course_id] = quiz_counts.get(course_id, 0) + 1
+    # 小テストの講座ごとの最高得点を取得
+    best_scores = dict(
+        session.execute(
+            select(QuizAttempt.course_id, func.max(QuizAttempt.score))
+            .where(QuizAttempt.user_id == user.id)
+            .group_by(QuizAttempt.course_id)
+        ).all()
+    )
+    # 集計結果を返却
+    return ProgressContext(
+        completed_units=_completed_unit_ids(session, user),
+        completed_courses=_completed_course_ids(session, user),
+        exercise_counts=exercise_counts,
+        quiz_counts=quiz_counts,
+        best_scores=best_scores,
+    )
+
+
+def visible_course_query(user: User):
     """
     ユーザが閲覧できる講座を絞り込むクエリを返す
 
@@ -98,36 +159,7 @@ def _completed_course_ids(session: Session, user: User) -> set[int]:
     )
 
 
-def _exercise_counts(session: Session, course_ids: list[int]) -> dict[int, int]:
-    """
-    単元ごとの演習数を返す
-
-    Args
-    -----------------
-    - session: Session,                 DB セッション
-    - course_ids: list[int],            対象の講座 ID
-
-    Returns
-    -----------------
-    - counts: dict[int, int],           単元 ID → 演習数
-
-    """
-    # 入れ物用意
-    counts: dict[int, int] = {}
-    # 対象講座の演習(単元に属する問題)を取得
-    rows = session.scalars(
-        select(Problem.unit_id).where(
-            Problem.course_id.in_(course_ids), Problem.kind == ProblemKind.EXERCISE
-        )
-    )
-    # 単元 ID ごとに数える
-    for unit_id in rows:
-        counts[unit_id] = counts.get(unit_id, 0) + 1
-    # 集計結果を返却
-    return counts
-
-
-def _dataset_out(dataset: Dataset) -> DatasetOut:
+def dataset_out(dataset: Dataset) -> DatasetOut:
     """
     データファイルを API 出力形式に変換する
 
@@ -144,18 +176,14 @@ def _dataset_out(dataset: Dataset) -> DatasetOut:
     return DatasetOut(id=dataset.id, filename=dataset.filename, url=f"/api/datasets/{dataset.id}")
 
 
-def _summarize(
-    course: Course, completed_units: set[int], completed_courses: set[int], counts: dict[int, int]
-) -> CourseSummaryOut:
+def summarize(course: Course, ctx: ProgressContext) -> CourseSummaryOut:
     """
     講座一覧用の要約を組み立てる
 
     Args
     -----------------
-    - course: Course,                   講座
-    - completed_units: set[int],        完了済み単元 ID
-    - completed_courses: set[int],      修了済み講座 ID
-    - counts: dict[int, int],           単元 ID → 演習数
+    - course: Course,                   講座(units を読み込み済み)
+    - ctx: ProgressContext,             進捗と問題数の集計
 
     Returns
     -----------------
@@ -163,7 +191,8 @@ def _summarize(
 
     """
     # 未完了の最初の単元を「続きから」の対象にする
-    next_unit = next((u for u in course.units if u.id not in completed_units), None)
+    next_unit = next((u for u in course.units if u.id not in ctx.completed_units), None)
+    completed_count = sum(1 for u in course.units if u.id in ctx.completed_units)
     # 要約を組み立てて返却
     return CourseSummaryOut(
         slug=course.slug,
@@ -173,11 +202,16 @@ def _summarize(
         tags=list(course.tags or []),
         status=course.status,
         unit_count=len(course.units),
-        completed_unit_count=sum(1 for u in course.units if u.id in completed_units),
-        exercise_count=sum(counts.get(u.id, 0) for u in course.units),
+        completed_unit_count=completed_count,
+        exercise_count=sum(ctx.exercise_counts.get(u.id, 0) for u in course.units),
         estimated_minutes=sum(u.estimated_minutes for u in course.units),
         next_unit_id=next_unit.id if next_unit else None,
-        completed=course.id in completed_courses,
+        completed=course.id in ctx.completed_courses,
+        quiz_question_count=ctx.quiz_counts.get(course.id, 0),
+        # 全単元を完了していれば小テストを受けられる
+        quiz_unlocked=len(course.units) > 0 and completed_count == len(course.units),
+        best_quiz_score=ctx.best_scores.get(course.id),
+        published_at=course.published_at,
     )
 
 
@@ -196,13 +230,11 @@ def list_courses(session: Session, user: User) -> list[CourseSummaryOut]:
 
     """
     # 閲覧できる講座を取得
-    courses = list(session.scalars(_visible_course_query(user).order_by(Course.id)))
-    # 進捗と演習数を取得
-    completed_units = _completed_unit_ids(session, user)
-    completed_courses = _completed_course_ids(session, user)
-    counts = _exercise_counts(session, [c.id for c in courses])
+    courses = list(session.scalars(visible_course_query(user).order_by(Course.id)))
+    # 進捗と問題数を取得
+    ctx = load_progress(session, user, [c.id for c in courses])
     # 講座ごとに要約を組み立てて返却
-    return [_summarize(c, completed_units, completed_courses, counts) for c in courses]
+    return [summarize(c, ctx) for c in courses]
 
 
 def get_course(session: Session, user: User, slug: str) -> CourseDetailOut:
@@ -222,7 +254,7 @@ def get_course(session: Session, user: User, slug: str) -> CourseDetailOut:
     """
     # 閲覧できる講座から識別名で検索
     course = session.scalar(
-        _visible_course_query(user)
+        visible_course_query(user)
         .where(Course.slug == slug)
         .options(
             selectinload(Course.datasets),
@@ -233,12 +265,10 @@ def get_course(session: Session, user: User, slug: str) -> CourseDetailOut:
     # 見つからない場合はエラー
     if course is None:
         raise NotFoundError(slug)
-    # 進捗と演習数を取得
-    completed_units = _completed_unit_ids(session, user)
-    completed_courses = _completed_course_ids(session, user)
-    counts = _exercise_counts(session, [course.id])
+    # 進捗と問題数を取得
+    ctx = load_progress(session, user, [course.id])
     # 講座の要約部分を組み立てる
-    summary = _summarize(course, completed_units, completed_courses, counts)
+    summary = summarize(course, ctx)
     # 詳細情報を加えて返却
     return CourseDetailOut(
         **summary.model_dump(),
@@ -250,7 +280,7 @@ def get_course(session: Session, user: User, slug: str) -> CourseDetailOut:
             PrerequisiteOut(
                 slug=p.prerequisite.slug,
                 title=p.prerequisite.title,
-                completed=p.prerequisite_id in completed_courses,
+                completed=p.prerequisite_id in ctx.completed_courses,
             )
             for p in course.prerequisites
         ],
@@ -261,12 +291,12 @@ def get_course(session: Session, user: User, slug: str) -> CourseDetailOut:
                 title=u.title,
                 summary=u.summary,
                 estimated_minutes=u.estimated_minutes,
-                exercise_count=counts.get(u.id, 0),
-                completed=u.id in completed_units,
+                exercise_count=ctx.exercise_counts.get(u.id, 0),
+                completed=u.id in ctx.completed_units,
             )
             for u in course.units
         ],
-        datasets=[_dataset_out(d) for d in course.datasets],
+        datasets=[dataset_out(d) for d in course.datasets],
     )
 
 
@@ -357,7 +387,7 @@ def get_unit(session: Session, user: User, unit_id: int) -> UnitDetailOut:
         units=nav,
         prev_unit=nav[index - 1] if index > 0 else None,
         next_unit=nav[index + 1] if index + 1 < len(nav) else None,
-        datasets=[_dataset_out(d) for d in unit.course.datasets],
+        datasets=[dataset_out(d) for d in unit.course.datasets],
     )
 
 

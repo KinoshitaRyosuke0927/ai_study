@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "acrLoginServer": { "value": "acrailearningportal.azurecr.io" },
+    "acrUsername": { "value": "<az acr credential show -n acrailearningportal で取得した username>" },
+    "acrPassword": { "value": "<az acr credential show -n acrailearningportal で取得した password>" },
+    "imageName": { "value": "acrailearningportal.azurecr.io/ai-learning-portal:<タグ>" },
+    "appSecretKey": { "value": "<python -c \"import secrets; print(secrets.token_urlsafe(48))\" で作った文字列>" },
+    "mysqlServerName": { "value": "mysql-ai-learning-portal" },
+    "mysqlUser": { "value": "ai_learning_portal" },
+    "mysqlPassword": { "value": "<アプリ用 DB ユーザ ai_learning_portal のパスワード>" },
+    "mysqlDatabase": { "value": "ai_learning_portal" },
+    "azureOpenAiEndpoint": { "value": "<リポジトリ直下の .env の AZURE_OPENAI_ENDPOINT>" },
+    "azureOpenAiKey": { "value": "<リポジトリ直下の .env の AZURE_OPENAI_KEY>" }
+  }
+}

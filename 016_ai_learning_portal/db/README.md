@@ -12,7 +12,7 @@
 ### 含まれるデータ
 
 - ユーザ 2名(下表。デモ用のサンプルユーザ)
-- 講座「統計の基礎」:5単元・演習6問・データファイル `scores.csv`
+- 講座「統計の基礎」:5単元・演習6問・小テスト10問・データファイル `scores.csv`
 - Alembic の版数:取り込み後に `alembic upgrade head` を実行しても何も変わりません。
 
 ### デモ用のサンプルユーザ
@@ -65,10 +65,10 @@ pip install -r requirements.txt
 cp .env.example .env                   # MYSQL_PASSWORD(手順1の接続ユーザのパスワード)と APP_SECRET_KEY を設定
 
 cd ../frontend && npm install && npm run build
-cd ../backend && uvicorn app.main:app --port 8016
+cd ../backend && uvicorn app.main:app --port 8000
 ```
 
-ブラウザで http://localhost:8016 を開き、上の「デモ用のサンプルユーザ」でログインします。
+ブラウザで http://localhost:8000 を開き、上の「デモ用のサンプルユーザ」でログインします。
 
 ## 注意
 

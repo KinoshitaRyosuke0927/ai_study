@@ -7,19 +7,19 @@ from sqlalchemy.orm import Session
 
 from app.common.constants import AnswerFormat, CourseStatus, Grading, ProblemKind
 from app.models import Course, Problem, Submission, UnitProgress, User
-from app.schemas import CodeSubmitRequest, SubmitResultOut
+from app.schemas import CodeSubmitRequest, QuizAnswerIn, SubmitResultOut
 from app.services.course_service import NotFoundError
 from app.services.grading import outputs_match
 
 
-def _grade_code(problem: Problem, req: CodeSubmitRequest) -> tuple[bool, str]:
+def grade_code(problem: Problem, req: CodeSubmitRequest | QuizAnswerIn) -> tuple[bool, str]:
     """
     コード問題を採点する
 
     Args
     -----------------
     - problem: Problem,                 問題
-    - req: CodeSubmitRequest,           提出内容
+    - req: CodeSubmitRequest | QuizAnswerIn, 提出内容(ブラウザでの実行結果を含む)
 
     Returns
     -----------------
@@ -116,7 +116,7 @@ def submit_code(
     if not user.is_admin and course.status != CourseStatus.PUBLISHED:
         raise NotFoundError(problem_id)
     # 採点
-    passed, message = _grade_code(problem, req)
+    passed, message = grade_code(problem, req)
     # 提出を記録
     session.add(
         Submission(

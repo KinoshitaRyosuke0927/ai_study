@@ -40,5 +40,6 @@
       "file": "05_correlation.ipynb",
       "minutes": 25
     }
-  ]
+  ],
+  "quiz": "quiz.ipynb"
 }

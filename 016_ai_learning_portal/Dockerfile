@@ -32,5 +32,5 @@ ENV APP_ENV=azure \
     PORT=8000
 EXPOSE 8000
 
-# 起動時にマイグレーションを適用してからアプリを起動する
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
+# 起動スクリプト(マイグレーションの適用 → アプリの起動。DB が停止中でも起動を続ける)
+CMD ["sh", "./start.sh"]

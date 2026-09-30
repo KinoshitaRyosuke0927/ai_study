@@ -4,6 +4,8 @@
     python -m app.cli set-password --login yamada
     python -m app.cli delete-user --login yamada
     python -m app.cli import-course ../content/statistics-basics [--author yamada] [--replace]
+    python -m app.cli db-state | db-start | db-stop       (Azure の MySQL サーバーの状態確認・起動・停止)
+    python -m app.cli db-idle-stop [--idle-minutes 60]    (一定時間アクセスが無ければ DB を停止)
 """
 
 from __future__ import annotations
@@ -11,12 +13,16 @@ from __future__ import annotations
 import argparse
 import getpass
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlalchemy import select
 
+from app.config.settings import get_settings
 from app.infra.db import new_session
+from app.infra.db_power import STATE_READY, DbPowerError, get_db_power
 from app.models import User
+from app.services.activity_service import last_activity
 from app.services.auth_service import create_user, hash_password
 from app.services.notebook_import import NotebookFormatError, import_course
 
@@ -136,6 +142,61 @@ def cmd_import_course(args: argparse.Namespace) -> None:
         print(f"取り込みました: {course.title}({course.slug} / 単元 {len(course.units)} / {course.status})")
 
 
+def cmd_db_power(args: argparse.Namespace) -> None:
+    """
+    DB(Azure の MySQL フレキシブルサーバー)の状態確認・起動・停止を行う
+
+    Args
+    -----------------
+    - args: argparse.Namespace,         コマンド引数(action: state / start / stop)
+
+    """
+    # 操作を実行して結果を表示
+    try:
+        power = get_db_power()
+        if args.action == "start":
+            power.start()
+            print("DB の起動を要求しました(起動まで数分かかります)")
+        elif args.action == "stop":
+            power.stop()
+            print("DB の停止を要求しました")
+        else:
+            print(power.state())
+    except DbPowerError as e:
+        sys.exit(str(e))
+
+
+def cmd_db_idle_stop(args: argparse.Namespace) -> None:
+    """
+    一定時間アクセスが無ければ DB を停止する(Container Apps のスケジュールジョブから定期的に実行する)
+
+    Args
+    -----------------
+    - args: argparse.Namespace,         コマンド引数(idle_minutes)
+
+    """
+    idle = timedelta(minutes=args.idle_minutes or get_settings().db_idle_stop_minutes)
+    try:
+        power = get_db_power()
+        # 起動中でなければ何もしない(停止済み・起動処理中など)
+        state = power.state()
+        if state != STATE_READY:
+            print(f"DB は {state} のため何もしません")
+            return
+        # 最終アクセス日時を確認(記録が無ければ未使用として扱う)
+        with new_session() as session:
+            last = last_activity(session)
+        now = datetime.now(timezone.utc)
+        if last is not None and now - last < idle:
+            print(f"最終アクセスから {int((now - last).total_seconds() // 60)} 分のため停止しません")
+            return
+        # 一定時間使われていないので停止する
+        power.stop()
+        print("一定時間アクセスが無いため、DB の停止を要求しました")
+    except DbPowerError as e:
+        sys.exit(str(e))
+
+
 def main() -> None:
     """
     コマンドライン引数を解釈してサブコマンドを実行する
@@ -165,6 +226,14 @@ def main() -> None:
     p.add_argument("--author", help="作成者のログイン名")
     p.add_argument("--replace", action="store_true", help="同じ識別名の講座を置き換える")
     p.set_defaults(func=cmd_import_course)
+    # db-state / db-start / db-stop
+    for action, label in (("state", "状態確認"), ("start", "起動"), ("stop", "停止")):
+        p = sub.add_parser(f"db-{action}", help=f"DB の{label}(Azure の MySQL サーバー)")
+        p.set_defaults(func=cmd_db_power, action=action)
+    # db-idle-stop
+    p = sub.add_parser("db-idle-stop", help="一定時間アクセスが無ければ DB を停止する")
+    p.add_argument("--idle-minutes", type=int, default=None, help="この時間(分)アクセスが無ければ停止(既定は設定値)")
+    p.set_defaults(func=cmd_db_idle_stop)
     # 実行
     args = parser.parse_args()
     args.func(args)

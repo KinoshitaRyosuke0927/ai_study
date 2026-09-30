@@ -84,7 +84,7 @@ export function UnitPage() {
       <Header
         breadcrumb={
           <>
-            <Link to="/">講座一覧</Link> / <Link to={`/courses/${unit.course_slug}`}>{unit.course_title}</Link> /{' '}
+            <Link to="/catalog">講座カタログ</Link> / <Link to={`/courses/${unit.course_slug}`}>{unit.course_title}</Link> /{' '}
             <span className="breadcrumb-current">
               単元{unit.position} {unit.title}
             </span>
@@ -114,7 +114,15 @@ export function UnitPage() {
               </Link>
             ),
           )}
-          <div className="toc-item toc-quiz">小テスト(フェーズ2)</div>
+          {unit.units.every((u) => u.completed) ? (
+            <Link className="toc-item toc-quiz toc-quiz-open" to={`/courses/${unit.course_slug}/quiz`}>
+              小テスト
+            </Link>
+          ) : (
+            <div className="toc-item toc-quiz" title="すべての単元を完了すると受験できます">
+              小テスト(全単元の完了後)
+            </div>
+          )}
         </nav>
 
         <main className="unit-main">
@@ -185,7 +193,11 @@ export function UnitPage() {
                 <CheckIcon size={20} />
                 <div>
                   <b>この単元を完了しました。</b>
-                  {unit.next_unit ? '次の単元に進みましょう。' : 'すべての単元を学習しました。'}
+                  {unit.next_unit
+                    ? '次の単元に進みましょう。'
+                    : unit.units.every((u) => u.completed)
+                      ? 'すべての単元を完了しました。小テストに挑戦しましょう。'
+                      : 'まだ完了していない単元があります。'}
                 </div>
               </div>
             )}
@@ -199,6 +211,10 @@ export function UnitPage() {
               {unit.next_unit ? (
                 <Link className="btn btn-dark" to={`/units/${unit.next_unit.id}`}>
                   次の単元:{unit.next_unit.title}
+                </Link>
+              ) : unit.units.every((u) => u.completed) ? (
+                <Link className="btn btn-dark" to={`/courses/${unit.course_slug}/quiz`}>
+                  小テストへ
                 </Link>
               ) : (
                 <Link className="btn btn-dark" to={`/courses/${unit.course_slug}`}>

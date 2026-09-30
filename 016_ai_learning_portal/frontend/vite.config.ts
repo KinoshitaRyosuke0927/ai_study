@@ -1,7 +1,7 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// 開発時は /api をバックエンド(uvicorn, ポート 8016)へ転送する。
+// 開発時は /api をバックエンド(uvicorn, ポート 8000)へ転送する。
 // 本番はビルド成果物(dist)をバックエンドが同じオリジンで配信する。
 export default defineConfig({
   plugins: [react()],
@@ -12,7 +12,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:8016',
+      '/api': 'http://localhost:8000',
     },
   },
 })

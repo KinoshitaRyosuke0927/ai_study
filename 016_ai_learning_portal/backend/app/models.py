@@ -200,6 +200,19 @@ class UnitProgress(Base):
     completed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class QuizAttempt(Base):
+    """小テストの受験記録(1回の採点 = 1件)。"""
+
+    __tablename__ = "quiz_attempts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
+    score: Mapped[int] = mapped_column(Integer)  # 正解数
+    total: Mapped[int] = mapped_column(Integer)  # 問題数
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Submission(Base):
     """演習・小テストの提出記録。"""
 
@@ -208,6 +221,10 @@ class Submission(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id", ondelete="CASCADE"))
+    # 小テストの回答なら受験記録 ID(演習の提出は NULL)
+    attempt_id: Mapped[int | None] = mapped_column(
+        ForeignKey("quiz_attempts.id", ondelete="CASCADE"), nullable=True
+    )
     answer: Mapped[str] = mapped_column(LongText, default="")  # コードまたは回答値
     output: Mapped[str] = mapped_column(LongText, default="")  # 実行時の出力
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -227,3 +244,50 @@ class CourseCompletion(Base):
         ForeignKey("courses.id", ondelete="CASCADE"), primary_key=True
     )
     completed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class AIJob(TimestampMixin, Base):
+    """AI による講座下書きの生成ジョブ(進捗を画面に表示する)。"""
+
+    __tablename__ = "ai_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=True)
+    kind: Mapped[str] = mapped_column(String(32), default="course_draft")
+    status: Mapped[str] = mapped_column(String(16), default="queued")  # queued / running / done / failed
+    total_steps: Mapped[int] = mapped_column(Integer, default=0)
+    done_steps: Mapped[int] = mapped_column(Integer, default=0)
+    current_step: Mapped[str] = mapped_column(String(200), default="")
+    message: Mapped[str] = mapped_column(LongText, default="")  # 失敗・警告の内容
+    request: Mapped[dict] = mapped_column(JSON, default=dict)  # 生成時の入力(題材・構成案)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+
+class AIGeneration(Base):
+    """AI 呼び出しの記録(プロンプトと応答をそのまま残し、精度改善に使う)。"""
+
+    __tablename__ = "ai_generations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int | None] = mapped_column(ForeignKey("ai_jobs.id", ondelete="SET NULL"), nullable=True)
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id", ondelete="SET NULL"), nullable=True)
+    purpose: Mapped[str] = mapped_column(String(32))  # outline / unit / quiz
+    model: Mapped[str] = mapped_column(String(100))
+    prompt_version: Mapped[str] = mapped_column(String(32))
+    system_prompt: Mapped[str] = mapped_column(LongText, default="")
+    user_prompt: Mapped[str] = mapped_column(LongText, default="")
+    response_text: Mapped[str] = mapped_column(LongText, default="")
+    success: Mapped[bool] = mapped_column(Boolean, default=False)
+    error: Mapped[str] = mapped_column(LongText, default="")
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class AppState(Base):
+    """アプリの状態(最終アクセス日時など)。DB の自動停止の判断に使う。"""
+
+    __tablename__ = "app_state"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(String(255), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

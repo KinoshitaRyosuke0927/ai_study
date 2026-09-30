@@ -31,8 +31,8 @@ def build_engine(settings: Settings) -> Engine:
     - engine: Engine,                   生成したエンジン
 
     """
-    # 接続オプションの入れ物用意
-    connect_args: dict = {}
+    # 接続オプションの入れ物用意(DB が停止中のとき長く待たないよう、接続のタイムアウトを短くする)
+    connect_args: dict = {"connect_timeout": 10}
     # CA 証明書が指定されている場合(Azure Database for MySQL)は TLS で接続する
     if settings.mysql_ssl_ca:
         connect_args["ssl"] = {"ca": settings.mysql_ssl_ca}

@@ -5,7 +5,7 @@
 --             ・デモ用のサンプルユーザ 2名
 --                 admin     / WrDuo__3d_7p  (管理者)
 --                 learner01 / dldtpnm7N2L4  (受講者)
---             ・講座「統計の基礎」(5単元・演習6問・データファイル scores.csv)
+--             ・講座「統計の基礎」(5単元・演習6問・小テスト10問・データファイル scores.csv)
 --             ・Alembic の版数(取り込み後の alembic upgrade head は何もしない)
 --   実行例  : mysql -u root -p --default-character-set=utf8mb4 ai_learning_portal < 02_schema_and_data.sql
 -- ============================================================
@@ -28,6 +28,81 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `ai_generations`
+--
+
+DROP TABLE IF EXISTS `ai_generations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ai_generations` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `job_id` int DEFAULT NULL,
+  `course_id` int DEFAULT NULL,
+  `purpose` varchar(32) NOT NULL,
+  `model` varchar(100) NOT NULL,
+  `prompt_version` varchar(32) NOT NULL,
+  `system_prompt` mediumtext NOT NULL,
+  `user_prompt` mediumtext NOT NULL,
+  `response_text` mediumtext NOT NULL,
+  `success` tinyint(1) NOT NULL,
+  `error` mediumtext NOT NULL,
+  `duration_ms` int NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT (now()),
+  PRIMARY KEY (`id`),
+  KEY `course_id` (`course_id`),
+  KEY `job_id` (`job_id`),
+  CONSTRAINT `ai_generations_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `ai_generations_ibfk_2` FOREIGN KEY (`job_id`) REFERENCES `ai_jobs` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `ai_generations`
+--
+
+LOCK TABLES `ai_generations` WRITE;
+/*!40000 ALTER TABLE `ai_generations` DISABLE KEYS */;
+/*!40000 ALTER TABLE `ai_generations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `ai_jobs`
+--
+
+DROP TABLE IF EXISTS `ai_jobs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ai_jobs` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `course_id` int DEFAULT NULL,
+  `kind` varchar(32) NOT NULL,
+  `status` varchar(16) NOT NULL,
+  `total_steps` int NOT NULL,
+  `done_steps` int NOT NULL,
+  `current_step` varchar(200) NOT NULL,
+  `message` mediumtext NOT NULL,
+  `request` json NOT NULL,
+  `created_by` int DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT (now()),
+  `updated_at` datetime NOT NULL DEFAULT (now()),
+  PRIMARY KEY (`id`),
+  KEY `course_id` (`course_id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `ai_jobs_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_jobs_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `ai_jobs`
+--
+
+LOCK TABLES `ai_jobs` WRITE;
+/*!40000 ALTER TABLE `ai_jobs` DISABLE KEYS */;
+/*!40000 ALTER TABLE `ai_jobs` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `alembic_version`
 --
 
@@ -46,8 +121,32 @@ CREATE TABLE `alembic_version` (
 
 LOCK TABLES `alembic_version` WRITE;
 /*!40000 ALTER TABLE `alembic_version` DISABLE KEYS */;
-INSERT INTO `alembic_version` VALUES ('0eb2fcc73f83');
+INSERT INTO `alembic_version` VALUES ('7ce72e64d310');
 /*!40000 ALTER TABLE `alembic_version` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `app_state`
+--
+
+DROP TABLE IF EXISTS `app_state`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `app_state` (
+  `key` varchar(64) NOT NULL,
+  `value` varchar(255) NOT NULL,
+  `updated_at` datetime NOT NULL DEFAULT (now()),
+  PRIMARY KEY (`key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `app_state`
+--
+
+LOCK TABLES `app_state` WRITE;
+/*!40000 ALTER TABLE `app_state` DISABLE KEYS */;
+/*!40000 ALTER TABLE `app_state` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -72,7 +171,7 @@ CREATE TABLE `cells` (
   KEY `unit_id` (`unit_id`),
   CONSTRAINT `cells_ibfk_1` FOREIGN KEY (`problem_id`) REFERENCES `problems` (`id`) ON DELETE SET NULL,
   CONSTRAINT `cells_ibfk_2` FOREIGN KEY (`unit_id`) REFERENCES `units` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=246 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -81,7 +180,7 @@ CREATE TABLE `cells` (
 
 LOCK TABLES `cells` WRITE;
 /*!40000 ALTER TABLE `cells` DISABLE KEYS */;
-INSERT INTO `cells` VALUES (1,1,1,'markdown','## 概念\n\nデータは大きく **量的データ**(数値で大きさを表す)と **質的データ**(カテゴリを表す)に分けられます。\nさらに、値の性質によって次の4つの **尺度水準** に分類されます。\n\n| 尺度 | 例 | できる計算 |\n|---|---|---|\n| 名義尺度 | 血液型、クラス | 度数を数える |\n| 順序尺度 | 満足度(1〜5)、順位 | 大小の比較 |\n| 間隔尺度 | 気温(℃)、西暦 | 差をとる |\n| 比例尺度 | 身長、点数、時間 | 比をとる |\n\n尺度によって使える集計方法が変わるため、分析の最初にデータの種類を確認することが大切です。',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(2,1,2,'markdown','## 例題\n40人分のテストの成績データ `scores.csv` を読み込み、先頭の行と各列の型を確認します。',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(3,1,3,'code','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\ndf.head()',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(4,1,4,'code','df.dtypes',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(5,1,5,'markdown','`class`(クラス)は名義尺度の質的データ、`math` や `study_hours` は比例尺度の量的データです。',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(6,1,6,'markdown','## 演習',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(7,1,7,'exercise','',1,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(8,2,1,'markdown','## 概念\n\n量的データは値がばらばらなので、一定の幅の **階級** に区切って、各階級に入るデータの個数(**度数**)を数えます。\nこれを表にしたものが **度数分布表**、棒グラフにしたものが **ヒストグラム** です。\n\n階級の幅を変えると見え方が変わるため、いくつか試して分布の特徴(山の位置・広がり・偏り)をつかみます。',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(9,2,2,'markdown','## 例題\n英語の点数を 20 点刻みの階級に分けて数えます。`pd.cut` で各データを階級に割り当てます。',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(10,2,3,'code','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nbins = [20, 40, 60, 80, 100]\npd.cut(df[\"english\"], bins=bins).value_counts().sort_index()',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(11,2,4,'markdown','同じデータをヒストグラムで表示します。',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(12,2,5,'code','import matplotlib.pyplot as plt\n\nplt.hist(df[\"english\"], bins=bins, edgecolor=\"white\")\nplt.xlabel(\"english\")\nplt.ylabel(\"count\")\nplt.show()',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(13,2,6,'markdown','## 演習',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(14,2,7,'exercise','',2,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(15,3,1,'markdown','## 概念\n\n代表値とは、データ全体の特徴を1つの数値で表したものです。\n\n- **平均(mean)**:すべての値の合計をデータ数で割った値 $\\bar{x} = \\frac{1}{n}\\sum_{i=1}^{n} x_i$\n- **中央値(median)**:小さい順に並べたとき真ん中にある値。データ数が偶数なら中央2つの平均\n- **最頻値(mode)**:データの中で最も多く現れる値\n\n> **ポイント** 平均は外れ値の影響を強く受けますが、中央値は受けにくい性質があります。年収や住宅価格のように偏りのあるデータでは、中央値もあわせて確認しましょう。',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(16,3,2,'markdown','## 例題\n8人のテストの点数から、3つの代表値を求めます。',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(17,3,3,'code','import pandas as pd\n\nscores = pd.Series([62, 75, 75, 81, 94, 58, 75, 88])\nprint(scores.mean())     # 平均\nprint(scores.median())   # 中央値\nprint(scores.mode()[0])  # 最頻値',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(18,3,4,'markdown','## 演習',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(19,3,5,'exercise','',3,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(20,4,1,'markdown','## 概念\n\n- **範囲**:最大値 − 最小値\n- **分散**:平均からの差(偏差)の2乗の平均 $s^2 = \\frac{1}{n-1}\\sum_{i=1}^{n}(x_i-\\bar{x})^2$\n- **標準偏差**:分散の平方根。元のデータと同じ単位になるので解釈しやすい\n\npandas の `var()` / `std()` は既定で **不偏分散**(n − 1 で割る、`ddof=1`)を計算します。\nNumPy の `np.var()` は既定で n で割る(`ddof=0`)ため、結果が異なる点に注意しましょう。',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(21,4,2,'markdown','## 例題',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(22,4,3,'code','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nmath = df[\"math\"]\nprint(\"範囲:\", math.max() - math.min())\nprint(\"分散:\", round(math.var(), 2))\nprint(\"標準偏差:\", round(math.std(), 2))\nprint(\"標準偏差(ddof=0):\", round(math.std(ddof=0), 2))',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(23,4,4,'markdown','## 演習',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(24,4,5,'exercise','',4,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(25,4,6,'exercise','',5,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(26,5,1,'markdown','## 概念\n\n**相関係数** $r$ は、2つの変数の直線的な関係の強さを −1 〜 1 で表します。\n\n- $r$ が 1 に近い:一方が大きいほど、もう一方も大きい(正の相関)\n- $r$ が −1 に近い:一方が大きいほど、もう一方は小さい(負の相関)\n- $r$ が 0 に近い:直線的な関係はほとんどない\n\n> **注意** 相関があっても、一方が原因でもう一方が起きている(因果関係)とは限りません。',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(27,5,2,'markdown','## 例題\n勉強時間と数学の点数の関係を散布図で確認します。',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(28,5,3,'code','import pandas as pd\nimport matplotlib.pyplot as plt\n\ndf = pd.read_csv(\"scores.csv\")\nplt.scatter(df[\"study_hours\"], df[\"math\"])\nplt.xlabel(\"study_hours\")\nplt.ylabel(\"math\")\nplt.show()',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(29,5,4,'code','df[[\"math\", \"english\", \"study_hours\"]].corr().round(2)',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(30,5,5,'markdown','## 演習',NULL,0,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(31,5,6,'exercise','',6,0,'2026-09-30 07:48:03','2026-09-30 07:48:03');
+INSERT INTO `cells` VALUES (32,6,1,'markdown','## 概念\n\nデータは大きく **量的データ**(数値で大きさを表す)と **質的データ**(カテゴリを表す)に分けられます。\nさらに、値の性質によって次の4つの **尺度水準** に分類されます。\n\n| 尺度 | 例 | できる計算 |\n|---|---|---|\n| 名義尺度 | 血液型、クラス | 度数を数える |\n| 順序尺度 | 満足度(1〜5)、順位 | 大小の比較 |\n| 間隔尺度 | 気温(℃)、西暦 | 差をとる |\n| 比例尺度 | 身長、点数、時間 | 比をとる |\n\n尺度によって使える集計方法が変わるため、分析の最初にデータの種類を確認することが大切です。',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(33,6,2,'markdown','## 例題\n40人分のテストの成績データ `scores.csv` を読み込み、先頭の行と各列の型を確認します。',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(34,6,3,'code','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\ndf.head()',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(35,6,4,'code','df.dtypes',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(36,6,5,'markdown','`class`(クラス)は名義尺度の質的データ、`math` や `study_hours` は比例尺度の量的データです。',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(37,6,6,'markdown','## 演習',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(38,6,7,'exercise','',7,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(39,7,1,'markdown','## 概念\n\n量的データは値がばらばらなので、一定の幅の **階級** に区切って、各階級に入るデータの個数(**度数**)を数えます。\nこれを表にしたものが **度数分布表**、棒グラフにしたものが **ヒストグラム** です。\n\n階級の幅を変えると見え方が変わるため、いくつか試して分布の特徴(山の位置・広がり・偏り)をつかみます。',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(40,7,2,'markdown','## 例題\n英語の点数を 20 点刻みの階級に分けて数えます。`pd.cut` で各データを階級に割り当てます。',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(41,7,3,'code','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nbins = [20, 40, 60, 80, 100]\npd.cut(df[\"english\"], bins=bins).value_counts().sort_index()',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(42,7,4,'markdown','同じデータをヒストグラムで表示します。',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(43,7,5,'code','import matplotlib.pyplot as plt\n\nplt.hist(df[\"english\"], bins=bins, edgecolor=\"white\")\nplt.xlabel(\"english\")\nplt.ylabel(\"count\")\nplt.show()',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(44,7,6,'markdown','## 演習',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(45,7,7,'exercise','',8,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(46,8,1,'markdown','## 概念\n\n代表値とは、データ全体の特徴を1つの数値で表したものです。\n\n- **平均(mean)**:すべての値の合計をデータ数で割った値 $\\bar{x} = \\frac{1}{n}\\sum_{i=1}^{n} x_i$\n- **中央値(median)**:小さい順に並べたとき真ん中にある値。データ数が偶数なら中央2つの平均\n- **最頻値(mode)**:データの中で最も多く現れる値\n\n> **ポイント** 平均は外れ値の影響を強く受けますが、中央値は受けにくい性質があります。年収や住宅価格のように偏りのあるデータでは、中央値もあわせて確認しましょう。',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(47,8,2,'markdown','## 例題\n8人のテストの点数から、3つの代表値を求めます。',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(48,8,3,'code','import pandas as pd\n\nscores = pd.Series([62, 75, 75, 81, 94, 58, 75, 88])\nprint(scores.mean())     # 平均\nprint(scores.median())   # 中央値\nprint(scores.mode()[0])  # 最頻値',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(49,8,4,'markdown','## 演習',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(50,8,5,'exercise','',9,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(51,9,1,'markdown','## 概念\n\n- **範囲**:最大値 − 最小値\n- **分散**:平均からの差(偏差)の2乗の平均 $s^2 = \\frac{1}{n-1}\\sum_{i=1}^{n}(x_i-\\bar{x})^2$\n- **標準偏差**:分散の平方根。元のデータと同じ単位になるので解釈しやすい\n\npandas の `var()` / `std()` は既定で **不偏分散**(n − 1 で割る、`ddof=1`)を計算します。\nNumPy の `np.var()` は既定で n で割る(`ddof=0`)ため、結果が異なる点に注意しましょう。',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(52,9,2,'markdown','## 例題',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(53,9,3,'code','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nmath = df[\"math\"]\nprint(\"範囲:\", math.max() - math.min())\nprint(\"分散:\", round(math.var(), 2))\nprint(\"標準偏差:\", round(math.std(), 2))\nprint(\"標準偏差(ddof=0):\", round(math.std(ddof=0), 2))',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(54,9,4,'markdown','## 演習',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(55,9,5,'exercise','',10,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(56,9,6,'exercise','',11,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(57,10,1,'markdown','## 概念\n\n**相関係数** $r$ は、2つの変数の直線的な関係の強さを −1 〜 1 で表します。\n\n- $r$ が 1 に近い:一方が大きいほど、もう一方も大きい(正の相関)\n- $r$ が −1 に近い:一方が大きいほど、もう一方は小さい(負の相関)\n- $r$ が 0 に近い:直線的な関係はほとんどない\n\n> **注意** 相関があっても、一方が原因でもう一方が起きている(因果関係)とは限りません。',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(58,10,2,'markdown','## 例題\n勉強時間と数学の点数の関係を散布図で確認します。',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(59,10,3,'code','import pandas as pd\nimport matplotlib.pyplot as plt\n\ndf = pd.read_csv(\"scores.csv\")\nplt.scatter(df[\"study_hours\"], df[\"math\"])\nplt.xlabel(\"study_hours\")\nplt.ylabel(\"math\")\nplt.show()',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(60,10,4,'code','df[[\"math\", \"english\", \"study_hours\"]].corr().round(2)',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(61,10,5,'markdown','## 演習',NULL,0,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(62,10,6,'exercise','',12,0,'2026-10-01 00:18:33','2026-10-01 00:18:33');
 /*!40000 ALTER TABLE `cells` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -163,7 +262,7 @@ CREATE TABLE `courses` (
   UNIQUE KEY `slug` (`slug`),
   KEY `author_id` (`author_id`),
   CONSTRAINT `courses_ibfk_1` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -172,7 +271,7 @@ CREATE TABLE `courses` (
 
 LOCK TABLES `courses` WRITE;
 /*!40000 ALTER TABLE `courses` DISABLE KEYS */;
-INSERT INTO `courses` VALUES (1,'statistics-basics','統計の基礎','データ分析の出発点となる記述統計を、pandas で手を動かしながら学びます。データの種類から代表値、散らばり、相関までを扱い、実データを要約して読み解けるようになることを目指します。','basic','[\"統計\", \"pandas\"]','[\"データの種類に応じた集計方法を選べる\", \"代表値と散らばりでデータを要約できる\", \"相関を計算し、正しく解釈できる\"]','[\"pandas\", \"numpy\", \"matplotlib\"]','published',1,NULL,'2026-09-30 07:48:03','2026-09-30 07:48:03');
+INSERT INTO `courses` VALUES (2,'statistics-basics','統計の基礎','データ分析の出発点となる記述統計を、pandas で手を動かしながら学びます。データの種類から代表値、散らばり、相関までを扱い、実データを要約して読み解けるようになることを目指します。','basic','[\"統計\", \"pandas\"]','[\"データの種類に応じた集計方法を選べる\", \"代表値と散らばりでデータを要約できる\", \"相関を計算し、正しく解釈できる\"]','[\"pandas\", \"numpy\", \"matplotlib\"]','published',1,'2026-10-01 00:18:34','2026-10-01 00:18:33','2026-10-01 00:18:33');
 /*!40000 ALTER TABLE `courses` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -194,7 +293,7 @@ CREATE TABLE `datasets` (
   PRIMARY KEY (`id`),
   KEY `course_id` (`course_id`),
   CONSTRAINT `datasets_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -203,7 +302,7 @@ CREATE TABLE `datasets` (
 
 LOCK TABLES `datasets` WRITE;
 /*!40000 ALTER TABLE `datasets` DISABLE KEYS */;
-INSERT INTO `datasets` VALUES (1,1,'scores.csv','text/csv',0x73747564656E745F69642C636C6173732C6D6174682C656E676C6973682C73747564795F686F7572730D0A533030312C412C37382C34302C372E360D0A533030322C422C33342C36312C322E390D0A533030332C412C37382C36342C362E360D0A533030342C422C35382C34332C332E370D0A533030352C412C33342C36342C342E350D0A533030362C422C36312C36302C362E370D0A533030372C412C38342C36372C382E300D0A533030382C422C38372C35372C392E350D0A533030392C412C34332C34372C342E300D0A533031302C422C37302C36302C382E300D0A533031312C412C37302C35342C362E300D0A533031322C422C33362C35312C332E320D0A533031332C412C35382C34372C362E390D0A533031342C422C36312C36392C342E360D0A533031352C412C36372C38312C362E390D0A533031362C422C34392C36392C342E390D0A533031372C412C37352C37382C372E390D0A533031382C422C35362C34392C342E300D0A533031392C412C36392C34322C352E390D0A533032302C422C36382C36362C342E390D0A533032312C412C35342C38332C362E360D0A533032322C422C34322C36332C332E370D0A533032332C412C36382C39322C352E350D0A533032342C422C37312C37392C372E350D0A533032352C412C38352C38302C392E380D0A533032362C422C37352C36372C372E350D0A533032372C412C38352C36362C392E370D0A533032382C422C36352C34392C362E340D0A533032392C412C36392C37352C372E300D0A533033302C422C39392C37302C31302E380D0A533033312C412C38372C38302C392E330D0A533033322C422C36372C36372C332E390D0A533033332C412C37372C37372C382E330D0A533033342C422C37392C36372C382E370D0A533033352C412C35372C37302C322E390D0A533033362C422C37392C37372C362E380D0A533033372C412C37372C37332C392E310D0A533033382C422C37382C37322C362E360D0A533033392C412C36312C36302C352E350D0A533034302C422C33312C36302C322E310D0A,'2026-09-30 07:48:03','2026-09-30 07:48:03');
+INSERT INTO `datasets` VALUES (2,2,'scores.csv','text/csv',0x73747564656E745F69642C636C6173732C6D6174682C656E676C6973682C73747564795F686F7572730D0A533030312C412C37382C34302C372E360D0A533030322C422C33342C36312C322E390D0A533030332C412C37382C36342C362E360D0A533030342C422C35382C34332C332E370D0A533030352C412C33342C36342C342E350D0A533030362C422C36312C36302C362E370D0A533030372C412C38342C36372C382E300D0A533030382C422C38372C35372C392E350D0A533030392C412C34332C34372C342E300D0A533031302C422C37302C36302C382E300D0A533031312C412C37302C35342C362E300D0A533031322C422C33362C35312C332E320D0A533031332C412C35382C34372C362E390D0A533031342C422C36312C36392C342E360D0A533031352C412C36372C38312C362E390D0A533031362C422C34392C36392C342E390D0A533031372C412C37352C37382C372E390D0A533031382C422C35362C34392C342E300D0A533031392C412C36392C34322C352E390D0A533032302C422C36382C36362C342E390D0A533032312C412C35342C38332C362E360D0A533032322C422C34322C36332C332E370D0A533032332C412C36382C39322C352E350D0A533032342C422C37312C37392C372E350D0A533032352C412C38352C38302C392E380D0A533032362C422C37352C36372C372E350D0A533032372C412C38352C36362C392E370D0A533032382C422C36352C34392C362E340D0A533032392C412C36392C37352C372E300D0A533033302C422C39392C37302C31302E380D0A533033312C412C38372C38302C392E330D0A533033322C422C36372C36372C332E390D0A533033332C412C37372C37372C382E330D0A533033342C422C37392C36372C382E370D0A533033352C412C35372C37302C322E390D0A533033362C422C37392C37372C362E380D0A533033372C412C37372C37332C392E310D0A533033382C422C37382C37322C362E360D0A533033392C412C36312C36302C352E350D0A533034302C422C33312C36302C322E310D0A,'2026-10-01 00:18:33','2026-10-01 00:18:33');
 /*!40000 ALTER TABLE `datasets` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -246,7 +345,7 @@ CREATE TABLE `problems` (
   CONSTRAINT `problems_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE,
   CONSTRAINT `problems_ibfk_2` FOREIGN KEY (`related_unit_id`) REFERENCES `units` (`id`) ON DELETE SET NULL,
   CONSTRAINT `problems_ibfk_3` FOREIGN KEY (`unit_id`) REFERENCES `units` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=84 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -255,8 +354,39 @@ CREATE TABLE `problems` (
 
 LOCK TABLES `problems` WRITE;
 /*!40000 ALTER TABLE `problems` DISABLE KEYS */;
-INSERT INTO `problems` VALUES (1,1,1,'exercise',1,'code','クラスごとの人数','質的データは度数を数えて集計します。`class` 列について、クラスごとの人数をクラス名の順に表示してください。空欄 `____` を埋めて実行し、提出してください。','Series の値ごとの出現回数は value_counts() で数えられます。','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\ncounts = df[\"class\"].____().sort_index()\nprint(counts)','output','class\nA    20\nB    20\nName: count, dtype: int64','','[]','',0.000001,'value_counts() は質的データの集計でよく使います。',NULL,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\ncounts = df[\"class\"].value_counts().sort_index()\nprint(counts)','verified',1,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(2,1,2,'exercise',1,'code','数学の度数分布表','数学(`math`)の点数を **10 点刻み**(30〜100 点)の階級に分け、階級の順に度数を表示してください。','階級の区切りは変数 bins に用意してあります。','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nbins = range(30, 101, 10)\ntable = pd.cut(df[\"math\"], bins=____).value_counts().sort_index()\nprint(table)','output','math\n(30, 40]      4\n(40, 50]      3\n(50, 60]      5\n(60, 70]     12\n(70, 80]     10\n(80, 90]      5\n(90, 100]     1\nName: count, dtype: int64','','[]','',0.000001,'(30, 40] は「30 より大きく 40 以下」を表します。',NULL,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nbins = range(30, 101, 10)\ntable = pd.cut(df[\"math\"], bins=bins).value_counts().sort_index()\nprint(table)','verified',1,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(3,1,3,'exercise',1,'code','外れ値を含むデータの代表値','9人目として **300点**(入力ミスによる外れ値)が加わりました。このデータの平均と中央値を求めてください。空欄 `____` を埋めて実行し、提出してください。','pandas の Series には .mean() と .median() メソッドがあります。','import pandas as pd\n\nscores = pd.Series([62, 75, 75, 81, 94, 58, 75, 88, 300])\n\nmean = scores.____()\nmedian = scores.____()\n\nprint(f\"平均: {mean:.2f}\")\nprint(f\"中央値: {median}\")','output','平均: 100.89\n中央値: 75.0','','[]','',0.000001,'平均は 76.0 から 100.89 に大きく動きましたが、中央値は 75.0 のままです。',NULL,'','import pandas as pd\n\nscores = pd.Series([62, 75, 75, 81, 94, 58, 75, 88, 300])\n\nmean = scores.mean()\nmedian = scores.median()\n\nprint(f\"平均: {mean:.2f}\")\nprint(f\"中央値: {median}\")','verified',1,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(4,1,4,'exercise',1,'code','英語の標準偏差','英語(`english`)の点数の **標準偏差**(不偏、`ddof=1`)を求め、小数第2位まで表示してください。','df[\"english\"] に対して std() を呼び出します。','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nsd = ____\nprint(round(sd, 2))','output','12.43','','[]','',0.000001,'pandas の std() は既定で ddof=1(不偏)です。',NULL,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nsd = df[\"english\"].std()\nprint(round(sd, 2))','verified',1,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(5,1,4,'exercise',2,'code','数学の点数の標準化','平均が 0、標準偏差が 1 になるように変換することを **標準化** といい、変換後の値を **zスコア** と呼びます。\n$z_i = \\frac{x_i - \\bar{x}}{s}$\n\n数学の点数を標準化した Series を変数 `z` に作ってください。この演習はテストコードで採点します(`z` の平均が 0、標準偏差が 1 になっていれば正解です)。','平均を引いて、標準偏差で割ります。','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nmath = df[\"math\"]\nz = ____\nprint(z.head())','test','','assert len(z) == 40\nassert abs(z.mean()) < 1e-9\nassert abs(z.std() - 1) < 1e-9','[]','',0.000001,'zスコアを使うと、単位や平均の異なるデータどうしを比較できます。',NULL,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nmath = df[\"math\"]\nz = (math - math.mean()) / math.std()\nprint(z.head())','verified',1,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(6,1,5,'exercise',1,'code','勉強時間と英語の相関係数','勉強時間(`study_hours`)と英語(`english`)の点数の相関係数を求め、小数第3位まで表示してください。','Series どうしの相関係数は corr() で求められます。','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nr = df[\"study_hours\"].____(df[\"english\"])\nprint(round(r, 3))','output','0.326','','[]','',0.000001,'数学より弱いものの、正の相関があります。',NULL,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nr = df[\"study_hours\"].corr(df[\"english\"])\nprint(round(r, 3))','verified',1,'2026-09-30 07:48:03','2026-09-30 07:48:03');
+INSERT INTO `problems` VALUES (7,2,6,'exercise',1,'code','クラスごとの人数','質的データは度数を数えて集計します。`class` 列について、クラスごとの人数をクラス名の順に表示してください。空欄 `____` を埋めて実行し、提出してください。','Series の値ごとの出現回数は value_counts() で数えられます。','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\ncounts = df[\"class\"].____().sort_index()\nprint(counts)','output','class\nA    20\nB    20\nName: count, dtype: int64','','[]','',0.000001,'value_counts() は質的データの集計でよく使います。',NULL,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\ncounts = df[\"class\"].value_counts().sort_index()\nprint(counts)','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(8,2,7,'exercise',1,'code','数学の度数分布表','数学(`math`)の点数を **10 点刻み**(30〜100 点)の階級に分け、階級の順に度数を表示してください。','階級の区切りは変数 bins に用意してあります。','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nbins = range(30, 101, 10)\ntable = pd.cut(df[\"math\"], bins=____).value_counts().sort_index()\nprint(table)','output','math\n(30, 40]      4\n(40, 50]      3\n(50, 60]      5\n(60, 70]     12\n(70, 80]     10\n(80, 90]      5\n(90, 100]     1\nName: count, dtype: int64','','[]','',0.000001,'(30, 40] は「30 より大きく 40 以下」を表します。',NULL,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nbins = range(30, 101, 10)\ntable = pd.cut(df[\"math\"], bins=bins).value_counts().sort_index()\nprint(table)','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(9,2,8,'exercise',1,'code','外れ値を含むデータの代表値','9人目として **300点**(入力ミスによる外れ値)が加わりました。このデータの平均と中央値を求めてください。空欄 `____` を埋めて実行し、提出してください。','pandas の Series には .mean() と .median() メソッドがあります。','import pandas as pd\n\nscores = pd.Series([62, 75, 75, 81, 94, 58, 75, 88, 300])\n\nmean = scores.____()\nmedian = scores.____()\n\nprint(f\"平均: {mean:.2f}\")\nprint(f\"中央値: {median}\")','output','平均: 100.89\n中央値: 75.0','','[]','',0.000001,'平均は 76.0 から 100.89 に大きく動きましたが、中央値は 75.0 のままです。',NULL,'','import pandas as pd\n\nscores = pd.Series([62, 75, 75, 81, 94, 58, 75, 88, 300])\n\nmean = scores.mean()\nmedian = scores.median()\n\nprint(f\"平均: {mean:.2f}\")\nprint(f\"中央値: {median}\")','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(10,2,9,'exercise',1,'code','英語の標準偏差','英語(`english`)の点数の **標準偏差**(不偏、`ddof=1`)を求め、小数第2位まで表示してください。','df[\"english\"] に対して std() を呼び出します。','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nsd = ____\nprint(round(sd, 2))','output','12.43','','[]','',0.000001,'pandas の std() は既定で ddof=1(不偏)です。',NULL,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nsd = df[\"english\"].std()\nprint(round(sd, 2))','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(11,2,9,'exercise',2,'code','数学の点数の標準化','平均が 0、標準偏差が 1 になるように変換することを **標準化** といい、変換後の値を **zスコア** と呼びます。\n$z_i = \\frac{x_i - \\bar{x}}{s}$\n\n数学の点数を標準化した Series を変数 `z` に作ってください。この演習はテストコードで採点します(`z` の平均が 0、標準偏差が 1 になっていれば正解です)。','平均を引いて、標準偏差で割ります。','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nmath = df[\"math\"]\nz = ____\nprint(z.head())','test','','assert len(z) == 40\nassert abs(z.mean()) < 1e-9\nassert abs(z.std() - 1) < 1e-9','[]','',0.000001,'zスコアを使うと、単位や平均の異なるデータどうしを比較できます。',NULL,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nmath = df[\"math\"]\nz = (math - math.mean()) / math.std()\nprint(z.head())','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(12,2,10,'exercise',1,'code','勉強時間と英語の相関係数','勉強時間(`study_hours`)と英語(`english`)の点数の相関係数を求め、小数第3位まで表示してください。','Series どうしの相関係数は corr() で求められます。','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nr = df[\"study_hours\"].____(df[\"english\"])\nprint(round(r, 3))','output','0.326','','[]','',0.000001,'数学より弱いものの、正の相関があります。',NULL,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nr = df[\"study_hours\"].corr(df[\"english\"])\nprint(round(r, 3))','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(13,2,NULL,'quiz',1,'choice','問1','「血液型(A型・B型・O型・AB型)」のデータは、次のどの尺度に当てはまりますか。','','','output','','','[\"名義尺度\", \"順序尺度\", \"間隔尺度\", \"比例尺度\"]','名義尺度',0,'血液型は区別のためのラベルで、順序や大小関係がないため名義尺度です。',6,'','','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(14,2,NULL,'quiz',2,'choice','問2','`pd.cut` で作った階級 `(30, 40]` が表す範囲として正しいものはどれですか。','','','output','','','[\"30 以上 40 未満\", \"30 より大きく 40 以下\", \"30 以上 40 以下\", \"30 より大きく 40 未満\"]','30 より大きく 40 以下',0,'pd.cut の既定(right=True)では、階級の右端を含み左端を含みません。',7,'','','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(15,2,NULL,'quiz',3,'code','問3','`scores.csv` の英語(`english`)の点数を、階級 `[20, 40, 60, 80, 100]` で区切ったとき、**60 点より大きく 80 点以下** の人数を表示してください。','','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nbins = [20, 40, 60, 80, 100]\ntable = pd.cut(df[\"english\"], bins=bins).value_counts().sort_index()\nprint(____)','output','23','','[]','',0.000001,'(60, 80] は3番目の階級なので table.iloc[2] で取り出せます。',7,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nbins = [20, 40, 60, 80, 100]\ntable = pd.cut(df[\"english\"], bins=bins).value_counts().sort_index()\nprint(table.iloc[2])','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(16,2,NULL,'quiz',4,'choice','問4','外れ値の影響を最も受けにくい代表値はどれですか。','','','output','','','[\"平均\", \"中央値\", \"最大値\", \"範囲\"]','中央値',0,'中央値は並べたときの真ん中の値なので、極端な値が加わってもほとんど動きません。',8,'','','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(17,2,NULL,'quiz',5,'numeric','問5','データ `[2, 4, 4, 5, 10]` の **平均** を答えてください。','','','output','','','[]','5',0.000001,'(2 + 4 + 4 + 5 + 10) ÷ 5 = 5 です。',8,'','','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(18,2,NULL,'quiz',6,'numeric','問6','データ `[2, 4, 4, 5, 10]` の **中央値** を答えてください。','','','output','','','[]','4',0.000001,'小さい順に並べた 2, 4, 4, 5, 10 の真ん中(3番目)の 4 が中央値です。',8,'','','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(19,2,NULL,'quiz',7,'code','問7','`scores.csv` の数学(`math`)の点数の **分散**(不偏分散)を求め、小数第2位まで表示してください。','','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nvar = ____\nprint(round(var, 2))','output','265.95','','[]','',0.000001,'pandas の var() は既定で不偏分散(ddof=1)を返します。',9,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nvar = df[\"math\"].var()\nprint(round(var, 2))','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(20,2,NULL,'quiz',8,'choice','問8','pandas の `std()` は、既定でどのように標準偏差を計算しますか。','','','output','','','[\"n で割る(ddof=0)\", \"n − 1 で割る(ddof=1)\", \"n + 1 で割る\", \"中央値からの差で計算する\"]','n − 1 で割る(ddof=1)',0,'pandas の var() / std() は既定で ddof=1(不偏)、NumPy の np.var() / np.std() は ddof=0 です。',9,'','','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(21,2,NULL,'quiz',9,'code','問9','`scores.csv` の数学(`math`)と英語(`english`)の点数の **相関係数** を求め、小数第3位まで表示してください。','','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nr = ____\nprint(round(r, 3))','output','0.306','','[]','',0.000001,'Series どうしの相関係数は corr() で求められます。',10,'','import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nr = df[\"math\"].corr(df[\"english\"])\nprint(round(r, 3))','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(22,2,NULL,'quiz',10,'choice','問10','相関係数について正しい説明はどれですか。','','','output','','','[\"相関係数が 0.9 なら、一方が原因でもう一方が起きている\", \"相関があっても、因果関係があるとは限らない\", \"相関係数が 0 なら、2つの変数にはまったく関係がない\", \"相関係数は 0 〜 100 の範囲の値をとる\"]','相関があっても、因果関係があるとは限らない',0,'第3の要因(交絡)や偶然でも相関は生じます。因果関係は相関係数だけでは判断できません。',10,'','','verified',1,'2026-10-01 00:18:33','2026-10-01 00:18:33');
 /*!40000 ALTER TABLE `problems` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `quiz_attempts`
+--
+
+DROP TABLE IF EXISTS `quiz_attempts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `quiz_attempts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `course_id` int NOT NULL,
+  `score` int NOT NULL,
+  `total` int NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT (now()),
+  PRIMARY KEY (`id`),
+  KEY `course_id` (`course_id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `quiz_attempts_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `quiz_attempts_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `quiz_attempts`
+--
+
+LOCK TABLES `quiz_attempts` WRITE;
+/*!40000 ALTER TABLE `quiz_attempts` DISABLE KEYS */;
+/*!40000 ALTER TABLE `quiz_attempts` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -275,12 +405,15 @@ CREATE TABLE `submissions` (
   `passed` tinyint(1) NOT NULL,
   `content_version` int NOT NULL,
   `created_at` datetime NOT NULL DEFAULT (now()),
+  `attempt_id` int DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `problem_id` (`problem_id`),
   KEY `user_id` (`user_id`),
+  KEY `attempt_id` (`attempt_id`),
   CONSTRAINT `submissions_ibfk_1` FOREIGN KEY (`problem_id`) REFERENCES `problems` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `submissions_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  CONSTRAINT `submissions_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `submissions_ibfk_3` FOREIGN KEY (`attempt_id`) REFERENCES `quiz_attempts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -289,6 +422,7 @@ CREATE TABLE `submissions` (
 
 LOCK TABLES `submissions` WRITE;
 /*!40000 ALTER TABLE `submissions` DISABLE KEYS */;
+INSERT INTO `submissions` VALUES (24,1,7,'import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\ncounts = df[\"class\"].value_counts().sort_index()\nprint(counts)','class\nA    20\nB    20\nName: count, dtype: int64\n',1,1,'2026-10-01 00:52:52',NULL),(25,1,8,'import pandas as pd\n\ndf = pd.read_csv(\"scores.csv\")\nbins = range(30, 101, 10)\ntable = pd.cut(df[\"math\"], bins=bins).value_counts().sort_index()\nprint(table)','math\n(30, 40]      4\n(40, 50]      3\n(50, 60]      5\n(60, 70]     12\n(70, 80]     10\n(80, 90]      5\n(90, 100]     1\nName: count, dtype: int64\n',1,1,'2026-10-01 00:53:43',NULL),(26,1,9,'import pandas as pd\n\nscores = pd.Series([62, 75, 75, 81, 94, 58, 75, 88, 300])\n\nmean = scores.mean()\nmedian = scores.median()\n\nprint(f\"平均: {mean:.2f}\")\nprint(f\"中央値: {median}\")','平均: 100.89\n中央値: 75.0\n',1,1,'2026-10-01 00:54:22',NULL);
 /*!40000 ALTER TABLE `submissions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -316,6 +450,7 @@ CREATE TABLE `unit_progress` (
 
 LOCK TABLES `unit_progress` WRITE;
 /*!40000 ALTER TABLE `unit_progress` DISABLE KEYS */;
+INSERT INTO `unit_progress` VALUES (1,6,'2026-10-01 00:52:52'),(1,7,'2026-10-01 00:53:43'),(1,8,'2026-10-01 00:54:22');
 /*!40000 ALTER TABLE `unit_progress` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -339,7 +474,7 @@ CREATE TABLE `units` (
   PRIMARY KEY (`id`),
   KEY `course_id` (`course_id`),
   CONSTRAINT `units_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -348,7 +483,7 @@ CREATE TABLE `units` (
 
 LOCK TABLES `units` WRITE;
 /*!40000 ALTER TABLE `units` DISABLE KEYS */;
-INSERT INTO `units` VALUES (1,1,1,'データの種類','量的データと質的データ、尺度水準の違いを学び、pandas でデータの型を確認します。','[\"量的データと質的データを区別できる\", \"4つの尺度水準を説明できる\", \"pandas でデータを読み込み、列の型を確認できる\"]',20,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(2,1,2,'度数分布とヒストグラム','量的データを階級に分けて数え、分布の形をヒストグラムで確認します。','[\"度数分布表の階級と度数を説明できる\", \"pandas で度数分布表を作れる\", \"matplotlib でヒストグラムを描ける\"]',25,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(3,1,3,'代表値：平均・中央値・最頻値','3つの代表値の違いと、外れ値が与える影響を学びます。','[\"平均・中央値・最頻値の違いを説明できる\", \"pandas で代表値を計算できる\", \"外れ値が代表値に与える影響を理解する\"]',20,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(4,1,4,'散らばり：分散と標準偏差','データが平均の周りにどれくらい散らばっているかを数値で表します。','[\"範囲・分散・標準偏差を説明できる\", \"不偏分散と ddof の意味を理解する\", \"データを標準化(zスコア)できる\"]',25,'2026-09-30 07:48:03','2026-09-30 07:48:03'),(5,1,5,'相関','2つの量的データの関係を、散布図と相関係数で確認します。','[\"散布図から2変数の関係を読み取れる\", \"相関係数を計算し、解釈できる\", \"相関と因果の違いを説明できる\"]',25,'2026-09-30 07:48:03','2026-09-30 07:48:03');
+INSERT INTO `units` VALUES (6,2,1,'データの種類','量的データと質的データ、尺度水準の違いを学び、pandas でデータの型を確認します。','[\"量的データと質的データを区別できる\", \"4つの尺度水準を説明できる\", \"pandas でデータを読み込み、列の型を確認できる\"]',20,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(7,2,2,'度数分布とヒストグラム','量的データを階級に分けて数え、分布の形をヒストグラムで確認します。','[\"度数分布表の階級と度数を説明できる\", \"pandas で度数分布表を作れる\", \"matplotlib でヒストグラムを描ける\"]',25,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(8,2,3,'代表値：平均・中央値・最頻値','3つの代表値の違いと、外れ値が与える影響を学びます。','[\"平均・中央値・最頻値の違いを説明できる\", \"pandas で代表値を計算できる\", \"外れ値が代表値に与える影響を理解する\"]',20,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(9,2,4,'散らばり：分散と標準偏差','データが平均の周りにどれくらい散らばっているかを数値で表します。','[\"範囲・分散・標準偏差を説明できる\", \"不偏分散と ddof の意味を理解する\", \"データを標準化(zスコア)できる\"]',25,'2026-10-01 00:18:33','2026-10-01 00:18:33'),(10,2,5,'相関','2つの量的データの関係を、散布図と相関係数で確認します。','[\"散布図から2変数の関係を読み取れる\", \"相関係数を計算し、解釈できる\", \"相関と因果の違いを説明できる\"]',25,'2026-10-01 00:18:33','2026-10-01 00:18:33');
 /*!40000 ALTER TABLE `units` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -370,7 +505,7 @@ CREATE TABLE `users` (
   `updated_at` datetime NOT NULL DEFAULT (now()),
   PRIMARY KEY (`id`),
   UNIQUE KEY `login_name` (`login_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
