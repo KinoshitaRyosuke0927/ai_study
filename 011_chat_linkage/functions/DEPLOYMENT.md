@@ -140,10 +140,25 @@ $Sas = az storage blob generate-sas `
   --auth-mode key -o tsv
 $Url = "https://$STORAGE.blob.core.windows.net/deploy/$BlobName`?$Sas"
 
-az functionapp config appsettings set --name $FUNCAPP --resource-group $RG `
-  --settings WEBSITE_RUN_FROM_PACKAGE="$Url"
+# SAS URLには "&" が含まれるため、PowerShellから --settings KEY="値" で直接渡すと
+# az.cmd(バッチファイル)が "&" をコマンド区切りと解釈して値が途中で切れる(トラブルシューティング12参照)。
+# そのためJSONファイル経由で設定する
+$Json = Join-Path $env:TEMP "runfrompkg.json"
+(@{ WEBSITE_RUN_FROM_PACKAGE = $Url } | ConvertTo-Json -Compress) | Set-Content -Encoding ascii $Json
+az functionapp config appsettings set --name $FUNCAPP --resource-group $RG --settings "@$Json"
+Remove-Item $Json
+
+# 設定値が切れずに保存されたかを読み戻して確認する(True になること)
+$Saved = az functionapp config appsettings list --name $FUNCAPP --resource-group $RG `
+  --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value" -o tsv
+$Saved -eq $Url
 
 az functionapp restart --name $FUNCAPP --resource-group $RG
+
+# WEBSITE_RUN_FROM_PACKAGE を手動設定した場合はトリガー情報が自動同期されないため、明示的に同期する
+$Sub = az account show --query id -o tsv
+az rest --method post `
+  --uri "/subscriptions/$Sub/resourceGroups/$RG/providers/Microsoft.Web/sites/$FUNCAPP/syncfunctiontriggers?api-version=2022-03-01"
 ```
 
 **重要**: Blob名は毎回変える(タイムスタンプを含める)こと。同じBlob名を使い回して内容だけ
@@ -158,6 +173,14 @@ az functionapp function list --resource-group $RG --name $FUNCAPP
 
 `poll_slash_commands` が一覧に出れば成功。空配列 `[]` の場合は、Application Insightsで
 エラーログを確認する(下記「動作確認・ログの見方」参照)。
+
+あわせて、ホストが起動していること(`state` が `Running`)も確認する。
+`function list` は過去に同期された情報を返すだけのため、ホストが起動できていなくても成功したように見えることがある:
+
+```powershell
+$Key = az functionapp keys list --resource-group $RG --name $FUNCAPP --query "masterKey" -o tsv
+Invoke-RestMethod -Uri "https://$FUNCAPP.azurewebsites.net/admin/host/status" -Headers @{ "x-functions-key" = $Key }
+```
 
 ## 5. 動作確認
 
@@ -320,6 +343,19 @@ az monitor app-insights query --app $FUNCAPP --resource-group $RG `
   ことであり、キャッシュの問題ではなかった。ただし切り分けの過程で、念のため
   **Blob名にタイムスタンプを含めて毎回変える**運用にしておくと、こうした切り分けが
   容易になる(本手順書のデプロイ手順もこの方式を採用している)。
+
+### 12. PowerShellから設定した `WEBSITE_RUN_FROM_PACKAGE` のURLが途中で切れ、関数が動かなくなる
+
+- **症状**: デプロイ後、タイマートリガーが一切実行されなくなった(Application Insightsに
+  実行記録もエラーログも出ない)。`function list` には関数が表示されるが、
+  `/admin/host/status` は503を返し続けた。
+- **原因**: PowerShellから `az functionapp config appsettings set --settings WEBSITE_RUN_FROM_PACKAGE="$Url"`
+  のようにSAS URLを渡すと、`az` の実体であるバッチファイル(az.cmd)が値の中の `&` を
+  コマンド区切りとして解釈し、最初の `&` より後ろが切り捨てられる。SAS URLの認証パラメータが
+  欠けるためパッケージをダウンロードできず(HEADで409)、ホストが起動できなかった。
+  再起動直後の1回は旧インスタンスで実行されて成功するため、デプロイ直後の確認では気付きにくい。
+- **対処**: 値をJSONファイルに書き出し `--settings "@ファイル"` で渡す方式に変更した(4章の手順)。
+  設定後は値を読み戻して元のURLと一致するか、`/admin/host/status` が `Running` になるかを確認する。
 
 ---
 

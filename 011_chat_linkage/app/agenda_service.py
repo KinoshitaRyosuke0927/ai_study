@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app import growi_service as growi
@@ -21,6 +21,11 @@ if getattr(sys, "frozen", False):
     AGENDA_TEMPLATE_PATH = Path(sys.executable).resolve().parent / "agenda_template.txt"
 else:
     AGENDA_TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "agenda_template.txt"
+
+# アジェンダの年月・投稿日時の表示に使うタイムゾーン。
+# Azure Functions上ではサーバのローカル時刻がUTCになるため、実行環境に依存せずJSTで扱う
+# (exe配布時のWindowsにはIANAタイムゾーンDBが無い場合があるため、ZoneInfoではなく固定オフセットを使う)
+JST = timezone(timedelta(hours=9), "JST")
 
 
 def filter_posts_by_reminder_score(posts: list[dict], threshold: float) -> list[dict]:
@@ -90,7 +95,7 @@ def render_agenda_document(items: list[dict]) -> str:
     if not AGENDA_TEMPLATE_PATH.exists():
         raise FileNotFoundError(f"アジェンダのひな形ファイルが見つかりません({AGENDA_TEMPLATE_PATH.name})")
 
-    now = datetime.now()
+    now = datetime.now(JST)
     template = AGENDA_TEMPLATE_PATH.read_text(encoding="utf-8")
     return (
         template.replace("{{YEAR}}", str(now.year))
@@ -144,7 +149,7 @@ def build_and_publish_agenda(settings: dict) -> str:
         return "直近の対象チャンネルにアジェンダ化できる投稿が見つかりませんでした。"
 
     agenda_text = render_agenda_document(items)
-    now = datetime.now()
+    now = datetime.now(JST)
     # 自動生成した内容は未確認のまま第三者に公開されないよう、自分のみ閲覧可能な状態で公開する
     # (画面からの手動公開はユーザーが選択した公開範囲(既定は公開)のままとし、この既定はここでのみ上書きする)
     result = publish_agenda_document(settings, agenda_text, now.year, now.month, grant=growi.PAGE_GRANT_ONLY_ME)

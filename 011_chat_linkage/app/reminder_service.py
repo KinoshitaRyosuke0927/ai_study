@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app import mattermost_service as mm
-from app.agenda_service import filter_posts_by_reminder_score
+from app.agenda_service import JST, filter_posts_by_reminder_score
 from app.azure_ai_service import call_summarize_post_for_reminder
 
 # リマインド作成時に、リアクション済みとみなす絵文字名
@@ -45,7 +45,7 @@ def _escape_table_cell(text: str) -> str:
 def build_reminder_list_message(settings: dict) -> str:
     """
     "/nightrain remind" コマンド用: settings.iniの[slash_watch]remind_channels(未設定時は
-    [history]channel)・read_dateで指定された対象チャンネルすべてを走査してリマインド候補投稿を
+    [history]channel)・[slash_watch]remind_read_dateで指定された対象チャンネルすべてを走査してリマインド候補投稿を
     抽出し、Markdown表形式の一覧メッセージを組み立てる。
     画面から作成する場合と異なり、挨拶文・メンションは付けずメインコンテンツのみを返す。
 
@@ -59,7 +59,7 @@ def build_reminder_list_message(settings: dict) -> str:
 
     """
     channel_names = settings.get("slash_watch_remind_channels", [])
-    read_date = settings.get("read_date", 30)
+    read_date = settings.get("slash_watch_remind_read_date", 7)
     threshold = settings.get("slash_watch_reminder_threshold", 0.9)
 
     if not channel_names:
@@ -90,9 +90,9 @@ def build_reminder_list_message(settings: dict) -> str:
     # 複数チャンネル分が混在するため、投稿日時順に並べ替えてから表にする
     candidates.sort(key=lambda p: p["create_at"])
 
-    rows = ["| 投稿日時 | 元の投稿へのリンク | 投稿内容要約 |", "| --- | --- | --- |"]
+    rows = ["| 投稿日時 | 元の投稿 | 投稿内容要約 |", "| --- | --- | --- |"]
     for post in candidates:
-        date_str = datetime.fromtimestamp(post["create_at"] / 1000).strftime("%Y-%m-%d %H:%M")
+        date_str = datetime.fromtimestamp(post["create_at"] / 1000, tz=JST).strftime("%Y-%m-%d %H:%M")
         summary = call_summarize_post_for_reminder(post["message"])
         rows.append(
             f"| {date_str} | [投稿を見る]({post['url']}) | {_escape_table_cell(summary)} |"

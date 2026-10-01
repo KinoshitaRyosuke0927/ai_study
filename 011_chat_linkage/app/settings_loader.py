@@ -59,4 +59,6 @@ def load_settings() -> dict:
         "slash_watch_remind_channels": remind_watch_channels,
         "slash_watch_poll_overlap_minutes": config.getint("slash_watch", "poll_overlap_minutes", fallback=2),
         "slash_watch_reminder_threshold": config.getfloat("slash_watch", "reminder_threshold", fallback=0.9),
+        # "/nightrain remind" 実行時にさかのぼる日数(画面の取得期間の初期値 history.read_date とは別管理)
+        "slash_watch_remind_read_date": config.getint("slash_watch", "remind_read_date", fallback=7),
     }
