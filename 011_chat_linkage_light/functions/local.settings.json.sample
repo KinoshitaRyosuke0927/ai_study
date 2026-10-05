@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "MATTERMOST_URL": "https://your-mattermost.example.com",
+    "MATTERMOST_TOKEN": "your-personal-access-token",
+    "AZURE_OPENAI_ENDPOINT": "https://your-endpoint.example.com",
+    "AZURE_OPENAI_KEY": "your-azure-openai-key",
+    "GROWI_BASE_URL": "https://your-growi.example.com",
+    "GROWI_API_TOKEN": "your-growi-api-token"
+  }
+}
