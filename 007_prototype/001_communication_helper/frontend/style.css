@@ -1,0 +1,184 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Hiragino Sans", "Meiryo", sans-serif;
+  background: #f4f5f7;
+  color: #222;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #2d3e50;
+  color: #fff;
+}
+header h1 { font-size: 18px; margin: 0; }
+.badge { font-size: 12px; padding: 2px 10px; border-radius: 10px; background: #7f8c8d; }
+.badge.connected { background: #27ae60; }
+.badge.connecting { background: #e67e22; }
+
+main {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  height: calc(100vh - 52px);
+}
+@media (max-width: 1100px) {
+  main { grid-template-columns: 300px minmax(0, 1fr); height: auto; }
+  .emotion-panel { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  main { grid-template-columns: 1fr; height: auto; }
+}
+.panel {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+  overflow: auto;
+}
+label { display: block; font-size: 13px; font-weight: 600; margin-top: 12px; }
+select { display: block; width: 100%; margin-top: 4px; padding: 6px; font-size: 14px; }
+.note { font-size: 12px; color: #666; margin: 4px 0 0; }
+.situation {
+  margin-top: 8px;
+  padding: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  background: #fff8e1;
+  border-left: 4px solid #f1c40f;
+}
+details { margin-top: 12px; font-size: 13px; }
+
+.buttons { display: flex; gap: 8px; margin-top: 16px; }
+button {
+  flex: 1;
+  padding: 10px;
+  font-size: 15px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #2980b9;
+  color: #fff;
+}
+button#stop-btn { background: #c0392b; }
+button:disabled, button#stop-btn:disabled { background: #bdc3c7; cursor: default; }
+
+.status { margin-top: 16px; font-size: 14px; display: grid; gap: 6px; }
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #ccc;
+}
+.dot.active { background: #e74c3c; box-shadow: 0 0 6px #e74c3c; }
+
+.log-panel { display: flex; flex-direction: column; }
+.log-panel h2 { font-size: 15px; margin: 0 0 8px; }
+.log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.msg {
+  max-width: 75%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.msg.user { align-self: flex-end; background: #d6eaf8; }
+.msg.ai { align-self: flex-start; background: #eceff1; }
+.msg.pending { color: #888; font-style: italic; }
+.msg .tag { display: block; font-size: 11px; color: #c0392b; margin-top: 2px; }
+.msg.system { align-self: center; background: none; color: #888; font-size: 12px; }
+
+/* --- 感情パネル --- */
+:root {
+  --series-1: #2a78d6; /* 安心感 */
+  --series-2: #eb6834; /* 緊張 */
+  --series-3: #1baf7a; /* 意欲 */
+  --series-4: #eda100; /* 信頼感 */
+  --text-secondary: #52514e;
+  --text-muted: #8a8984;
+  --good: #1e7d32;
+  --bad: #c0392b;
+}
+.emotion-panel h2 { font-size: 15px; margin: 0 0 8px; }
+.eval-status { font-size: 12px; font-weight: normal; color: var(--text-muted); margin-left: 6px; }
+.meters { display: grid; gap: 6px; }
+.meter { display: grid; grid-template-columns: 56px 1fr 36px 44px; align-items: center; gap: 8px; font-size: 13px; }
+.meter-name { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
+.meter-key { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.meter-track { display: block; height: 8px; background: #eceff1; border-radius: 4px; overflow: hidden; }
+.meter-fill { display: block; height: 100%; border-radius: 4px; transition: width .6s ease; }
+.meter-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.meter-delta { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.inner-voice {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #f7f3ff;
+  border-radius: 10px;
+}
+.inner-voice-label { font-size: 11px; color: var(--text-muted); }
+.inner-voice p { margin: 2px 0 0; font-size: 14px; }
+.chart-wrap { position: relative; height: 240px; margin-top: 12px; }
+.reason { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 8px 0 0; }
+
+/* 会話ログ内の評価表示 */
+.eval { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.chip { font-size: 11px; padding: 1px 6px; border-radius: 8px; background: #fff; border: 1px solid #ddd; }
+.chip.good { border-color: var(--good); color: var(--good); }
+.chip.bad { border-color: var(--bad); color: var(--bad); }
+.chip.voice { color: var(--text-secondary); background: #f4f5f7; border-color: #e0e0dc; }
+.chip.voice.notable { color: #8a4b00; background: #fff4e0; border-color: #f0c27a; }
+
+/* 態度への反映 */
+.directive { margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+.directive pre {
+  margin: 4px 0 0;
+  padding: 8px;
+  white-space: pre-wrap;
+  font-family: inherit;
+  background: #f4f5f7;
+  border-radius: 6px;
+}
+
+/* 振り返りレポート */
+button.secondary {
+  flex: none;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  font-size: 14px;
+  background: #fff;
+  color: #2980b9;
+  border: 1px solid #2980b9;
+}
+button.secondary:disabled { background: #fff; color: #bdc3c7; border-color: #ddd; }
+dialog#report-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 20px 24px;
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .25);
+}
+dialog#report-dialog::backdrop { background: rgba(0, 0, 0, .4); }
+.report-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.report-head h2 { margin: 0; font-size: 18px; }
+.report-head button.secondary { width: auto; margin: 0; padding: 4px 14px; }
+#report-body h3 { font-size: 14px; margin: 18px 0 6px; padding-left: 8px; border-left: 4px solid #2980b9; }
+#report-body p { margin: 4px 0; font-size: 14px; line-height: 1.7; }
+.report-meta { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.report-emotions { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.report-emotions th, .report-emotions td { padding: 4px 8px; border-bottom: 1px solid #eee; text-align: right; }
+.report-emotions th:first-child, .report-emotions td:first-child { text-align: left; }
+.report-impression { padding: 10px 14px; background: #f7f3ff; border-radius: 10px; }
+.report-item { margin: 8px 0; padding: 10px 12px; border-radius: 8px; background: #f8f9fa; font-size: 14px; line-height: 1.7; }
+.report-item .quote { font-weight: 600; }
+.report-item .better { margin-top: 4px; padding: 6px 10px; background: #eaf6ec; border-radius: 6px; }
+.report-item .better::before { content: "言い換え例: "; font-size: 12px; color: var(--good); font-weight: 600; }
+.report-focus { padding: 10px 14px; background: #fff8e1; border-left: 4px solid #f1c40f; }
+.report-loading { padding: 32px 0; text-align: center; color: var(--text-muted); }

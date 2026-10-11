@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>会話練習 PoC</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>コミュニケーション練習 PoC</h1>
+    <span id="conn-status" class="badge">未接続</span>
+  </header>
+
+  <main>
+    <!-- 左: 設定と状態 -->
+    <section class="panel">
+      <label>会話相手
+        <select id="persona"></select>
+      </label>
+      <p id="persona-desc" class="note"></p>
+
+      <label>性別
+        <select id="gender"></select>
+      </label>
+
+      <label>シナリオ
+        <select id="scenario"></select>
+      </label>
+      <div id="situation" class="situation"></div>
+
+      <details>
+        <summary>詳細設定</summary>
+        <label>AIの声
+          <select id="voice"></select>
+        </label>
+        <label>話者交代の検出
+          <select id="vad"></select>
+        </label>
+      </details>
+
+      <div class="buttons">
+        <button id="start-btn">会話を開始</button>
+        <button id="stop-btn" disabled>終了</button>
+      </div>
+      <button id="report-btn" class="secondary" disabled>振り返りレポートを見る</button>
+
+      <div class="status">
+        <div><span id="user-indicator" class="dot"></span>あなた</div>
+        <div><span id="ai-indicator" class="dot"></span>相手</div>
+        <div>経過 <span id="timer">00:00</span> / <span id="timer-max">--:--</span></div>
+        <div>割り込み <span id="interrupt-count">0</span> 回</div>
+      </div>
+    </section>
+
+    <!-- 中央: 会話ログ -->
+    <section class="panel log-panel">
+      <h2>会話ログ</h2>
+      <div id="log" class="log"></div>
+    </section>
+
+    <!-- 右: 受け手の感情 -->
+    <section class="panel emotion-panel">
+      <h2><span id="emotion-title">相手</span>の気持ち <span id="eval-status" class="eval-status"></span></h2>
+      <div id="meters" class="meters"></div>
+      <div class="inner-voice">
+        <span class="inner-voice-label">心の声</span>
+        <p id="inner-voice">―</p>
+      </div>
+      <details class="directive">
+        <summary>相手の態度への反映</summary>
+        <pre id="directive">（まだありません）</pre>
+      </details>
+      <div class="chart-wrap">
+        <canvas id="emotion-chart" aria-label="発話ごとの感情の推移"></canvas>
+      </div>
+      <p id="emotion-reason" class="reason"></p>
+    </section>
+  </main>
+
+  <!-- 振り返りレポート -->
+  <dialog id="report-dialog">
+    <div class="report-head">
+      <h2>振り返りレポート</h2>
+      <button id="report-close" class="secondary" aria-label="閉じる">閉じる</button>
+    </div>
+    <div id="report-body"></div>
+  </dialog>
+
+  <audio id="remote-audio" autoplay></audio>
+  <script src="/static/voice-analyzer.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
