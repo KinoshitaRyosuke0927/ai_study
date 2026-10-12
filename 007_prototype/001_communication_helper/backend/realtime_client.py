@@ -9,29 +9,25 @@ import httpx
 
 from .config import Settings
 
-# 話者交代検出（VAD）のプリセット
-TURN_DETECTION_PRESETS: dict[str, dict] = {
-    # 発話内容から話し終わりを判断する方式
-    "semantic_vad": {"type": "semantic_vad", "eagerness": "auto", "interrupt_response": True},
-    # 無音時間で話し終わりを判断する方式
-    "server_vad": {
-        "type": "server_vad",
-        "threshold": 0.5,
-        "prefix_padding_ms": 300,
-        "silence_duration_ms": 600,
-        "interrupt_response": True,
-    },
+# 発話区間の検出設定
+# 発話の区切り（ユーザ発話の確定）は検出するが、応答は自動生成しない。
+# 応答するかどうかはフロントエンドがターン判定（turn_taking.py）の結果で決める。
+# AI の発話中にユーザが話し始めた場合は、従来どおり AI の発話を止める。
+TURN_DETECTION = {
+    "type": "semantic_vad",
+    "eagerness": "auto",
+    "create_response": False,
+    "interrupt_response": True,
 }
 
 
-def build_session_config(settings: Settings, instructions: str, voice: str, vad: str) -> dict:
+def build_session_config(settings: Settings, instructions: str, voice: str) -> dict:
     """Realtime セッションの設定を組み立てる。
 
     Args:
         settings: アプリ設定。
         instructions: システム指示文。
         voice: AI の声の種類。
-        vad: 話者交代検出のプリセット名。
 
     Returns:
         dict: client_secrets API に渡す session オブジェクト。
@@ -46,7 +42,7 @@ def build_session_config(settings: Settings, instructions: str, voice: str, vad:
                 # ユーザ発話の文字起こし（会話ログ・後続の感情推定に使用）
                 "transcription": {"model": settings.transcribe_model, "language": "ja"},
                 "noise_reduction": {"type": "near_field"},
-                "turn_detection": TURN_DETECTION_PRESETS.get(vad, TURN_DETECTION_PRESETS["semantic_vad"]),
+                "turn_detection": TURN_DETECTION,
             },
             "output": {"voice": voice},
         },

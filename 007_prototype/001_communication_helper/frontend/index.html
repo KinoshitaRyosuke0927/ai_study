@@ -3,42 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>会話練習 PoC</title>
+  <title>コミュニケーション練習ツール</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
   <header>
-    <h1>コミュニケーション練習 PoC</h1>
+    <h1>コミュニケーション練習ツール</h1>
     <span id="conn-status" class="badge">未接続</span>
   </header>
 
   <main>
     <!-- 左: 設定と状態 -->
-    <section class="panel">
+    <section class="panel side-panel">
       <label>会話相手
         <select id="persona"></select>
       </label>
-      <p id="persona-desc" class="note"></p>
 
       <label>性別
         <select id="gender"></select>
       </label>
 
-      <label>シナリオ
+      <label>シチュエーション
         <select id="scenario"></select>
       </label>
-      <div id="situation" class="situation"></div>
-
-      <details>
-        <summary>詳細設定</summary>
-        <label>AIの声
-          <select id="voice"></select>
-        </label>
-        <label>話者交代の検出
-          <select id="vad"></select>
-        </label>
-      </details>
 
       <div class="buttons">
         <button id="start-btn">会話を開始</button>
@@ -54,28 +42,41 @@
       </div>
     </section>
 
-    <!-- 中央: 会話ログ -->
+    <!-- 中央: 相手のカメラ映像（表情）・会話相手とシチュエーション・気持ち -->
+    <div class="center-col">
+      <section class="video-tile" id="video-tile" role="button" tabindex="0" aria-pressed="false"
+               aria-label="会話相手の表情。クリックで相手の音声をオン・オフ" title="クリックで相手の音声をオン/オフ">
+        <img id="face" alt="">
+        <span class="video-name" id="video-name"></span>
+        <span class="video-audio" id="video-audio">🔊 音声オン</span>
+      </section>
+
+      <section class="panel situation-panel">
+        <div class="situation-block">
+          <h2>会話相手: <span id="persona-name"></span></h2>
+          <p id="persona-desc"></p>
+        </div>
+        <div class="situation-block">
+          <h2>シチュエーション: <span id="situation-title"></span></h2>
+          <p id="situation"></p>
+        </div>
+      </section>
+
+      <section class="panel emotion-panel">
+        <h2><span id="emotion-title">相手</span>の気持ち <span id="eval-status" class="eval-status"></span></h2>
+        <div class="emotion-body">
+          <div id="meters" class="meters"></div>
+          <div class="chart-wrap">
+            <canvas id="emotion-chart" aria-label="発話ごとの感情の推移"></canvas>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右: 会話ログ -->
     <section class="panel log-panel">
       <h2>会話ログ</h2>
       <div id="log" class="log"></div>
-    </section>
-
-    <!-- 右: 受け手の感情 -->
-    <section class="panel emotion-panel">
-      <h2><span id="emotion-title">相手</span>の気持ち <span id="eval-status" class="eval-status"></span></h2>
-      <div id="meters" class="meters"></div>
-      <div class="inner-voice">
-        <span class="inner-voice-label">心の声</span>
-        <p id="inner-voice">―</p>
-      </div>
-      <details class="directive">
-        <summary>相手の態度への反映</summary>
-        <pre id="directive">（まだありません）</pre>
-      </details>
-      <div class="chart-wrap">
-        <canvas id="emotion-chart" aria-label="発話ごとの感情の推移"></canvas>
-      </div>
-      <p id="emotion-reason" class="reason"></p>
     </section>
   </main>
 
@@ -83,7 +84,10 @@
   <dialog id="report-dialog">
     <div class="report-head">
       <h2>振り返りレポート</h2>
-      <button id="report-close" class="secondary" aria-label="閉じる">閉じる</button>
+      <div class="report-actions">
+        <button id="report-download" class="secondary" disabled>レポートダウンロード</button>
+        <button id="report-close" class="secondary" aria-label="閉じる">閉じる</button>
+      </div>
     </div>
     <div id="report-body"></div>
   </dialog>

@@ -4,6 +4,7 @@
 // ユーザの発話が確定するたびにバックエンドで受け手の感情を推定し、グラフに反映する。
 // 推定には発話内容に加え、声の特徴（間・話速・声量・声の高さ・抑揚）も渡す。
 // 推定した感情は振る舞いの指示として AI の会話に差し込み、会話終了後に振り返りレポートを生成する。
+// 話者交代は自動応答を使わず、発話ごとのターン判定（応答 / 相づち / 待機）と沈黙タイマーで制御する。
 
 const $ = (id) => document.getElementById(id);
 
@@ -18,7 +19,21 @@ const state = {
   analyzer: null, // VoiceAnalyzer（声量・声の高さの計測）
   sessionId: 0, // 古いセッションの評価結果を無視するための連番
   aiSpeaking: false,
+  userSpeaking: false,
+  responseActive: false, // AI の応答（音声）を生成中か
+  responseRequestedAt: 0,
+  responsePurposes: new Map(), // response_id → 応答の目的（respond / backchannel / proactive / opening / turn_judge）
+  judgeSeq: 0, // ターン判定の連番（古い判定結果を無視するため）
+  lastActivityAt: 0, // 最後に誰かが話した・応答を要求した時刻（沈黙の計測用）
+  proactiveDone: false, // 今回の沈黙ですでに AI から話しかけたか
+  stage: "導入", // 会話の進行段階（感情推定で判定: 導入 / 本題 / まとめ / 終了）
+  nextAction: "", // 感情推定で判定した「後輩が次にすべきこと」（沈黙時の話しかけに添える）
+  closingDone: false, // 締めの段階（まとめ / 終了）で締めの一言をすでに言わせたか
+  itemSeq: 0, // 差し込むシステムメッセージの ID 用の連番
+  directiveItemId: null, // 会話に残している最新の態度の指示の ID（次の指示を入れるときに削除）
+  promptItemId: null, // 応答待ちの 1 回きりの指示の ID（応答が終わったら削除）
   pendingInterrupt: false, // 次に確定するユーザ発話が割り込みかどうか
+  lastInterruptItemId: null, // 直前に割り込みと判定したユーザ発話の item_id（取り消し用）
   interruptCount: 0,
   startedAt: 0,
   timerId: null,
@@ -31,6 +46,8 @@ const state = {
   evalChain: Promise.resolve(), // 感情推定を発話順に直列実行するためのキュー
   evalPending: 0,
   chart: null,
+  lastReport: null, // ダウンロード用のレポート { report, ctx }
+  logPinned: true, // 会話ログを最下部（最新）に追従させるか（ユーザが上にスクロールすると false）
 };
 
 /**
@@ -40,22 +57,21 @@ async function loadOptions() {
   // 選択肢を取得
   const res = await fetch("/api/options");
   state.options = await res.json();
-  const { personas, genders, scenarios, voices, vads, session_max_minutes } = state.options;
+  const { personas, genders, scenarios, session_max_minutes } = state.options;
 
   // セレクトボックスへ反映
   fillSelect($("persona"), personas.map((p) => [p.id, p.name]));
   fillSelect($("gender"), genders.map((g) => [g.id, g.label]));
   fillScenarioSelect($("scenario"), scenarios);
-  fillSelect($("voice"), voices.map((v) => [v.id, v.label]));
-  fillSelect($("vad"), vads.map((v) => [v, v]));
   $("timer-max").textContent = formatTime(session_max_minutes * 60);
 
-  // 選択に応じた説明・声の初期値・感情の初期値の表示
+  // 選択に応じた説明・感情の初期値・表情の表示
   $("persona").onchange = updateDescriptions;
   $("scenario").onchange = () => { updateDescriptions(); resetEmotion(); };
-  $("gender").onchange = updateVoice;
+  $("gender").onchange = () => { preloadFaces(); updateExpression(state.emotion, null); };
   updateDescriptions();
-  updateVoice();
+  preloadFaces();
+  setVideoOnline(false);
   initChart();
   resetEmotion();
 }
@@ -103,17 +119,13 @@ function fillScenarioSelect(el, scenarios) {
  */
 function updateDescriptions() {
   const persona = currentPersona();
+  const scenario = currentScenario();
+  $("persona-name").textContent = persona.name;
   $("persona-desc").textContent = persona.description;
-  $("situation").textContent = currentScenario().situation;
+  $("situation-title").textContent = `${scenario.category} / ${scenario.title}`;
+  $("situation").textContent = scenario.situation;
   $("emotion-title").textContent = personShortName();
-}
-
-/**
- * 選択中の性別に合わせて声の初期値を切り替える。
- */
-function updateVoice() {
-  const gender = state.options.genders.find((g) => g.id === $("gender").value);
-  $("voice").value = gender.default_voice;
+  $("video-name").textContent = personShortName();
 }
 
 const currentPersona = () => state.options.personas.find((p) => p.id === $("persona").value);
@@ -136,6 +148,8 @@ async function startSession() {
   resetEmotion();
   $("report-body").innerHTML = "";
   $("report-btn").disabled = true;
+  $("report-download").disabled = true;
+  state.lastReport = null;
 
   try {
     // マイク取得（エコー除去を有効にしてスピーカー音の回り込みを防ぐ）
@@ -169,8 +183,6 @@ async function startSession() {
       body: JSON.stringify({
         sdp: offer.sdp,
         ...selectionPayload(),
-        voice: $("voice").value,
-        vad: $("vad").value,
       }),
     });
     if (!res.ok) throw new Error(await res.text());
@@ -200,17 +212,19 @@ function onChannelOpen() {
   setConnStatus("接続中（話しかけてください）", "connected");
   addSystemMessage("会話を開始しました");
 
-  // 経過時間タイマー（上限で自動終了）
+  // 経過時間タイマー（上限で自動終了）と沈黙の監視
   state.startedAt = Date.now();
+  markActivity();
   const maxSec = state.options.session_max_minutes * 60;
   state.timerId = setInterval(() => {
     const sec = Math.floor((Date.now() - state.startedAt) / 1000);
     $("timer").textContent = formatTime(sec);
     if (sec >= maxSec) stopSession("上限時間に達したため終了しました");
+    else checkSilence();
   }, 500);
 
   // AI から話し始めるシナリオでは応答生成を要求
-  if (currentScenario().ai_speaks_first) send({ type: "response.create" });
+  if (currentScenario().ai_speaks_first) requestResponse("opening");
 }
 
 /**
@@ -232,7 +246,7 @@ function stopSession(reason = "会話を終了しました") {
   // 表示の後始末（評価中の結果は終了後も反映する）
   setIndicator("user-indicator", false);
   setIndicator("ai-indicator", false);
-  state.aiSpeaking = false;
+  state.aiSpeaking = state.userSpeaking = state.responseActive = false;
   setConnStatus("未接続", "");
   setControls(false);
   addSystemMessage(reason);
@@ -263,18 +277,26 @@ function handleServerEvent(ev) {
     case "input_audio_buffer.speech_started":
       setIndicator("user-indicator", true);
       // AI の発話中に話し始めた = 割り込み
-      if (state.aiSpeaking) markInterrupted();
+      if (state.aiSpeaking) markInterrupted(ev.item_id);
       onSpeechStarted(ev);
+      // ユーザが話したので、沈黙時に AI から話しかける権利を戻す
+      state.userSpeaking = true;
+      state.proactiveDone = false;
+      markActivity();
       break;
     case "input_audio_buffer.speech_stopped":
       setIndicator("user-indicator", false);
       onSpeechStopped(ev);
+      state.userSpeaking = false;
+      markActivity();
       break;
     case "input_audio_buffer.committed":
       // 発話が確定した時点で吹き出しを確保（文字起こしは後から届く）
       upsertTurn(ev.item_id, "user", "（文字起こし中…）", { pending: true });
       state.turns.get(ev.item_id).interrupted = state.pendingInterrupt;
       state.pendingInterrupt = false;
+      // AI が話す番かどうかを判定
+      requestTurnJudge();
       break;
 
     // --- ユーザ発話の文字起こし（gpt-transcribe は途中経過も届く） ---
@@ -303,34 +325,214 @@ function handleServerEvent(ev) {
     case "output_audio_buffer.started":
       state.aiSpeaking = true;
       setIndicator("ai-indicator", true);
+      markActivity();
       break;
     case "output_audio_buffer.stopped":
       // 最後まで話し終えた時刻を記録（次のユーザ発話までの間の計測用）
       state.aiStoppedAt = performance.now();
       state.aiSpeaking = false;
       setIndicator("ai-indicator", false);
+      markActivity();
       break;
     case "output_audio_buffer.cleared":
       // 割り込みで止まった場合は間を計測しない
       state.aiStoppedAt = null;
       state.aiSpeaking = false;
       setIndicator("ai-indicator", false);
+      markActivity();
+      break;
+
+    // --- 応答の開始・終了（ターン判定の結果もここで受け取る） ---
+    case "response.created":
+      state.responsePurposes.set(ev.response.id, ev.response.metadata?.purpose ?? "respond");
+      break;
+    case "response.done":
+      if (ev.response.metadata?.purpose === "turn_judge") {
+        handleTurnJudge(ev.response);
+      } else {
+        state.responseActive = false;
+        markActivity();
+        // 相づち・話しかけなどの 1 回きりの指示は、使い終わったら削除する
+        deleteSystemItem(state.promptItemId);
+        state.promptItemId = null;
+      }
       break;
 
     // --- AI 発話の文字起こし（ストリーミング） ---
-    case "response.output_audio_transcript.delta":
+    case "response.output_audio_transcript.delta": {
       state.lastAiItemId = ev.item_id;
+      const isNew = !state.turns.has(ev.item_id);
       appendTurn(ev.item_id, "ai", ev.delta);
+      // 相づちは小さく表示
+      if (isNew && state.responsePurposes.get(ev.response_id) === "backchannel") {
+        state.turns.get(ev.item_id).backchannel = true;
+        state.turns.get(ev.item_id).bubble.classList.add("backchannel");
+      }
       break;
+    }
     case "response.output_audio_transcript.done":
       upsertTurn(ev.item_id, "ai", ev.transcript, { final: true });
       break;
 
     case "error":
+      // AI の話し終わりと同時に話し始めたときの切り詰め失敗は無害なので、画面に出さず割り込みを取り消す
+      if (isTruncateAfterEndError(ev.error)) {
+        console.debug("割り込みを取り消し:", ev.error.message);
+        cancelLastInterrupt();
+        break;
+      }
+      // 指示の削除の失敗（すでに無い等）は会話に影響しないので画面に出さない
+      if (ev.error?.event_id?.startsWith("del_")) {
+        console.debug("指示の削除に失敗:", ev.error.message);
+        break;
+      }
       console.error("Realtime error", ev.error);
       addSystemMessage(`エラー: ${ev.error?.message ?? "不明なエラー"}`);
       break;
   }
+}
+
+// ===================================================================
+// 話者交代の制御
+// ===================================================================
+
+/**
+ * 最後に会話の動きがあった時刻を更新する（沈黙の計測をリセット）。
+ */
+function markActivity() {
+  state.lastActivityAt = performance.now();
+}
+
+/**
+ * AI に音声で応答させる。
+ * @param {string} purpose 応答の目的（respond / backchannel / proactive / opening）
+ * @param {string} [prompt] 応答の直前に差し込むシステムメッセージ（相づち・話しかけの指示）
+ */
+function requestResponse(purpose, prompt) {
+  // 1 回きりの指示は、応答が終わったら削除できるよう ID を付けて差し込む
+  if (prompt) state.promptItemId = addSystemItem("tmp", prompt);
+  send({ type: "response.create", response: { metadata: { purpose } } });
+  state.responseActive = true;
+  state.responseRequestedAt = performance.now();
+  markActivity();
+}
+
+// 応答を要求したのに音声が始まらないまま、この時間が過ぎたら要求失敗とみなす
+const RESPONSE_TIMEOUT_MS = 10_000;
+
+/**
+ * システムメッセージを ID 付きで会話に差し込む（後から削除できるようにする）。
+ * @param {string} kind ID の接頭辞（dir: 態度の指示 / tmp: 1 回きりの指示）
+ * @param {string} text 指示文
+ * @returns {string} 差し込んだアイテムの ID
+ */
+function addSystemItem(kind, text) {
+  state.itemSeq += 1;
+  const id = `${kind}_${state.sessionId}_${state.itemSeq}`;
+  send({
+    type: "conversation.item.create",
+    item: { id, type: "message", role: "system", content: [{ type: "input_text", text }] },
+  });
+  return id;
+}
+
+/**
+ * 差し込んだシステムメッセージを会話から削除する（古い指示が文脈に残って混乱するのを防ぐ）。
+ * @param {string|null} id 削除するアイテムの ID
+ */
+function deleteSystemItem(id) {
+  if (id) send({ type: "conversation.item.delete", item_id: id, event_id: `del_${id}` });
+}
+
+/**
+ * 最新のユーザ発話の後に AI が話す番かどうかを判定させる。
+ * 会話に残らない裏側の応答（out-of-band）で、判定用の関数を必ず呼ばせて結果を受け取る。
+ */
+function requestTurnJudge() {
+  state.judgeSeq += 1;
+  const tt = state.options.turn_taking;
+  send({
+    type: "response.create",
+    response: {
+      conversation: "none",
+      output_modalities: ["text"],
+      instructions: tt.judge_instructions,
+      tools: [tt.judge_tool],
+      tool_choice: "required",
+      metadata: { purpose: "turn_judge", seq: String(state.judgeSeq) },
+    },
+  });
+}
+
+/**
+ * ターン判定の応答から判定結果を取り出す。
+ * @param {object} response response.done イベントの response
+ * @returns {"RESPOND"|"BACKCHANNEL"|"WAIT"} 判定結果。読み取れない場合は RESPOND（後輩として返事をしようとした場合が多いため）
+ */
+function parseTurnDecision(response) {
+  const item = response.output?.[0];
+  try {
+    const decision = JSON.parse(item?.arguments ?? "{}").decision;
+    if (["RESPOND", "BACKCHANNEL", "WAIT"].includes(decision)) return decision;
+  } catch {
+    // 引数が JSON でない場合は下のフォールバックへ
+  }
+  return "RESPOND";
+}
+
+/**
+ * ターン判定の結果に応じて、応答・相づち・待機を行う。
+ * @param {object} response response.done イベントの response
+ */
+function handleTurnJudge(response) {
+  // 新しい発話の判定が後から依頼されていれば、この結果は使わない
+  if (Number(response.metadata.seq) !== state.judgeSeq) return;
+  // ユーザが話し続けている・AI がすでに話している場合は何もしない
+  if (state.userSpeaking || state.aiSpeaking || state.responseActive) {
+    console.debug("ターン判定を見送り:", { user: state.userSpeaking, ai: state.aiSpeaking, active: state.responseActive });
+    return;
+  }
+
+  // 判定結果に応じて応答・相づち・待機
+  const decision = parseTurnDecision(response);
+  console.debug("ターン判定:", decision);
+  if (decision === "RESPOND") {
+    requestResponse("respond");
+  } else if (decision === "BACKCHANNEL") {
+    requestResponse("backchannel", state.options.turn_taking.backchannel_prompt);
+  }
+  // WAIT の場合は何も言わずに待つ（沈黙が続けば checkSilence で話しかける）
+}
+
+/**
+ * 誰も話さない状態が一定時間続いたら、AI から話しかける（1 回の沈黙につき 1 回まで）。
+ */
+function checkSilence() {
+  // 応答の要求がエラー等で失敗したまま残っていたら解除する
+  if (state.responseActive && !state.aiSpeaking && performance.now() - state.responseRequestedAt > RESPONSE_TIMEOUT_MS) {
+    state.responseActive = false;
+  }
+  if (state.userSpeaking || state.aiSpeaking || state.responseActive || state.proactiveDone) return;
+  const silenceMs = state.options.turn_taking.silence_sec * 1000;
+  if (performance.now() - state.lastActivityAt < silenceMs) return;
+  state.proactiveDone = true;
+
+  // 会話が締めの段階（まとめ / 終了）なら、一度だけ締めの一言を言わせ、以降は話しかけない
+  const tt = state.options.turn_taking;
+  if (tt.closing_stages.includes(state.stage)) {
+    if (state.closingDone) return;
+    state.closingDone = true;
+    requestResponse("closing", tt.closing_prompt);
+    return;
+  }
+  // まだ誰も話していなければ、会話の始まりにふさわしい一言（挨拶など）にする
+  if (state.turns.size === 0) {
+    requestResponse("proactive", tt.idle_opening_prompt);
+    return;
+  }
+  // それ以外は、感情推定で判定した「次にすべきこと」を添えて話しかけさせる
+  const hint = state.nextAction ? `\n（参考: 今あなたが次にすべきこと: ${state.nextAction}）` : "";
+  requestResponse("proactive", tt.proactive_prompt + hint);
 }
 
 // ===================================================================
@@ -417,19 +619,47 @@ function buildVoiceFeatures(itemId, text) {
 }
 
 /**
- * 割り込みを記録し、直前の AI 発話に印を付ける。
+ * 割り込みを記録する（感情推定・レポート用。ユーザが萎縮しないよう会話ログには印を付けない）。
+ * @param {string} itemId 割り込んで話し始めたユーザ発話の item_id
  */
-function markInterrupted() {
+function markInterrupted(itemId) {
   state.interruptCount += 1;
   state.pendingInterrupt = true;
+  state.lastInterruptItemId = itemId;
   $("interrupt-count").textContent = state.interruptCount;
-  const bubble = state.turns.get(state.lastAiItemId)?.bubble;
-  if (bubble && !bubble.querySelector(".tag")) {
-    const tag = document.createElement("span");
-    tag.className = "tag";
-    tag.textContent = "⚠ 発話の途中で遮られました";
-    bubble.appendChild(tag);
-  }
+}
+
+/**
+ * 直前の割り込みを取り消す。
+ * AI が話し終えた直後に話し始めた場合、再生終了の通知が遅れて割り込みと誤判定されることがある。
+ * その場合は Azure 側の音声の切り詰めが失敗するので、そのエラーを受けて取り消す。
+ */
+function cancelLastInterrupt() {
+  const itemId = state.lastInterruptItemId;
+  if (!itemId) return;
+  state.lastInterruptItemId = null;
+
+  // 回数を戻す
+  state.interruptCount = Math.max(0, state.interruptCount - 1);
+  $("interrupt-count").textContent = state.interruptCount;
+
+  // 発話がまだ確定前なら確定時の印を、確定済みなら発話の印を外す（感情推定は文字起こし確定後に行うため間に合う）
+  if (state.turns.has(itemId)) state.turns.get(itemId).interrupted = false;
+  else state.pendingInterrupt = false;
+
+  // 実際は AI が話し終えた直後に話し始めているので、間は 0 秒（即答）として扱う
+  const sp = state.speech.get(itemId);
+  if (sp && sp.latency === null) sp.latency = 0;
+}
+
+/**
+ * 「AI の話し終わりと同時に話し始めた」ことによる、Azure 側の音声切り詰めの失敗エラーかを判定する。
+ * 例: "Audio content of 5400ms is already shorter than 5740ms"
+ * @param {object} error error イベントの error
+ * @returns {boolean}
+ */
+function isTruncateAfterEndError(error) {
+  return /already shorter than/i.test(error?.message ?? "");
 }
 
 // ===================================================================
@@ -492,20 +722,52 @@ function addSystemMessage(text) {
 
 function clearLog() {
   $("log").innerHTML = "";
+  state.logPinned = true;
   state.turns.clear();
   state.speech.clear();
+  state.responsePurposes.clear();
+  state.judgeSeq = 0;
+  state.proactiveDone = false;
+  state.stage = "導入";
+  state.nextAction = "";
+  state.closingDone = false;
+  state.itemSeq = 0;
+  state.directiveItemId = state.promptItemId = null;
+  state.userSpeaking = state.aiSpeaking = state.responseActive = false;
   state.aiStoppedAt = null;
   state.baseline = { volume: [], pitch: [] };
   state.lastAiItemId = null;
   state.pendingInterrupt = false;
+  state.lastInterruptItemId = null;
   state.interruptCount = 0;
   $("interrupt-count").textContent = "0";
   $("timer").textContent = "00:00";
 }
 
+// 最下部からこの距離（px）以内なら「最新を表示中」とみなす
+const LOG_BOTTOM_THRESHOLD = 40;
+
+/**
+ * 会話ログが最新（最下部）を表示中なら、最下部までスクロールする。
+ * ユーザが上にスクロールして過去のログを見ているときは位置を変えない。
+ */
 function scrollLog() {
+  if (!state.logPinned) return;
   const log = $("log");
   log.scrollTop = log.scrollHeight;
+}
+
+/**
+ * 会話ログのスクロール追従を設定する。
+ * - ユーザのスクロール操作で「最下部に追従するか」を切り替える
+ * - 文字起こしの追記や評価ラベルの追加など、ログの中身が変わるたびに追従中なら最下部へ移動する
+ */
+function initLogAutoScroll() {
+  const log = $("log");
+  log.addEventListener("scroll", () => {
+    state.logPinned = log.scrollHeight - log.scrollTop - log.clientHeight <= LOG_BOTTOM_THRESHOLD;
+  });
+  new MutationObserver(scrollLog).observe(log, { childList: true, subtree: true, characterData: true });
 }
 
 // ===================================================================
@@ -564,17 +826,18 @@ async function evaluateTurn(itemId, sessionId) {
   state.emotion = result.emotion;
   target.evaluation = result;
   renderMeters(result.emotion, result.delta);
-  $("inner-voice").textContent = `「${result.inner_voice}」`;
-  $("emotion-reason").textContent = result.reason;
+  updateExpression(result.emotion, result.delta);
   pushChartPoint(target.text, result);
   annotateTurn(target, result);
 
-  // 感情を AI の態度に反映（次の応答から効く振る舞いの指示を会話に差し込む）
-  $("directive").textContent = result.directive;
-  send({
-    type: "conversation.item.create",
-    item: { type: "message", role: "system", content: [{ type: "input_text", text: result.directive }] },
-  });
+  // 会話の進行段階を記録（締めの段階以外に戻ったら、締めの一言をまた言えるようにする）
+  state.stage = result.stage;
+  state.nextAction = result.next_action;
+  if (!state.options.turn_taking.closing_stages.includes(result.stage)) state.closingDone = false;
+
+  // 感情と進行状況を AI の態度に反映（次の応答から効く振る舞いの指示を差し込み、前回の指示は削除して最新の 1 件だけ残す）
+  deleteSystemItem(state.directiveItemId);
+  state.directiveItemId = addSystemItem("dir", result.directive);
 }
 
 /**
@@ -628,9 +891,7 @@ function updateEvalStatus() {
 function resetEmotion() {
   state.emotion = { ...currentScenario().initial_emotion };
   renderMeters(state.emotion, null);
-  $("inner-voice").textContent = "―";
-  $("emotion-reason").textContent = "";
-  $("directive").textContent = "（まだありません）";
+  updateExpression(state.emotion, null);
 
   // グラフは「開始」時点の値だけにする
   const chart = state.chart;
@@ -654,16 +915,94 @@ function renderMeters(emotion, delta) {
     const d = delta?.[axis.id] ?? 0;
     row.innerHTML = `
       <span class="meter-name"><span class="meter-key"></span></span>
-      <span class="meter-track"><span class="meter-fill"></span></span>
       <span class="meter-value"></span>
       <span class="meter-delta"></span>`;
     row.querySelector(".meter-key").style.background = SERIES_COLORS[i];
     row.querySelector(".meter-name").append(axis.label);
-    row.querySelector(".meter-fill").style.cssText = `width:${emotion[axis.id]}%;background:${SERIES_COLORS[i]}`;
     row.querySelector(".meter-value").textContent = emotion[axis.id];
     row.querySelector(".meter-delta").textContent = delta ? (d > 0 ? `▲${d}` : d < 0 ? `▼${-d}` : "±0") : "";
     box.appendChild(row);
   });
+}
+
+// ===================================================================
+// 相手の表情（カメラ映像風の表示）
+// ===================================================================
+
+// 表情画像の種類（image/{man|woman}_{表情}.png）
+const EXPRESSIONS = ["smile", "laugh", "think", "surprise", "angry"];
+// 性別 ID → 画像ファイル名の接頭辞
+const FACE_PREFIX = { male: "man", female: "woman" };
+
+/**
+ * 感情値から表情を選ぶ。強い感情ほど優先する（怒り > 動揺 > 困惑・萎縮 > 大喜び > 穏やか）。
+ * @param {object} emotion 感情値 { relief, tension, motivation, trust }
+ * @param {object|null} delta 直前の発話による変化量
+ * @returns {string} 表情（EXPRESSIONS のいずれか）
+ */
+function expressionFor(emotion, delta) {
+  const { relief, tension, motivation, trust } = emotion;
+  // 不満・反発: 安心感も信頼感も大きく損なわれている
+  if (relief <= 25 && trust <= 25) return "angry";
+  // 動揺・焦り: 1 回の発言で緊張が急に高まった、または強く萎縮している
+  if ((delta?.tension ?? 0) >= 15 || tension >= 80) return "surprise";
+  // 困惑・緊張・落ち込み
+  if (tension >= 60 || motivation <= 35 || relief <= 35) return "think";
+  // 安心して前向き
+  if (relief >= 70 && motivation >= 65 && tension <= 35) return "laugh";
+  return "smile";
+}
+
+/**
+ * 表情画像を切り替える（変わったときだけ軽いアニメーションを付ける）。
+ * @param {object} emotion 感情値
+ * @param {object|null} delta 直前の発話による変化量
+ */
+function updateExpression(emotion, delta) {
+  const img = $("face");
+  const src = faceUrl(expressionFor(emotion, delta));
+  if (img.getAttribute("src") === src) return;
+  img.src = src;
+  img.classList.remove("changed");
+  void img.offsetWidth; // アニメーションを再生し直すためにリフローさせる
+  img.classList.add("changed");
+}
+
+/**
+ * 選択中の性別の表情画像の URL を返す。
+ * @param {string} expression 表情
+ * @returns {string}
+ */
+function faceUrl(expression) {
+  return `/images/${FACE_PREFIX[$("gender").value]}_${expression}.png`;
+}
+
+/**
+ * 表情の切り替え時にちらつかないよう、選択中の性別の画像を先読みする。
+ */
+function preloadFaces() {
+  for (const expression of EXPRESSIONS) new Image().src = faceUrl(expression);
+}
+
+/**
+ * 相手（AI）の音声のオン/オフを切り替える。
+ * 再生だけを止めるので、会話（文字起こし・感情推定・話者交代）はそのまま続く。
+ */
+function toggleAiAudio() {
+  const audio = $("remote-audio");
+  audio.muted = !audio.muted;
+  const tile = $("video-tile");
+  tile.classList.toggle("muted", audio.muted);
+  tile.setAttribute("aria-pressed", String(audio.muted));
+  $("video-audio").textContent = audio.muted ? "🔇 音声オフ" : "🔊 音声オン";
+}
+
+/**
+ * 接続中かどうかでカメラ映像の見た目を切り替える（未接続時は薄く表示）。
+ * @param {boolean} online 接続中かどうか
+ */
+function setVideoOnline(online) {
+  $("video-tile").classList.toggle("offline", !online);
 }
 
 /**
@@ -748,6 +1087,8 @@ async function createReport(sessionId) {
   // 生成中の表示
   const body = $("report-body");
   body.innerHTML = '<p class="report-loading">レポートを作成しています…</p>';
+  state.lastReport = null;
+  $("report-download").disabled = true;
   openReport();
 
   try {
@@ -791,6 +1132,10 @@ async function createReport(sessionId) {
 
     renderReport(report, initial, state.emotion);
     $("report-btn").disabled = false;
+
+    // ダウンロード用に、レポートと会話の情報を保持
+    state.lastReport = { report, ctx: buildReportContext(initial) };
+    $("report-download").disabled = false;
   } catch (err) {
     console.error(err);
     body.innerHTML = "";
@@ -833,7 +1178,7 @@ function renderReport(report, initial, final) {
   }
   table.appendChild(tbody);
   body.appendChild(table);
-  body.appendChild(el("p", "report-meta", "※緊張は低いほど良い状態です。発言ごとの推移は右側のグラフで確認できます。"));
+  body.appendChild(el("p", "report-meta", "※緊張は低いほど良い状態です。"));
 
   // 相手から見た印象
   body.appendChild(el("h3", "", `${name}から見たあなた`));
@@ -863,6 +1208,123 @@ function renderReport(report, initial, final) {
   // 次回のポイント
   body.appendChild(el("h3", "", "次回意識すること"));
   body.appendChild(el("p", "report-focus", report.next_focus));
+}
+
+/**
+ * ダウンロード用に、会話の条件と評価付きの会話ログをまとめる。
+ * @param {object} initial 開始時の感情値
+ * @returns {object} レポートの Markdown 化に必要な情報
+ */
+function buildReportContext(initial) {
+  const gender = state.options.genders.find((g) => g.id === $("gender").value);
+  return {
+    startedAt: new Date(state.startedAt),
+    personName: currentPersona().name,
+    shortName: personShortName(),
+    genderLabel: gender.label,
+    scenario: currentScenario(),
+    duration: $("timer").textContent,
+    interruptCount: state.interruptCount,
+    initial,
+    final: { ...state.emotion },
+    turns: [...state.turns.values()].filter((t) => t.final && !t.pending),
+  };
+}
+
+/**
+ * レポートと会話ログを Markdown 形式の文字列にする。
+ * @param {{report: object, ctx: object}} data state.lastReport
+ * @returns {string} Markdown
+ */
+function buildReportMarkdown({ report, ctx }) {
+  const axes = state.options.emotion_axes;
+  const lines = [];
+  const signed = (d) => (d > 0 ? `+${d}` : String(d));
+
+  // 見出しと会話の条件
+  lines.push("# 振り返りレポート", "");
+  lines.push(`- 日時: ${formatDateTime(ctx.startedAt)}`);
+  lines.push(`- 会話相手: ${ctx.personName}（${ctx.genderLabel}）`);
+  lines.push(`- シチュエーション: ${ctx.scenario.category} / ${ctx.scenario.title}`);
+  lines.push(`- 状況: ${ctx.scenario.situation}`);
+  lines.push(`- 会話時間: ${ctx.duration}　割り込み: ${ctx.interruptCount} 回`, "");
+
+  // 総評
+  lines.push("## 総評", "", report.summary, "");
+
+  // 気持ちの変化
+  lines.push(`## ${ctx.shortName}の気持ちの変化`, "");
+  lines.push("| | 開始 | 終了 | 変化 |", "|---|---:|---:|---:|");
+  for (const axis of axes) {
+    const d = ctx.final[axis.id] - ctx.initial[axis.id];
+    lines.push(`| ${axis.label} | ${ctx.initial[axis.id]} | ${ctx.final[axis.id]} | ${signed(d)} |`);
+  }
+  lines.push("", "※緊張は低いほど良い状態です。", "");
+
+  // 相手から見た印象
+  lines.push(`## ${ctx.shortName}から見たあなた`, "", `> 「${report.impression}」`, "");
+
+  // 良かったところ
+  lines.push("## 良かったところ", "");
+  for (const item of report.good_points) lines.push(`- **「${item.quote}」**`, `  - ${item.comment}`);
+  lines.push("");
+
+  // もっと良くできるところ
+  if (report.improvements.length) {
+    lines.push("## もっと良くできるところ", "");
+    report.improvements.forEach((item, i) => {
+      lines.push(`### ${i + 1}. 「${item.quote}」`, "", `- 伝わり方: ${item.problem}`, `- 言い換え例: 「${item.better}」`, "");
+    });
+  }
+
+  // 次回意識すること
+  lines.push("## 次回意識すること", "", report.next_focus, "");
+
+  // 会話ログ（あなたの発言には評価を添える）
+  lines.push("## 会話ログ", "");
+  for (const turn of ctx.turns) {
+    if (turn.role === "ai") {
+      lines.push(`**${ctx.shortName}**${turn.backchannel ? "（相づち）" : ""}: ${turn.text}`, "");
+      continue;
+    }
+    lines.push(`**あなた**: ${turn.text}`, "");
+    const ev = turn.evaluation;
+    if (!ev) continue;
+    lines.push(`- 気持ちの変化: ${axes.map((a) => `${a.label} ${signed(ev.delta[a.id])}`).join(" / ")}`);
+    if (ev.voice_labels.length) lines.push(`- 声: ${ev.voice_labels.map((lb) => `${lb.name} ${lb.label}`).join(" / ")}`);
+    if (ev.good_points.length) lines.push(`- 良かった点: ${ev.good_points.join(" / ")}`);
+    if (ev.bad_points.length) lines.push(`- 改善点: ${ev.bad_points.join(" / ")}`);
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+/**
+ * レポートを Markdown ファイルとしてダウンロードする。
+ */
+function downloadReport() {
+  if (!state.lastReport) return;
+  const { ctx } = state.lastReport;
+
+  // ファイル名: report_YYYYMMDD_HHMM_シナリオ名.md
+  const d = ctx.startedAt;
+  const pad = (n) => String(n).padStart(2, "0");
+  const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+  const filename = `report_${stamp}_${ctx.scenario.title}.md`;
+
+  // Blob を作ってリンク経由で保存
+  const blob = new Blob([buildReportMarkdown(state.lastReport)], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function formatDateTime(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function openReport() {
@@ -900,6 +1362,8 @@ function wrapText(text, n) {
 
 function setIndicator(id, active) {
   $(id).classList.toggle("active", active);
+  // 相手が話している間は、カメラ映像の枠を光らせる
+  if (id === "ai-indicator") $("video-tile").classList.toggle("speaking", active);
 }
 
 function setConnStatus(text, cls) {
@@ -915,7 +1379,8 @@ function setConnStatus(text, cls) {
 function setControls(running) {
   $("start-btn").disabled = running;
   $("stop-btn").disabled = !running;
-  for (const id of ["persona", "gender", "scenario", "voice", "vad"]) $(id).disabled = running;
+  for (const id of ["persona", "gender", "scenario"]) $(id).disabled = running;
+  setVideoOnline(running);
 }
 
 function formatTime(sec) {
@@ -929,4 +1394,20 @@ $("start-btn").onclick = startSession;
 $("stop-btn").onclick = () => stopSession();
 $("report-btn").onclick = openReport;
 $("report-close").onclick = () => $("report-dialog").close();
+// モーダルの外側（背景）をクリックしたら閉じる
+$("report-dialog").addEventListener("click", (e) => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+  if (!inside) e.currentTarget.close();
+});
+$("report-download").onclick = downloadReport;
+// カメラ映像風のエリアをクリック（または Enter / Space）で相手の音声をオン/オフ
+$("video-tile").onclick = toggleAiAudio;
+$("video-tile").onkeydown = (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    toggleAiAudio();
+  }
+};
+initLogAutoScroll();
 loadOptions();

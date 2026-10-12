@@ -18,19 +18,35 @@ header h1 { font-size: 18px; margin: 0; }
 .badge.connected { background: #27ae60; }
 .badge.connecting { background: #e67e22; }
 
+/* 左: 設定 / 中央: 映像・説明・気持ち / 右: 会話ログ */
 main {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr); /* 行の高さを画面の高さに固定し、各カラム内で伸縮させる */
+  grid-template-areas: "side center log";
   gap: 16px;
   padding: 16px;
   height: calc(100vh - 52px);
 }
+.side-panel { grid-area: side; }
+.center-col { grid-area: center; }
+.log-panel { grid-area: log; }
 @media (max-width: 1100px) {
-  main { grid-template-columns: 300px minmax(0, 1fr); height: auto; }
-  .emotion-panel { grid-column: 1 / -1; }
+  main {
+    grid-template-columns: 260px minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas:
+      "side center"
+      "log log";
+    height: auto;
+  }
+  .log-panel { height: 480px; }
 }
 @media (max-width: 760px) {
-  main { grid-template-columns: 1fr; height: auto; }
+  main {
+    grid-template-columns: 1fr;
+    grid-template-areas: "side" "center" "log";
+  }
 }
 .panel {
   background: #fff;
@@ -41,16 +57,73 @@ main {
 }
 label { display: block; font-size: 13px; font-weight: 600; margin-top: 12px; }
 select { display: block; width: 100%; margin-top: 4px; padding: 6px; font-size: 14px; }
-.note { font-size: 12px; color: #666; margin: 4px 0 0; }
-.situation {
-  margin-top: 8px;
-  padding: 10px;
-  font-size: 13px;
-  line-height: 1.6;
-  background: #fff8e1;
-  border-left: 4px solid #f1c40f;
+.side-panel label:first-child { margin-top: 0; }
+
+/* 会話相手・シチュエーションの説明 */
+.situation-panel {
+  display: grid;
+  gap: 10px;
+  flex: none;
+  padding: 12px 16px;
 }
-details { margin-top: 12px; font-size: 13px; }
+.situation-block h2 { font-size: 13px; margin: 0 0 4px; color: var(--text-secondary); }
+.situation-block h2 span { color: #222; }
+.situation-block p { margin: 0; font-size: 13px; line-height: 1.65; }
+.situation-block + .situation-block { padding-left: 12px; border-left: 3px solid #f1c40f; }
+
+/* 相手のカメラ映像（Web 会議の相手画面風） */
+.center-col { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto; }
+.center-col .emotion-panel { flex: 1 1 0; min-height: 230px; padding: 12px 16px; overflow: hidden; }
+.video-tile {
+  position: relative;
+  flex: none;
+  height: 190px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, #3b4a5a, #1f2933);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+  outline: 3px solid transparent;
+  outline-offset: -3px;
+  transition: outline-color .2s;
+}
+.video-tile.speaking { outline-color: #2ecc71; } /* 相手が話している間は枠を光らせる */
+.video-tile { cursor: pointer; } /* クリックで相手の音声をオン/オフ */
+.video-tile:focus-visible { outline-color: #5dade2; }
+.video-audio {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, .55);
+  border-radius: 4px;
+}
+.video-tile.muted .video-audio { background: #c0392b; }
+.video-tile img {
+  display: block;
+  height: 100%;
+  margin: 0 auto;
+  padding-top: 12px;
+  object-fit: contain;
+  transition: opacity .3s;
+}
+.video-tile.offline img { opacity: .55; }
+.video-tile img.changed { animation: face-pop .35s ease; }
+@keyframes face-pop {
+  from { transform: scale(.96); opacity: .6; }
+  to { transform: scale(1); opacity: 1; }
+}
+.video-name {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 3px 10px;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(0, 0, 0, .55);
+  border-radius: 4px;
+}
 
 .buttons { display: flex; gap: 8px; margin-top: 16px; }
 button {
@@ -91,7 +164,6 @@ button:disabled, button#stop-btn:disabled { background: #bdc3c7; cursor: default
 .msg.user { align-self: flex-end; background: #d6eaf8; }
 .msg.ai { align-self: flex-start; background: #eceff1; }
 .msg.pending { color: #888; font-style: italic; }
-.msg .tag { display: block; font-size: 11px; color: #c0392b; margin-top: 2px; }
 .msg.system { align-self: center; background: none; color: #888; font-size: 12px; }
 
 /* --- 感情パネル --- */
@@ -107,24 +179,22 @@ button:disabled, button#stop-btn:disabled { background: #bdc3c7; cursor: default
 }
 .emotion-panel h2 { font-size: 15px; margin: 0 0 8px; }
 .eval-status { font-size: 12px; font-weight: normal; color: var(--text-muted); margin-left: 6px; }
-.meters { display: grid; gap: 6px; }
-.meter { display: grid; grid-template-columns: 56px 1fr 36px 44px; align-items: center; gap: 8px; font-size: 13px; }
+.meters { display: grid; gap: 8px; }
+.meter { display: grid; grid-template-columns: 72px 32px 40px; align-items: center; gap: 8px; font-size: 13px; }
 .meter-name { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
 .meter-key { width: 10px; height: 10px; border-radius: 2px; flex: none; }
-.meter-track { display: block; height: 8px; background: #eceff1; border-radius: 4px; overflow: hidden; }
-.meter-fill { display: block; height: 100%; border-radius: 4px; transition: width .6s ease; }
-.meter-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.meter-value { text-align: right; font-size: 16px; font-variant-numeric: tabular-nums; font-weight: 600; }
 .meter-delta { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text-muted); }
-.inner-voice {
-  margin-top: 12px;
-  padding: 8px 12px;
-  background: #f7f3ff;
-  border-radius: 10px;
+.emotion-panel { display: flex; flex-direction: column; }
+/* 気持ち欄: 左にメーター、右に推移グラフ（グラフの高さを確保するため横に並べる） */
+.emotion-body { display: flex; gap: 16px; flex: 1 1 0; min-height: 0; }
+.emotion-body .meters { flex: 0 0 auto; align-content: center; }
+.meter-name { white-space: nowrap; }
+.chart-wrap { position: relative; flex: 1 1 0; min-width: 0; min-height: 180px; }
+@media (max-width: 560px) {
+  .emotion-body { flex-direction: column; }
+  .emotion-body .meters { flex: none; }
 }
-.inner-voice-label { font-size: 11px; color: var(--text-muted); }
-.inner-voice p { margin: 2px 0 0; font-size: 14px; }
-.chart-wrap { position: relative; height: 240px; margin-top: 12px; }
-.reason { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 8px 0 0; }
 
 /* 会話ログ内の評価表示 */
 .eval { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
@@ -133,17 +203,6 @@ button:disabled, button#stop-btn:disabled { background: #bdc3c7; cursor: default
 .chip.bad { border-color: var(--bad); color: var(--bad); }
 .chip.voice { color: var(--text-secondary); background: #f4f5f7; border-color: #e0e0dc; }
 .chip.voice.notable { color: #8a4b00; background: #fff4e0; border-color: #f0c27a; }
-
-/* 態度への反映 */
-.directive { margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
-.directive pre {
-  margin: 4px 0 0;
-  padding: 8px;
-  white-space: pre-wrap;
-  font-family: inherit;
-  background: #f4f5f7;
-  border-radius: 6px;
-}
 
 /* 振り返りレポート */
 button.secondary {
@@ -158,16 +217,20 @@ button.secondary {
 }
 button.secondary:disabled { background: #fff; color: #bdc3c7; border-color: #ddd; }
 dialog#report-dialog {
-  width: min(760px, calc(100vw - 32px));
+  width: 60vw;
   max-height: calc(100vh - 48px);
   padding: 20px 24px;
   border: none;
   border-radius: 10px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, .25);
 }
+@media (max-width: 760px) {
+  dialog#report-dialog { width: calc(100vw - 32px); }
+}
 dialog#report-dialog::backdrop { background: rgba(0, 0, 0, .4); }
 .report-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .report-head h2 { margin: 0; font-size: 18px; }
+.report-actions { display: flex; gap: 8px; }
 .report-head button.secondary { width: auto; margin: 0; padding: 4px 14px; }
 #report-body h3 { font-size: 14px; margin: 18px 0 6px; padding-left: 8px; border-left: 4px solid #2980b9; }
 #report-body p { margin: 4px 0; font-size: 14px; line-height: 1.7; }
@@ -182,3 +245,6 @@ dialog#report-dialog::backdrop { background: rgba(0, 0, 0, .4); }
 .report-item .better::before { content: "言い換え例: "; font-size: 12px; color: var(--good); font-weight: 600; }
 .report-focus { padding: 10px 14px; background: #fff8e1; border-left: 4px solid #f1c40f; }
 .report-loading { padding: 32px 0; text-align: center; color: var(--text-muted); }
+
+/* 相づち（AI の短い応答） */
+.msg.ai.backchannel { font-size: 12px; padding: 4px 10px; color: var(--text-secondary); background: #f4f5f7; }

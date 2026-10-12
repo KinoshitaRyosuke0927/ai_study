@@ -1,6 +1,6 @@
 """コミュニケーション練習ツール（PoC）のバックエンド。
 
-起動: プロジェクト直下で `python -m uvicorn backend.main:app --port 8000`
+起動: プロジェクト直下で `python run.py`（または `python -m uvicorn backend.main:app --port 8000`）
 """
 
 import logging
@@ -11,12 +11,20 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .config import PROJECT_ROOT, load_settings
+from .config import RESOURCE_DIR, load_settings
 from .emotion import EvaluateRequest, evaluate
 from .personas import EMOTION_AXES, GENDERS, PERSONAS, SCENARIOS, build_instructions, initial_emotion
 from .report import ReportRequest, generate_report
+from .turn_taking import (
+    BACKCHANNEL_PROMPT,
+    CLOSING_PROMPT,
+    CLOSING_STAGES,
+    IDLE_OPENING_PROMPT,
+    JUDGE_INSTRUCTIONS,
+    JUDGE_TOOL,
+    PROACTIVE_PROMPT,
+)
 from .realtime_client import (
-    TURN_DETECTION_PRESETS,
     build_session_config,
     create_client_secret,
     exchange_sdp,
@@ -26,44 +34,27 @@ logger = logging.getLogger("uvicorn.error")
 settings = load_settings()
 app = FastAPI(title="Communication Helper PoC")
 
-FRONTEND_DIR = PROJECT_ROOT / "frontend"
-
-# 選択可能な AI の声（Realtime API の組み込みボイス）と声質の目安
-VOICES: dict[str, str] = {
-    "marin": "女性寄り",
-    "coral": "女性寄り",
-    "shimmer": "女性寄り",
-    "sage": "女性寄り",
-    "cedar": "男性寄り",
-    "ash": "男性寄り",
-    "echo": "男性寄り",
-    "verse": "男性寄り",
-    "ballad": "男性寄り",
-    "alloy": "中性的",
-}
-
+FRONTEND_DIR = RESOURCE_DIR / "frontend"
 
 class SessionRequest(BaseModel):
-    """WebRTC セッション開始リクエスト。"""
+    """WebRTC セッション開始リクエスト。AI の声は性別ごとに固定（personas.GENDERS）。"""
 
     sdp: str
     persona_id: str
     gender_id: str
     scenario_id: str
-    voice: str | None = None
-    vad: str = "semantic_vad"
 
 
 @app.get("/api/options")
 def get_options() -> dict:
-    """画面の選択肢（ペルソナ・性別・シナリオ・声・VAD）を返す。
+    """画面の選択肢（ペルソナ・性別・シナリオ）と話者交代の制御設定を返す。
 
     Returns:
         dict: 選択肢一覧とセッション上限時間。
     """
     return {
         "personas": [{"id": p.id, "name": p.name, "description": p.description} for p in PERSONAS.values()],
-        "genders": [{"id": g.id, "label": g.label, "default_voice": g.default_voice} for g in GENDERS.values()],
+        "genders": [{"id": g.id, "label": g.label} for g in GENDERS.values()],
         "scenarios": [
             {
                 "id": s.id,
@@ -76,9 +67,17 @@ def get_options() -> dict:
             for s in SCENARIOS.values()
         ],
         "emotion_axes": [{"id": key, "label": label} for key, label in EMOTION_AXES.items()],
-        "voices": [{"id": v, "label": f"{v}（{desc}）"} for v, desc in VOICES.items()],
-        "vads": list(TURN_DETECTION_PRESETS.keys()),
         "session_max_minutes": settings.session_max_minutes,
+        "turn_taking": {
+            "judge_instructions": JUDGE_INSTRUCTIONS,
+            "judge_tool": JUDGE_TOOL,
+            "backchannel_prompt": BACKCHANNEL_PROMPT,
+            "proactive_prompt": PROACTIVE_PROMPT,
+            "closing_prompt": CLOSING_PROMPT,
+            "closing_stages": CLOSING_STAGES,
+            "idle_opening_prompt": IDLE_OPENING_PROMPT,
+            "silence_sec": settings.proactive_silence_sec,
+        },
     }
 
 
@@ -98,10 +97,9 @@ async def start_session(req: SessionRequest) -> str:
     scenario = SCENARIOS.get(req.scenario_id)
     if persona is None or gender is None or scenario is None:
         raise HTTPException(status_code=400, detail="不明なペルソナ・性別・シナリオです")
-    voice = req.voice if req.voice in VOICES else gender.default_voice
 
     # ペルソナ・性別・シナリオからセッション設定を作成
-    session = build_session_config(settings, build_instructions(persona, gender, scenario), voice, req.vad)
+    session = build_session_config(settings, build_instructions(persona, gender, scenario), gender.default_voice)
 
     # エフェメラルキー発行 → SDP 交換
     try:
@@ -176,3 +174,5 @@ def index() -> FileResponse:
 
 # JS / CSS などの静的ファイル
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+# 会話相手の表情画像（{man|woman}_{angry|laugh|smile|surprise|think}.png）
+app.mount("/images", StaticFiles(directory=RESOURCE_DIR / "image"), name="images")

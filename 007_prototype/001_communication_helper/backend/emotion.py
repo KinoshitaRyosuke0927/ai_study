@@ -39,6 +39,14 @@ class EvaluateRequest(BaseModel):
     voice: VoiceFeatures | None = None  # 声の特徴量（計測できなかった場合は None）
 
 
+# 会話の進行段階（キー → 判定基準）。AI の振る舞いの指示や、沈黙時の話しかけ方に使う
+STAGES: dict[str, str] = {
+    "導入": "挨拶や切り出しの段階。まだ用件・話題の本題に入っていない",
+    "本題": "用件・話題についてやりとりしている途中",
+    "まとめ": "結論や合意がほぼ出て、確認や締めくくりに向かっている",
+    "終了": "用件が済んだ、または話が一段落し、後輩がお礼や挨拶で会話を締める段階",
+}
+
 # 評価用 LLM に返させる JSON スキーマ
 RESPONSE_SCHEMA = {
     "type": "json_schema",
@@ -48,13 +56,15 @@ RESPONSE_SCHEMA = {
         "schema": {
             "type": "object",
             "additionalProperties": False,
-            "required": [*EMOTION_AXES.keys(), "inner_voice", "reason", "good_points", "bad_points"],
+            "required": [*EMOTION_AXES.keys(), "inner_voice", "reason", "good_points", "bad_points", "stage", "next_action"],
             "properties": {
                 **{key: {"type": "integer", "description": f"更新後の{label}（0〜100）"} for key, label in EMOTION_AXES.items()},
                 "inner_voice": {"type": "string", "description": "受け手の心の声（口には出さない本音）。30字以内"},
                 "reason": {"type": "string", "description": "感情が変化した理由。発話のどの部分が影響したか。60字以内"},
                 "good_points": {"type": "array", "items": {"type": "string"}, "description": "先輩の言動のうち良かった点（各15字以内、0〜2個。該当なしなら空）"},
                 "bad_points": {"type": "array", "items": {"type": "string"}, "description": "先輩の言動のうち改善すべき点（各15字以内、0〜2個。該当なしなら空。受け手の感想や状況ではなく先輩の言動を書く）"},
+                "stage": {"type": "string", "enum": list(STAGES.keys()), "description": "先輩の最新の発話を受けた時点での会話の進行段階"},
+                "next_action": {"type": "string", "description": "受け手（後輩）が次の発話ですべきこと。会話の目的と流れに沿って具体的に。40字以内"},
             },
         },
     },
@@ -82,6 +92,12 @@ EVALUATION_RUBRIC = """# 感情の軸（0〜100）
 - 1回の発話による変化は各軸とも最大±25程度に抑え、段階的に変化させる。
 - 当たり障りのない普通の発話なら、変化は小さく（±0〜5）する。
 - 受け手の人物設定（性格・状況）を踏まえて、その人が実際にどう感じるかを推定する。
+
+# 会話の進行段階（stage）と次にすべきこと（next_action）
+- 「この会話での受け手の目的と流れ」に照らして、先輩の最新の発話を受けた時点の段階を判定する。
+""" + "\n".join(f"  - {k}: {v}" for k, v in STAGES.items()) + """
+- next_action には、受け手が後輩の立場として次の発話ですべきことを書く（例: 「抱えている3つの作業を具体的に説明する」「お礼を言って作業に戻る」）。
+  先輩を助けたり、先輩に質問を促したりする内容にはしない。
 
 # 声の特徴の扱い
 - 「声の特徴」は音声から機械的に計測した参考値で、誤差がある。言葉の内容を主な判断材料とし、
@@ -114,6 +130,7 @@ def build_messages(
         "先輩の最新の発話を聞いた受け手が内心どう感じたかを推定してください。",
         "# 受け手の人物設定\n" + persona.profile + "\n" + gender.profile,
         "# 受け手が置かれている状況\n" + scenario.ai_context,
+        "# この会話での受け手の目的と流れ\n" + scenario.goal_flow,
         EVALUATION_RUBRIC,
     ])
 
@@ -134,14 +151,20 @@ def build_messages(
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
-def build_behavior_directive(emotion: dict[str, int], inner_voice: str) -> str:
-    """感情値から、次の発話での振る舞いの指示を組み立てる（ルールベース）。
+def build_behavior_directive(
+    emotion: dict[str, int], inner_voice: str, scenario: Scenario, stage: str, next_action: str
+) -> str:
+    """感情値と会話の進行状況から、次の発話での振る舞いの指示を組み立てる（ルールベース）。
 
-    Realtime API の会話にシステムメッセージとして差し込み、感情を AI の態度に反映させる。
+    Realtime API の会話にシステムメッセージとして差し込み、感情と会話の流れを AI の態度に反映させる。
+    （フロントエンドは常に最新の 1 件だけを会話に残す）
 
     Args:
         emotion: 現在の感情値。
         inner_voice: 推定した心の声。
+        scenario: 練習シナリオ（AI が用件を持ちかける側かどうかで指示を変える）。
+        stage: 会話の進行段階（STAGES のキー）。
+        next_action: 後輩が次の発話ですべきこと。
 
     Returns:
         str: 振る舞いの指示文。
@@ -168,18 +191,27 @@ def build_behavior_directive(emotion: dict[str, int], inner_voice: str) -> str:
 
     # 信頼感（本音・相談の開示）
     if trust <= 30:
-        rules.append("相手を信頼できていない。指示には従うが、本音や困りごとは言わず、自分から相談もしない。")
+        if scenario.ai_has_agenda:
+            rules.append("相手を信頼できていない。相談の内容は聞かれた分だけ最低限答え、本音は控える。")
+        else:
+            rules.append("相手を信頼できていない。指示には従うが、本音や困りごとは言わず、自分から相談もしない。")
     elif trust >= 70:
         rules.append("相手を信頼している。困っていることや本音を打ち明けたり、自分から質問や相談をしたりできる。")
 
     # 自分から話す余地（緊張と信頼の組み合わせ）
+    # 自分が用件を持ちかける側（相談など）の場合は、緊張していても用件そのものは話す
     if tension >= 60 or trust <= 40:
-        rules.append("自分から質問・意見・雑談の話題を出さない。")
+        if scenario.ai_has_agenda:
+            rules.append("遠慮がちでも、相談したいこと（自分の状況・困りごと）は聞かれたら具体的に話す。余計な雑談はしない。")
+        else:
+            rules.append("自分から質問・意見・雑談の話題を出さない。")
 
     state_text = ", ".join(f"{label}={emotion[key]}" for key, label in EMOTION_AXES.items())
     return (
         "# 現在のあなたの気持ち（相手には言わず、態度ににじませる）\n"
         f"{state_text}\n本音:「{inner_voice}」\n\n"
+        "# 会話の進行状況\n"
+        f"段階: {stage}（{STAGES.get(stage, '')}）\n次にすべきこと: {next_action}\n\n"
         "# 次の発話での振る舞い\n" + "\n".join(f"- {r}" for r in rules)
     )
 
@@ -216,6 +248,7 @@ async def evaluate(
 
     Returns:
         dict: emotion（更新後の値）, delta（変化量）, inner_voice, reason, good_points, bad_points, voice_labels,
+            stage（会話の進行段階）, next_action（後輩が次にすべきこと）,
             directive（AI の会話に差し込む振る舞いの指示）。
     """
     # 声の特徴量を判定ラベルに変換
@@ -248,5 +281,7 @@ async def evaluate(
         "good_points": data["good_points"][:2],
         "bad_points": data["bad_points"][:2],
         "voice_labels": [lb.model_dump() for lb in voice_labels],
-        "directive": build_behavior_directive(emotion, data["inner_voice"]),
+        "stage": data["stage"],
+        "next_action": data["next_action"],
+        "directive": build_behavior_directive(emotion, data["inner_voice"], scenario, data["stage"], data["next_action"]),
     }
