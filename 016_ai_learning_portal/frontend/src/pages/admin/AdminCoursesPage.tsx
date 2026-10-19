@@ -6,11 +6,13 @@ import { LEVEL_LABEL } from '../../api/types'
 import { AdminNav } from '../../components/admin/AdminNav'
 import { formatDate } from '../../components/format'
 import { Header } from '../../components/Header'
+import { useAuth } from '../../auth/AuthContext'
 import { useLoad } from '../useLoad'
 
 type Filter = 'all' | 'published' | 'draft'
 
 export function AdminCoursesPage() {
+  const { user } = useAuth()
   const { data: rows, error } = useLoad(() => api.admin.courses(), [])
   const [filter, setFilter] = useState<Filter>('all')
   const [keyword, setKeyword] = useState('')
@@ -30,7 +32,7 @@ export function AdminCoursesPage() {
             ＋ 新しい講座を作成
           </Link>
         </div>
-        <div className="filter-row filters">
+        <div className="filter-row admin-filters">
           {(
             [
               ['all', 'すべて'],
@@ -42,8 +44,7 @@ export function AdminCoursesPage() {
               {label}
             </button>
           ))}
-          <span className="spacer" />
-          <label className="search">
+          <label className="search admin-search">
             検索
             <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="講座名・識別名" />
           </label>
@@ -97,14 +98,19 @@ export function AdminCoursesPage() {
               {rows && visible.length === 0 && (
                 <tr>
                   <td colSpan={10} className="muted">
-                    該当する講座はありません。
+                    {rows.length === 0 && !user?.is_admin
+                      ? 'まだ講座を作成していません。「新しい講座を作成」から始めましょう。'
+                      : '該当する講座はありません。'}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <p className="muted small">受講者は1単元以上完了した人数、修了者は小テストで満点を取った人数です。</p>
+        <p className="muted small">
+          {user?.is_admin ? 'すべての講座を表示しています。' : 'あなたが作成した講座を表示しています。'}
+          受講者は1単元以上完了した人数、修了者は小テストで満点を取った人数です。
+        </p>
       </main>
     </>
   )

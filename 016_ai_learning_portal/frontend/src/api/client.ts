@@ -103,35 +103,35 @@ export const api = {
   home: () => request<Home>('GET', '/api/home'),
   myPage: () => request<MyPage>('GET', '/api/me/summary'),
 
-  // ---------- 管理者 ----------
+  // ---------- 講座の作成・編集(全ユーザ。自分の講座のみ)と、メンバー管理(管理者のみ) ----------
   admin: {
-    courses: () => request<AdminCourseRow[]>('GET', '/api/admin/courses'),
-    createCourse: (info: CourseInfo) => request<CourseEditor>('POST', '/api/admin/courses', info),
-    editor: (id: number) => request<CourseEditor>('GET', `/api/admin/courses/${id}`),
-    updateInfo: (id: number, info: CourseInfo) => request<CourseEditor>('PUT', `/api/admin/courses/${id}`, info),
-    deleteCourse: (id: number) => request<void>('DELETE', `/api/admin/courses/${id}`),
-    addUnit: (courseId: number, info: UnitInfo) => request<AdminUnit>('POST', `/api/admin/courses/${courseId}/units`, info),
+    courses: () => request<AdminCourseRow[]>('GET', '/api/authoring/courses'),
+    createCourse: (info: CourseInfo) => request<CourseEditor>('POST', '/api/authoring/courses', info),
+    editor: (id: number) => request<CourseEditor>('GET', `/api/authoring/courses/${id}`),
+    updateInfo: (id: number, info: CourseInfo) => request<CourseEditor>('PUT', `/api/authoring/courses/${id}`, info),
+    deleteCourse: (id: number) => request<void>('DELETE', `/api/authoring/courses/${id}`),
+    addUnit: (courseId: number, info: UnitInfo) => request<AdminUnit>('POST', `/api/authoring/courses/${courseId}/units`, info),
     reorderUnits: (courseId: number, unitIds: number[]) =>
-      request<void>('PUT', `/api/admin/courses/${courseId}/units/order`, { unit_ids: unitIds }),
+      request<void>('PUT', `/api/authoring/courses/${courseId}/units/order`, { unit_ids: unitIds }),
     saveUnit: (unitId: number, body: UnitInfo & { cells: CellIn[] }) =>
-      request<AdminUnit>('PUT', `/api/admin/units/${unitId}`, body),
-    deleteUnit: (unitId: number) => request<void>('DELETE', `/api/admin/units/${unitId}`),
+      request<AdminUnit>('PUT', `/api/authoring/units/${unitId}`, body),
+    deleteUnit: (unitId: number) => request<void>('DELETE', `/api/authoring/units/${unitId}`),
     saveQuiz: (courseId: number, questions: ProblemIn[]) =>
-      request<Problem[]>('PUT', `/api/admin/courses/${courseId}/quiz`, { questions }),
+      request<Problem[]>('PUT', `/api/authoring/courses/${courseId}/quiz`, { questions }),
     verify: (problemId: number, author: RunIn, ai: RunIn | null) =>
-      request<VerifyResult>('POST', `/api/admin/problems/${problemId}/verify`, { author, ai }),
+      request<VerifyResult>('POST', `/api/authoring/problems/${problemId}/verify`, { author, ai }),
     acceptAuthor: (problemId: number, output: string) =>
-      request<VerifyResult>('POST', `/api/admin/problems/${problemId}/accept-author`, { output }),
-    publishCheck: (courseId: number) => request<PublishCheck>('GET', `/api/admin/courses/${courseId}/publish-check`),
+      request<VerifyResult>('POST', `/api/authoring/problems/${problemId}/accept-author`, { output }),
+    publishCheck: (courseId: number) => request<PublishCheck>('GET', `/api/authoring/courses/${courseId}/publish-check`),
     publish: (courseId: number, examplesOk: boolean) =>
-      request<PublishCheck>('POST', `/api/admin/courses/${courseId}/publish`, { examples_ok: examplesOk }),
-    unpublish: (courseId: number) => request<PublishCheck>('POST', `/api/admin/courses/${courseId}/unpublish`),
+      request<PublishCheck>('POST', `/api/authoring/courses/${courseId}/publish`, { examples_ok: examplesOk }),
+    unpublish: (courseId: number) => request<PublishCheck>('POST', `/api/authoring/courses/${courseId}/unpublish`),
     uploadDataset: (courseId: number, file: File) => {
       const form = new FormData()
       form.append('file', file)
-      return request<CourseEditor>('POST', `/api/admin/courses/${courseId}/datasets`, form)
+      return request<CourseEditor>('POST', `/api/authoring/courses/${courseId}/datasets`, form)
     },
-    deleteDataset: (datasetId: number) => request<void>('DELETE', `/api/admin/datasets/${datasetId}`),
+    deleteDataset: (datasetId: number) => request<void>('DELETE', `/api/authoring/datasets/${datasetId}`),
     progress: () => request<ProgressMatrix>('GET', '/api/admin/progress'),
     member: (userId: number) => request<MemberDetail>('GET', `/api/admin/members/${userId}`),
     users: () => request<AdminUser[]>('GET', '/api/admin/users'),
@@ -140,23 +140,17 @@ export const api = {
     updateUser: (id: number, body: { display_name: string; is_admin: boolean; is_active: boolean; password?: string }) =>
       request<AdminUser>('PUT', `/api/admin/users/${id}`, body),
     deleteUser: (id: number) => request<void>('DELETE', `/api/admin/users/${id}`),
-    confirm: (problemId: number) => request<VerifyResult>('POST', `/api/admin/problems/${problemId}/confirm`),
-    importCourse: (file: File, replace: boolean) => {
-      const form = new FormData()
-      form.append('file', file)
-      form.append('replace', String(replace))
-      return request<CourseEditor>('POST', '/api/admin/import/course', form)
-    },
+    confirm: (problemId: number) => request<VerifyResult>('POST', `/api/authoring/problems/${problemId}/confirm`),
     importUnit: (courseId: number, file: File) => {
       const form = new FormData()
       form.append('file', file)
-      return request<AdminUnit>('POST', `/api/admin/courses/${courseId}/import-unit`, form)
+      return request<AdminUnit>('POST', `/api/authoring/courses/${courseId}/import-unit`, form)
     },
-    aiStatus: () => request<AIStatus>('GET', '/api/admin/ai/status'),
-    aiOutline: (req: OutlineRequest) => request<CourseOutline>('POST', '/api/admin/ai/outline', req),
+    aiStatus: () => request<AIStatus>('GET', '/api/authoring/ai/status'),
+    aiOutline: (req: OutlineRequest) => request<CourseOutline>('POST', '/api/authoring/ai/outline', req),
     aiCreateDraft: (slug: string, req: OutlineRequest, outline: CourseOutline) =>
-      request<AIJob>('POST', '/api/admin/ai/drafts', { slug, request: req, outline }),
-    aiJob: (jobId: number) => request<AIJob>('GET', `/api/admin/ai/jobs/${jobId}`),
-    aiResumeJob: (jobId: number) => request<AIJob>('POST', `/api/admin/ai/jobs/${jobId}/resume`),
+      request<AIJob>('POST', '/api/authoring/ai/drafts', { slug, request: req, outline }),
+    aiJob: (jobId: number) => request<AIJob>('GET', `/api/authoring/ai/jobs/${jobId}`),
+    aiResumeJob: (jobId: number) => request<AIJob>('POST', `/api/authoring/ai/jobs/${jobId}/resume`),
   },
 }

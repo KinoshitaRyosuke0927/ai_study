@@ -1,4 +1,4 @@
-// 講座を作成:作成方法(AI で作成 / .ipynb を取り込む / 白紙から作成)を選んで下書きを作る
+// 講座を作成:作成方法(AI で作成 / 白紙から作成)を選んで下書きを作る
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
@@ -8,11 +8,10 @@ import { AdminNav } from '../../components/admin/AdminNav'
 import { Header } from '../../components/Header'
 import { useLoad } from '../useLoad'
 
-type Method = 'ai' | 'ipynb' | 'blank'
+type Method = 'ai' | 'blank'
 
 const METHODS: { key: Method; label: string; desc: string }[] = [
   { key: 'ai', label: '題材から AI で作成', desc: '題材を入力すると AI が構成案を作ります。構成案を編集してから下書きを作ります' },
-  { key: 'ipynb', label: '.ipynb を取り込む', desc: '講座フォルダ(course.json + .ipynb)を zip にして取り込みます' },
   { key: 'blank', label: '白紙から作成', desc: 'エディタで説明・例題・演習を一から書きます' },
 ]
 
@@ -242,54 +241,6 @@ function AICreate() {
   )
 }
 
-/** .ipynb を取り込む:講座フォルダの zip をアップロード */
-function IpynbImport() {
-  const navigate = useNavigate()
-  const [file, setFile] = useState<File | null>(null)
-  const [replace, setReplace] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!file) return
-    setBusy(true)
-    setError(null)
-    try {
-      const editor = await api.admin.importCourse(file, replace)
-      navigate(`/admin/courses/${editor.id}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form className="card create-form form-stack" onSubmit={(e) => void submit(e)}>
-      <p className="small">
-        講座フォルダ(<code>course.json</code>・単元の <code>.ipynb</code>・<code>quiz.ipynb</code>・<code>data/</code>)を zip にしてアップロードします。
-        書き方は <code>docs/notebook-format.md</code> を参照してください。取り込んだ講座は下書きになります。
-      </p>
-      <label className="field">
-        講座フォルダの zip
-        <input type="file" accept=".zip" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required />
-      </label>
-      <label className="check-inline">
-        <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
-        同じ識別名の講座があれば置き換える(受講記録も削除されます)
-      </label>
-      {error && <div className="form-error">{error}</div>}
-      <div className="save-bar">
-        <span className="spacer muted small">既存の講座に単元を1つ追加する場合は、講座エディタの「.ipynb から単元を追加」を使います。</span>
-        <button type="submit" className="btn btn-primary" disabled={busy || !file}>
-          {busy ? '取り込み中…' : '取り込んでエディタへ'}
-        </button>
-      </div>
-    </form>
-  )
-}
-
 /** 白紙から作成 */
 function BlankCreate() {
   const navigate = useNavigate()
@@ -375,7 +326,6 @@ export function CourseCreatePage() {
           </div>
         </section>
         {method === 'ai' && <AICreate />}
-        {method === 'ipynb' && <IpynbImport />}
         {method === 'blank' && <BlankCreate />}
       </main>
     </>

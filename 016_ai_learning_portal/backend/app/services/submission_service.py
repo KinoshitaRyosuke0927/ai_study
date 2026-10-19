@@ -113,7 +113,7 @@ def submit_code(
         raise NotFoundError(problem_id)
     # 非公開講座の問題を管理者以外が提出した場合はエラー
     course = session.get(Course, problem.course_id)
-    if not user.is_admin and course.status != CourseStatus.PUBLISHED:
+    if not (user.is_admin or course.status == CourseStatus.PUBLISHED or course.author_id == user.id):
         raise NotFoundError(problem_id)
     # 採点
     passed, message = grade_code(problem, req)

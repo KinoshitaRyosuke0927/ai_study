@@ -10,10 +10,8 @@
 
 from __future__ import annotations
 
-import io
 import math
 import tempfile
-import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -59,7 +57,7 @@ from app.schemas_admin import (
 )
 from app.services.course_service import NotFoundError, dataset_out
 from app.services.grading import outputs_match
-from app.services.notebook_import import NotebookFormatError, add_parsed_unit, import_course, parse_notebook
+from app.services.notebook_import import NotebookFormatError, add_parsed_unit, parse_notebook
 
 # 採点に関わる項目(変更したら再検証が必要)
 _GRADED_FIELDS = (
@@ -75,7 +73,7 @@ _GRADED_FIELDS = (
 )
 # データファイルの上限サイズ
 MAX_DATASET_BYTES = 20 * 1024 * 1024
-# 取り込む zip / .ipynb の上限サイズ
+# 取り込む .ipynb の上限サイズ
 MAX_IMPORT_BYTES = 50 * 1024 * 1024
 
 
@@ -201,25 +199,25 @@ def _unit_out(unit: Unit) -> UnitAdminOut:
 
 
 # ---------- 講座 ----------
-def list_courses(session: Session) -> list[AdminCourseRowOut]:
+def list_courses(session: Session, user: User) -> list[AdminCourseRowOut]:
     """
-    講座管理の一覧(下書きを含むすべての講座)を返す
+    講座管理の一覧を返す(管理者はすべての講座、一般ユーザは自分が作った講座だけ)
 
     Args
     -----------------
     - session: Session,                 DB セッション
+    - user: User,                       ログイン中ユーザ
 
     Returns
     -----------------
     - rows: list[AdminCourseRowOut],    講座の一覧
 
     """
-    # 講座を作成者・単元とあわせて取得
-    courses = list(
-        session.scalars(
-            select(Course).options(selectinload(Course.units), selectinload(Course.author)).order_by(Course.id)
-        )
-    )
+    # 講座を作成者・単元とあわせて取得(一般ユーザは自分が作った講座だけ)
+    query = select(Course).options(selectinload(Course.units), selectinload(Course.author)).order_by(Course.id)
+    if not user.is_admin:
+        query = query.where(Course.author_id == user.id)
+    courses = list(session.scalars(query))
     # 講座ごとの問題数・検証済み数
     problem_counts: dict[int, tuple[int, int]] = {}
     for course_id, status, count in session.execute(
@@ -361,7 +359,7 @@ def delete_course(session: Session, course_id: int) -> None:
     session.flush()
 
 
-def get_editor(session: Session, course_id: int) -> CourseEditorOut:
+def get_editor(session: Session, course_id: int, user: User) -> CourseEditorOut:
     """
     講座エディタの表示内容(講座情報・全単元・小テスト・データファイル)を返す
 
@@ -369,6 +367,7 @@ def get_editor(session: Session, course_id: int) -> CourseEditorOut:
     -----------------
     - session: Session,                 DB セッション
     - course_id: int,                   講座 ID
+    - user: User,                       ログイン中ユーザ(前提講座の候補を絞るため)
 
     Returns
     -----------------
@@ -393,8 +392,13 @@ def get_editor(session: Session, course_id: int) -> CourseEditorOut:
         .where(Problem.course_id == course.id, Problem.kind == ProblemKind.QUIZ)
         .order_by(Problem.position)
     )
-    # 前提講座の候補(自分以外の講座)
-    others = session.execute(select(Course.id, Course.title).where(Course.id != course.id).order_by(Course.id))
+    # 前提講座の候補(自分以外の講座。一般ユーザには公開中の講座と自分の講座だけを出す)
+    others_query = select(Course.id, Course.title).where(Course.id != course.id).order_by(Course.id)
+    if not user.is_admin:
+        others_query = others_query.where(
+            (Course.status == CourseStatus.PUBLISHED) | (Course.author_id == user.id)
+        )
+    others = session.execute(others_query)
     # 表示内容を返却
     return CourseEditorOut(
         id=course.id,
@@ -826,75 +830,7 @@ def confirm_problem(session: Session, problem_id: int) -> VerifyOut:
     )
 
 
-# ---------- .ipynb の取り込み ----------
-def _safe_extract(data: bytes, dest: Path) -> Path:
-    """
-    zip を展開し、course.json のあるフォルダを返す(展開先の外に出るパスは拒否する)
-
-    Args
-    -----------------
-    - data: bytes,                      zip の内容
-    - dest: Path,                       展開先
-
-    Returns
-    -----------------
-    - course_dir: Path,                 course.json のあるフォルダ
-
-    """
-    # zip として開けるか確認
-    try:
-        archive = zipfile.ZipFile(io.BytesIO(data))
-    except zipfile.BadZipFile:
-        raise AdminInputError("zip ファイルとして読み込めませんでした")
-    root = dest.resolve()
-    total = 0
-    with archive:
-        for info in archive.infolist():
-            # 展開先の外を指すパス(../ や絶対パス)は拒否する
-            target = (root / info.filename).resolve()
-            if root not in target.parents and target != root:
-                raise AdminInputError(f"zip に不正なパスが含まれています: {info.filename}")
-            total += info.file_size
-            if total > MAX_IMPORT_BYTES * 4:
-                raise AdminInputError("zip の展開後のサイズが大きすぎます")
-        archive.extractall(root)
-    # course.json を探す(zip の直下、または1階層下のフォルダ)
-    candidates = [p.parent for p in root.glob("course.json")] + [p.parent for p in root.glob("*/course.json")]
-    if len(candidates) != 1:
-        raise AdminInputError("zip の中に course.json が見つかりません(講座フォルダを zip にしてください)")
-    return candidates[0]
-
-
-def import_course_zip(session: Session, author: User, data: bytes, replace: bool) -> Course:
-    """
-    講座フォルダの zip(course.json + .ipynb + data/)を取り込み、下書きの講座として登録する
-
-    Args
-    -----------------
-    - session: Session,                 DB セッション
-    - author: User,                     作成者
-    - data: bytes,                      zip の内容
-    - replace: bool,                    同じ識別名の講座を置き換えるなら True
-
-    Returns
-    -----------------
-    - course: Course,                   登録した講座
-
-    """
-    # サイズの確認
-    if len(data) > MAX_IMPORT_BYTES:
-        raise AdminInputError("ファイルが大きすぎます(上限 50MB)")
-    # 一時フォルダに展開して取り込む(公開前チェックを通すため、必ず下書きで登録する)
-    with tempfile.TemporaryDirectory() as tmp:
-        course_dir = _safe_extract(data, Path(tmp))
-        try:
-            return import_course(session, course_dir, author=author, replace=replace, force_status=CourseStatus.DRAFT)
-        except NotebookFormatError as e:
-            raise AdminInputError(f"取り込みに失敗しました: {e}")
-        except (KeyError, ValueError) as e:
-            raise AdminInputError(f"course.json の内容が正しくありません: {e}")
-
-
+# ---------- .ipynb からの単元の追加 ----------
 def import_unit_notebook(session: Session, course_id: int, filename: str, data: bytes) -> UnitAdminOut:
     """
     .ipynb を1つ読み込み、講座の末尾に単元として追加する

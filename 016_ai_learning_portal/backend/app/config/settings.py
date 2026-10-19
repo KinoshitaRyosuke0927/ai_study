@@ -60,9 +60,9 @@ class Settings(BaseSettings):
     azure_openai_endpoint: str = Field(default="", alias="AZURE_OPENAI_ENDPOINT")
     azure_openai_key: str = Field(default="", alias="AZURE_OPENAI_KEY")
     # 構成案の生成に使うモデル(デプロイ名)
-    ai_model_outline: str = Field(default="gpt-5.4-mini", alias="AI_MODEL_OUTLINE")
+    ai_model_outline: str = Field(default="gpt-6-luna", alias="AI_MODEL_OUTLINE")
     # 単元・小テストの下書き生成に使うモデル(デプロイ名)
-    ai_model_draft: str = Field(default="gpt-5.4", alias="AI_MODEL_DRAFT")
+    ai_model_draft: str = Field(default="gpt-6-luna", alias="AI_MODEL_DRAFT")
     ai_timeout_seconds: int = Field(default=300, alias="AI_TIMEOUT_SECONDS")
 
     # --- DB の自動起動・停止(Azure Database for MySQL フレキシブルサーバー) ---

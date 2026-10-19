@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { AdminNav } from '../../components/admin/AdminNav'
 import { formatDate } from '../../components/format'
 import { Header } from '../../components/Header'
+import { PasswordInput } from '../../components/PasswordInput'
 import { useLoad } from '../useLoad'
 
 function UserRow({ user, isSelf, onChanged }: { user: AdminUser; isSelf: boolean; onChanged: () => void }) {
@@ -51,9 +52,8 @@ function UserRow({ user, isSelf, onChanged }: { user: AdminUser; isSelf: boolean
         <input type="checkbox" aria-label={`${user.login_name} を有効にする`} checked={active} disabled={isSelf} onChange={(e) => setActive(e.target.checked)} />
       </td>
       <td>
-        <input
+        <PasswordInput
           className="cell-input"
-          type="password"
           aria-label={`${user.login_name} の新しいパスワード`}
           placeholder="変更する場合のみ(8文字以上)"
           value={password}
@@ -122,7 +122,7 @@ export function UsersPage() {
             </label>
             <label className="field field-mid">
               初期パスワード(8文字以上)
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
             </label>
             <label className="check-inline">
               <input type="checkbox" checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} />

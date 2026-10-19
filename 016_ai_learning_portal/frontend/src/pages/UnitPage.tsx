@@ -204,22 +204,22 @@ export function UnitPage() {
 
             <div className="unit-footer">
               {unit.prev_unit ? (
-                <Link to={`/units/${unit.prev_unit.id}`}>前の単元:{unit.prev_unit.title}</Link>
+                <Link className="btn btn-dark" to={`/units/${unit.prev_unit.id}`}>
+                  前の単元:{unit.prev_unit.title}
+                </Link>
               ) : (
-                <Link to={`/courses/${unit.course_slug}`}>講座の詳細へ</Link>
+                <span />
               )}
               {unit.next_unit ? (
                 <Link className="btn btn-dark" to={`/units/${unit.next_unit.id}`}>
                   次の単元:{unit.next_unit.title}
                 </Link>
-              ) : unit.units.every((u) => u.completed) ? (
-                <Link className="btn btn-dark" to={`/courses/${unit.course_slug}/quiz`}>
-                  小テストへ
-                </Link>
               ) : (
-                <Link className="btn btn-dark" to={`/courses/${unit.course_slug}`}>
-                  講座の詳細へ
-                </Link>
+                unit.units.every((u) => u.completed) && (
+                  <Link className="btn btn-dark" to={`/courses/${unit.course_slug}/quiz`}>
+                    小テストへ
+                  </Link>
+                )
               )}
             </div>
           </div>

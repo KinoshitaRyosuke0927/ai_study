@@ -1,9 +1,8 @@
 # 講座ノートブックの書き方
 
 Jupyter / VS Code / Google Colab で書いた `.ipynb` を、そのまま講座として取り込めます。
-取り込みは、管理者画面(管理 › 講座を作成 › 「.ipynb を取り込む」で講座フォルダの zip をアップロード。
-既存の講座に単元を1つ足す場合は、講座エディタの「.ipynb から単元を追加」)か、
-`python -m app.cli import-course <講座フォルダ>`(`backend/` で実行)で行います。画面から取り込んだ講座は下書きになります。
+講座の取り込みは `python -m app.cli import-course <講座フォルダ>`(`backend/` で実行)で行います。
+画面からは、講座エディタの「.ipynb から単元を追加」で、既存の講座に単元を1つずつ追加できます。
 見本は [`content/statistics-basics/`](../content/statistics-basics/) です。
 
 ## 講座フォルダの構成

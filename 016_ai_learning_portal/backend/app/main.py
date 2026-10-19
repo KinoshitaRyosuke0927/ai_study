@@ -23,7 +23,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config.settings import get_settings
 from app.infra.db import get_engine
 from app.infra.db_power import DbPowerError, ensure_starting
-from app.routers import admin, auth, learning
+from app.routers import admin, authoring, auth, learning
 from app.services.activity_service import record_activity
 from app.services.ai_course_service import mark_interrupted_jobs
 
@@ -136,6 +136,7 @@ def create_app() -> FastAPI:
     # API ルーターを登録
     app.include_router(auth.router)
     app.include_router(learning.router)
+    app.include_router(authoring.router)
     app.include_router(admin.router)
 
     @app.get("/api/health")

@@ -1,9 +1,12 @@
 // ログイン画面
 import { useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { PasswordInput } from '../components/PasswordInput'
 
 export function LoginPage() {
   const { login } = useAuth()
+  const navigate = useNavigate()
   const [loginName, setLoginName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -15,6 +18,8 @@ export function LoginPage() {
     setError(null)
     try {
       await login(loginName, password)
+      // ログインしたら、どのページから来た場合もホームを表示する
+      navigate('/', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -36,8 +41,7 @@ export function LoginPage() {
         </label>
         <label className="field">
           パスワード
-          <input
-            type="password"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"

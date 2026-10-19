@@ -20,7 +20,6 @@ export function MyPage() {
         <section className="my-head">
           <div className="my-name">
             <h1 className="page-title">{user?.display_name} さんの学習</h1>
-            <div className="muted small">この画面の内容は、あなたと管理者だけが見られます。</div>
           </div>
           {me && (
             <div className="stats stats-4">

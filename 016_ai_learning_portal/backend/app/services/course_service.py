@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.common.constants import CellType, CourseStatus, Grading, ProblemKind
@@ -114,11 +114,33 @@ def visible_course_query(user: User):
     """
     # 講座と単元をまとめて読み込むクエリを用意
     query = select(Course).options(selectinload(Course.units))
-    # 管理者以外は公開中の講座だけに絞る
+    # 管理者以外は、公開中の講座と自分が作った講座(下書きのプレビュー用)に絞る
     if not user.is_admin:
-        query = query.where(Course.status == CourseStatus.PUBLISHED)
+        query = query.where(or_(Course.status == CourseStatus.PUBLISHED, Course.author_id == user.id))
     # クエリを返却
     return query
+
+
+def _viewable(user: User, course: Course) -> bool:
+    """
+    講座を閲覧(受講)できるかを返す(公開中、作成者本人、または管理者)
+
+    Args
+    -----------------
+    - user: User,                       ログイン中ユーザ
+    - course: Course,                   講座
+
+    Returns
+    -----------------
+    - allowed: bool,                    閲覧できれば True
+
+    """
+    # 公開中の講座はだれでも、下書きは作成者本人と管理者だけ
+    return (
+        user.is_admin
+        or course.status == CourseStatus.PUBLISHED
+        or (course.author_id is not None and course.author_id == user.id)
+    )
 
 
 def _completed_unit_ids(session: Session, user: User) -> set[int]:
@@ -326,7 +348,7 @@ def get_unit(session: Session, user: User, unit_id: int) -> UnitDetailOut:
         )
     )
     # 存在しない、または非公開講座を管理者以外が開いた場合はエラー
-    if unit is None or (not user.is_admin and unit.course.status != CourseStatus.PUBLISHED):
+    if unit is None or not _viewable(user, unit.course):
         raise NotFoundError(unit_id)
     # 進捗を取得
     completed_units = _completed_unit_ids(session, user)
@@ -409,9 +431,7 @@ def get_dataset(session: Session, user: User, dataset_id: int) -> Dataset:
     # データファイルを取得
     dataset = session.get(Dataset, dataset_id)
     # 存在しない、または非公開講座のデータを管理者以外が要求した場合はエラー
-    if dataset is None or (
-        not user.is_admin and dataset.course.status != CourseStatus.PUBLISHED
-    ):
+    if dataset is None or not _viewable(user, dataset.course):
         raise NotFoundError(dataset_id)
     # データファイルを返却
     return dataset

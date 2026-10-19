@@ -83,8 +83,8 @@ def test_ai_unavailable_without_settings(admin, monkeypatch):
     from app.config.settings import get_settings
 
     monkeypatch.setattr(get_settings(), "azure_openai_endpoint", "")
-    assert admin.get("/api/admin/ai/status").json()["enabled"] is False
-    res = admin.post("/api/admin/ai/outline", json=REQUEST)
+    assert admin.get("/api/authoring/ai/status").json()["enabled"] is False
+    res = admin.post("/api/authoring/ai/outline", json=REQUEST)
     assert res.status_code == 503 and "接続情報" in res.json()["detail"]
 
 
@@ -92,7 +92,7 @@ def test_outline_retries_broken_output(admin):
     # 形式の崩れた応答は、誤りを伝えて1回だけ再試行する
     fake = FakeAI(broken_first=True)
     set_ai_client(fake)
-    res = admin.post("/api/admin/ai/outline", json=REQUEST)
+    res = admin.post("/api/authoring/ai/outline", json=REQUEST)
     assert res.status_code == 200 and res.json()["title"] == "時系列分析入門"
     assert len(fake.calls) == 2
     # 呼び出しはすべて記録される(失敗 1 件 + 成功 1 件、プロンプトの版番号つき)
@@ -105,10 +105,10 @@ def test_outline_retries_broken_output(admin):
 def test_draft_job_creates_unverified_course(admin):
     set_ai_client(FakeAI())
     # 構成案から下書きを作成(バックグラウンド処理はテストでは応答の前に完了する)
-    job = admin.post("/api/admin/ai/drafts", json={"slug": "time-series", "request": REQUEST, "outline": OUTLINE}).json()
-    job = admin.get(f"/api/admin/ai/jobs/{job['id']}").json()
+    job = admin.post("/api/authoring/ai/drafts", json={"slug": "time-series", "request": REQUEST, "outline": OUTLINE}).json()
+    job = admin.get(f"/api/authoring/ai/jobs/{job['id']}").json()
     assert job["status"] == "done" and job["done_steps"] == job["total_steps"] == 3
-    editor = admin.get(f"/api/admin/courses/{job['course_id']}").json()
+    editor = admin.get(f"/api/authoring/courses/{job['course_id']}").json()
     assert editor["status"] == "draft" and editor["level"] == "intermediate"
     assert [u["title"] for u in editor["units"]] == ["移動平均", "予測の評価"]
     # セルは AI 生成の印つき。演習は AI の模範解答だけがあり、作成者の解答は空で未検証
@@ -121,10 +121,10 @@ def test_draft_job_creates_unverified_course(admin):
     assert [q["verify_status"] for q in editor["quiz"]] == ["todo", "todo", "todo"]
     assert editor["quiz"][2]["related_unit_id"] == editor["units"][1]["id"]
     # 選択式は作成者が確認すると検証済みになる(コード問題は確認ボタンでは検証できない)
-    assert admin.post(f"/api/admin/problems/{editor['quiz'][0]['id']}/confirm").json()["verify_status"] == "verified"
-    assert admin.post(f"/api/admin/problems/{editor['quiz'][2]['id']}/confirm").status_code == 400
+    assert admin.post(f"/api/authoring/problems/{editor['quiz'][0]['id']}/confirm").json()["verify_status"] == "verified"
+    assert admin.post(f"/api/authoring/problems/{editor['quiz'][2]['id']}/confirm").status_code == 400
     # 公開前チェックでは未検証の問題が残っている
-    check = admin.get(f"/api/admin/courses/{job['course_id']}/publish-check").json()
+    check = admin.get(f"/api/authoring/courses/{job['course_id']}/publish-check").json()
     assert check["publishable"] is False
 
 
@@ -137,23 +137,23 @@ def test_draft_job_failure_and_resume(admin):
             return super().complete_json(system_prompt, user_prompt, model)
 
     set_ai_client(HalfBroken())
-    job = admin.post("/api/admin/ai/drafts", json={"slug": "broken", "request": REQUEST, "outline": OUTLINE}).json()
-    job = admin.get(f"/api/admin/ai/jobs/{job['id']}").json()
+    job = admin.post("/api/authoring/ai/drafts", json={"slug": "broken", "request": REQUEST, "outline": OUTLINE}).json()
+    job = admin.get(f"/api/authoring/ai/jobs/{job['id']}").json()
     assert job["status"] == "failed" and job["done_steps"] == 1
     assert "単元1" in job["message"] and "単元2" in job["message"]
-    editor = admin.get(f"/api/admin/courses/{job['course_id']}").json()
+    editor = admin.get(f"/api/authoring/courses/{job['course_id']}").json()
     assert len(editor["quiz"]) == 3 and editor["units"][0]["cells"] == []
     # 再開すると、中身の無い単元だけを作る(小テストは作り直さない)
     fake = FakeAI()
     set_ai_client(fake)
-    job = admin.post(f"/api/admin/ai/jobs/{job['id']}/resume").json()
-    job = admin.get(f"/api/admin/ai/jobs/{job['id']}").json()
+    job = admin.post(f"/api/authoring/ai/jobs/{job['id']}/resume").json()
+    job = admin.get(f"/api/authoring/ai/jobs/{job['id']}").json()
     assert job["status"] == "done" and job["done_steps"] == 3 and job["message"] == ""
     assert len(fake.calls) == 2 and all("単元の教材" in c[0] for c in fake.calls)
-    editor = admin.get(f"/api/admin/courses/{job['course_id']}").json()
+    editor = admin.get(f"/api/authoring/courses/{job['course_id']}").json()
     assert all(u["cells"] for u in editor["units"]) and len(editor["quiz"]) == 3
     # 完了したジョブは再開できない
-    assert admin.post(f"/api/admin/ai/jobs/{job['id']}/resume").status_code == 400
+    assert admin.post(f"/api/authoring/ai/jobs/{job['id']}/resume").status_code == 400
 
 
 def test_interrupted_jobs_marked_on_startup(admin):
@@ -171,5 +171,5 @@ def test_interrupted_jobs_marked_on_startup(admin):
 
 def test_draft_rejects_duplicate_slug(admin):
     set_ai_client(FakeAI())
-    res = admin.post("/api/admin/ai/drafts", json={"slug": "statistics-basics", "request": REQUEST, "outline": OUTLINE})
+    res = admin.post("/api/authoring/ai/drafts", json={"slug": "statistics-basics", "request": REQUEST, "outline": OUTLINE})
     assert res.status_code == 400

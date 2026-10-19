@@ -87,7 +87,6 @@ export function MembersProgressPage() {
         <div className="page-head">
           <div className="spacer">
             <h1 className="page-title">メンバーの受講状況</h1>
-            <div className="muted small">学習の支援と講座改善のための情報です。人事評価には使用しません。</div>
           </div>
           {data && (
             <div className="stats stats-3 head-stats">

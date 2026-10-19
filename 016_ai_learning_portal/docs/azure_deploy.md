@@ -4,7 +4,9 @@ AI学習ポータル(`016_ai_learning_portal`)を Azure Container Apps(従量課
 Azure Database for MySQL(フレキシブルサーバー)にデプロイする手順です。構成・命名・IP 制限は
 `010_ai_reviewer`(`010_ai_reviewer/docs/azure_deploy.md`)に合わせています。
 
-> この手順書は未実施です(2026-10 時点でデプロイは行っていません)。実施時に差異があれば追記してください。
+> 2026-10-20 にこの手順でデプロイしました。実施時の状況は末尾の「デプロイの記録」を参照してください。
+> デプロイしたアカウントには**ロールの割り当て権限が無かった**ため、DB の自動起動・停止は無効のまま運用しています
+> (DB は手動で起動・停止。「自動起動・停止を有効にする」の手順で後から有効にできます)。
 
 ## 構成
 
@@ -18,7 +20,7 @@ Azure Database for MySQL(フレキシブルサーバー)にデプロイする手
 | Container App | `ca-ai-learning-portal` | `minReplicas=0` / `maxReplicas=1`。Ingress に IP 制限 |
 | Container Apps ジョブ | `caj-ai-learning-portal-db-stop` | 15 分ごとに「一定時間使われていなければ DB を停止」 |
 | Azure Database for MySQL | `mysql-ai-learning-portal` | フレキシブルサーバー / Burstable B1ms / MySQL 8.0 |
-| Azure OpenAI | 既存(010 と同じ) | `gpt-5.4-mini`(構成案)/ `gpt-5.4`(下書き) |
+| Azure OpenAI | 既存(010 と同じリソース) | `gpt-6-luna`(構成案・下書きとも) |
 
 IP 制限(010 と同じ社内ネットワーク):オフィス `221.117.124.90` / VPN `122.220.62.58`
 
@@ -128,6 +130,8 @@ mysql -h $MYSQL.mysql.database.azure.com -u alpadmin -p --ssl-mode=REQUIRED \
 
 ### 5. パラメータファイルの作成
 
+> 秘密情報(MySQL の管理者・アプリ用パスワード、`APP_SECRET_KEY`)は `infra/.env.azure`(`.gitignore` 済み)に控えておきます。
+
 `infra/containerapp.parameters.json.example` をコピーして `infra/containerapp.parameters.json` を作り、値を埋めます
 (このファイルは `.gitignore` 済み。**Git にコミットしない**)。
 
@@ -142,6 +146,13 @@ mysql -h $MYSQL.mysql.database.azure.com -u alpadmin -p --ssl-mode=REQUIRED \
 IP 制限・DB 自動停止までの時間(`dbIdleStopMinutes`)・ジョブの実行間隔(`idleStopCron`)・モデル名は、
 テンプレートの既定値を変える場合だけ指定します。
 
+手順 7(ロールの割り当て)ができない場合は、次の 2 つを `false` にします(自動起動・停止を使わない構成)。
+
+| パラメータ | 内容 |
+|---|---|
+| `dbAutostartEnabled` | 停止中の DB をアプリが起動するか(`false` なら停止中は「データベースに接続できません」と表示) |
+| `deployIdleStopJob` | 使われていない DB を停止するジョブを作るか |
+
 ### 6. Container Apps 環境・Container App・DB 自動停止ジョブのデプロイ
 
 ```bash
@@ -153,7 +164,12 @@ az deployment group create \
   --query "properties.outputs"
 ```
 
-出力の `fqdn` がアプリの URL、`appPrincipalId` / `jobPrincipalId` が手順 7 で使うマネージド ID です。
+出力の `fqdn` がアプリの URL、`appPrincipalId` が手順 7 で使うアプリのマネージド ID です。
+ジョブのマネージド ID は次で取得します(`deployIdleStopJob` が `true` の場合のみ)。
+
+```bash
+az resource show -g $RG -n caj-ai-learning-portal-db-stop --resource-type Microsoft.App/jobs --query identity.principalId -o tsv
+```
 
 ### 7. マネージド ID に DB を操作する権限を付ける
 
@@ -188,6 +204,10 @@ az mysql flexible-server stop -g $RG -n $MYSQL      # 停止してから 5 を�
 ```bash
 az containerapp job start -g $RG -n caj-ai-learning-portal-db-stop    # 拡張機能が使えない場合はポータルから「今すぐ実行」
 ```
+
+> Windows の Azure CLI は、`az acr build` のログ表示で文字コードのエラー(cp932)になることがあります。
+> その場合も Azure 側のビルドは続いているため、`az acr task list-runs -r $ACR --top 1 -o table` で結果を確認します。
+> 事前に `export PYTHONIOENCODING=utf-8` を設定すると避けられます。
 
 7. 確認が終わったら DB を停止しておく(開発中は停止が基本)。
 
@@ -232,6 +252,13 @@ az containerapp logs show -g $RG -n ca-ai-learning-portal --follow
 - **DB の手動操作**:`az mysql flexible-server start|stop|show -g $RG -n $MYSQL --query state`。
 - **ユーザ管理**:管理者でログインし「管理 › メンバー管理」から行います(コンテナ内で CLI を使う必要はありません)。
 
+## 自動起動・停止を有効にする(ロールの割り当てができるようになったら)
+
+1. 所有者(またはユーザー アクセス管理者)の権限を持つ人に、手順 7 のロールの割り当てを実行してもらう
+   (アプリのマネージド ID は手順 6 の出力 `appPrincipalId`)。
+2. `infra/containerapp.parameters.json` の `dbAutostartEnabled` と `deployIdleStopJob` を `true` にして、手順 6 を再実行する。
+3. 作られた DB 停止ジョブのマネージド ID にも、手順 7 と同じロールを割り当ててもらう。
+
 ## 時間指定の起動・停止への切り替え(将来)
 
 運用開始後、9:00〜18:00(平日)だけ DB を起動する場合は、次のように変更します。Container Apps ジョブの cron は
@@ -256,3 +283,23 @@ az acr delete -g $RG -n $ACR --yes
 ```
 
 ※ `test20251008` は他プロジェクトのリソースと共用しているため、リソースグループ自体は削除しないでください。
+
+## デプロイの記録
+
+| 項目 | 内容 |
+|---|---|
+| 実施日 | 2026-10-20 |
+| URL | `https://ca-ai-learning-portal.icymeadow-336147b5.japaneast.azurecontainerapps.io`(オフィス・VPN からのみ) |
+| イメージ | `acrailearningportal.azurecr.io/ai-learning-portal:20261020072419` |
+| MySQL | `mysql-ai-learning-portal`(Burstable B1ms / MySQL 8.0 / TLS 必須)。接続許可は「Azure のサービス」のみ |
+| データ | デプロイ時点のローカル DB の内容をそのまま登録(ユーザ・講座・受講記録) |
+| DB の自動起動・停止 | **無効**(`dbAutostartEnabled=false` / `deployIdleStopJob=false`)。デプロイしたアカウントにロールの割り当て権限が無いため |
+| 秘密情報 | `infra/.env.azure`・`infra/containerapp.parameters.json`(どちらも Git 管理対象外) |
+
+DB の起動・停止は手動で行います(停止中にアクセスすると「データベースに接続できません」と表示されます)。
+
+```bash
+az mysql flexible-server stop  -g test20251008 -n mysql-ai-learning-portal    # 使い終わったら停止
+az mysql flexible-server start -g test20251008 -n mysql-ai-learning-portal    # 使う前に起動(数分かかる)
+az mysql flexible-server show  -g test20251008 -n mysql-ai-learning-portal --query state -o tsv
+```

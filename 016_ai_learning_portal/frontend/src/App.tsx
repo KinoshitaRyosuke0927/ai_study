@@ -43,14 +43,15 @@ function AppRoutes() {
       <Route path="/courses/:slug" element={<CourseDetailPage />} />
       <Route path="/courses/:slug/quiz" element={<QuizPage />} />
       <Route path="/units/:unitId" element={<UnitPage />} />
-      {/* 管理者のみ(サーバ側でも権限を確認している) */}
+      {/* 講座の作成・編集:全ユーザ(自分の講座のみ。サーバ側でも権限を確認している) */}
+      <Route path="/admin" element={<AdminCoursesPage />} />
+      <Route path="/admin/courses/new" element={<CourseCreatePage />} />
+      <Route path="/admin/courses/:courseId" element={<CourseEditorPage />} />
+      <Route path="/admin/courses/:courseId/publish" element={<PublishCheckPage />} />
+      <Route path="/admin/ai-jobs/:jobId" element={<AIJobPage />} />
+      {/* メンバーの受講状況・メンバー管理:管理者のみ */}
       {user.is_admin && (
         <>
-          <Route path="/admin" element={<AdminCoursesPage />} />
-          <Route path="/admin/courses/new" element={<CourseCreatePage />} />
-          <Route path="/admin/courses/:courseId" element={<CourseEditorPage />} />
-          <Route path="/admin/courses/:courseId/publish" element={<PublishCheckPage />} />
-          <Route path="/admin/ai-jobs/:jobId" element={<AIJobPage />} />
           <Route path="/admin/progress" element={<MembersProgressPage />} />
           <Route path="/admin/users" element={<UsersPage />} />
         </>

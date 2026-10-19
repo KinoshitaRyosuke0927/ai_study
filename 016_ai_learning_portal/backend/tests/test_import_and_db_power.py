@@ -1,7 +1,5 @@
-"""画面からの .ipynb 取り込みと、DB の自動起動・停止のテスト。"""
+""".ipynb からの単元の追加と、DB の自動起動・停止のテスト。"""
 
-import io
-import zipfile
 from argparse import Namespace
 from datetime import datetime, timedelta, timezone
 
@@ -24,54 +22,15 @@ def admin(seeded):
     return c
 
 
-def _course_zip(slug: str, top: str = "") -> bytes:
-    """サンプル講座を、識別名を変えて zip にする。"""
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as z:
-        for path in SAMPLE_COURSE.rglob("*"):
-            if path.is_file():
-                data = path.read_bytes()
-                if path.name == "course.json":
-                    data = data.replace(b'"statistics-basics"', f'"{slug}"'.encode())
-                z.writestr(top + str(path.relative_to(SAMPLE_COURSE)).replace("\\", "/"), data)
-    return buf.getvalue()
-
-
-def test_import_course_zip_as_draft(admin):
-    # フォルダごと zip にしたもの(1階層下に course.json)を取り込むと、下書きで登録される
-    res = admin.post("/api/admin/import/course", files={"file": ("course.zip", _course_zip("zip-course", "statistics-basics/"), "application/zip")})
-    assert res.status_code == 200
-    editor = res.json()
-    assert editor["slug"] == "zip-course" and editor["status"] == "draft"
-    assert len(editor["units"]) == 5 and len(editor["quiz"]) == 10 and editor["datasets"][0]["filename"] == "scores.csv"
-    # 同じ識別名は置き換え指定が無ければエラー
-    res = admin.post("/api/admin/import/course", files={"file": ("c.zip", _course_zip("zip-course"), "application/zip")})
-    assert res.status_code == 400
-    res = admin.post("/api/admin/import/course", data={"replace": "true"}, files={"file": ("c.zip", _course_zip("zip-course"), "application/zip")})
-    assert res.status_code == 200
-
-
-def test_import_rejects_unsafe_zip(admin):
-    # 展開先の外を指すパスを含む zip は拒否する
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as z:
-        z.writestr("../evil.txt", "x")
-    res = admin.post("/api/admin/import/course", files={"file": ("e.zip", buf.getvalue(), "application/zip")})
-    assert res.status_code == 400 and "不正なパス" in res.json()["detail"]
-    # zip でないファイルも拒否する
-    res = admin.post("/api/admin/import/course", files={"file": ("e.zip", b"not zip", "application/zip")})
-    assert res.status_code == 400
-
-
 def test_import_unit_notebook(admin):
-    course = admin.get("/api/admin/courses").json()[0]
+    course = admin.get("/api/authoring/courses").json()[0]
     nb = (SAMPLE_COURSE / "03_central_tendency.ipynb").read_bytes()
-    res = admin.post(f"/api/admin/courses/{course['id']}/import-unit", files={"file": ("03.ipynb", nb, "application/json")})
+    res = admin.post(f"/api/authoring/courses/{course['id']}/import-unit", files={"file": ("03.ipynb", nb, "application/json")})
     assert res.status_code == 200
     unit = res.json()
     assert unit["position"] == 6 and unit["title"].startswith("代表値")
     # 書き方の誤りは理由つきでエラー
-    res = admin.post(f"/api/admin/courses/{course['id']}/import-unit", files={"file": ("bad.ipynb", b"{}", "application/json")})
+    res = admin.post(f"/api/authoring/courses/{course['id']}/import-unit", files={"file": ("bad.ipynb", b"{}", "application/json")})
     assert res.status_code == 400
 
 
@@ -137,3 +96,4 @@ def test_activity_recorded_and_idle_stop(client):
     # 停止済みなら何もしない
     set_db_power(FakePower("Stopped"))
     cmd_db_idle_stop(Namespace(idle_minutes=60))
+

@@ -252,17 +252,6 @@ a:focus-visible {
   color: var(--ink-2);
   font-size: 14px;
 }
-.avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--ink);
-  color: #fff;
-  font-size: 12px;
-}
 
 /* ---------- ページ共通 ---------- */
 .page {
@@ -600,14 +589,14 @@ a.toc-item:hover {
   flex-grow: 1;
   justify-content: center;
   min-width: 0;
-  padding: 40px 32px 80px;
+  padding: 40px 48px 80px;
 }
 .unit-column {
   display: flex;
   flex-direction: column;
   gap: 20px;
   width: 100%;
-  max-width: 900px;
+  max-width: 1240px;
 }
 .unit-head {
   display: flex;
@@ -2238,4 +2227,45 @@ a.unit-row-quiz:hover {
   margin: 0;
   color: var(--ink-2);
   font-size: 14px;
+}
+
+/* ============================================================
+   改修:パスワードの表示切り替え・講座管理の絞り込み
+   ============================================================ */
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.password-field input {
+  width: 100%;
+  padding-right: 42px;
+}
+.password-toggle {
+  position: absolute;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.password-toggle:hover {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+.password-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+.admin-filters {
+  margin-bottom: 20px;
+}
+.admin-search {
+  margin-left: 12px;
 }

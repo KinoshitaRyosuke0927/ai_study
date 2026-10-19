@@ -30,27 +30,89 @@ def _exercise_cell(prompt="問題文", starter="x = ____\nprint(x)", answer="x =
     }
 
 
-def test_admin_api_requires_admin(client):
-    # 受講者は管理者 API を使えない
-    assert client.get("/api/admin/courses").status_code == 403
+def test_admin_only_apis_require_admin(client):
+    # 受講状況・メンバー管理は管理者だけ(一般ユーザは 403)
+    assert client.get("/api/admin/progress").status_code == 403
+    assert client.get("/api/admin/users").status_code == 403
+    assert client.post("/api/admin/users", json={"login_name": "x", "display_name": "x", "password": "password1"}).status_code == 403
+
+
+def test_learner_can_author_own_courses(client, admin):
+    # 一般ユーザも講座を作成できる(作成者は本人)
+    info = {"slug": "learner-course", "title": "受講者の講座", "summary": "概要", "level": "basic"}
+    editor = client.post("/api/authoring/courses", json=info).json()
+    cid, uid = editor["id"], editor["units"][0]["id"]
+    # 講座管理の一覧:一般ユーザは自分の講座だけ、管理者はすべて
+    assert [r["slug"] for r in client.get("/api/authoring/courses").json()] == ["learner-course"]
+    assert {r["slug"] for r in admin.get("/api/authoring/courses").json()} == {"statistics-basics", "learner-course"}
+    # 自分の講座は編集・検証・公開前チェックができる
+    unit = client.put(f"/api/authoring/units/{uid}", json={"title": "単元", "cells": [_exercise_cell()]}).json()
+    pid = unit["cells"][0]["problem"]["id"]
+    assert client.post(f"/api/authoring/problems/{pid}/verify", json={"author": {"output": "42"}}).json()["verify_status"] == "verified"
+    assert client.get(f"/api/authoring/courses/{cid}/publish-check").status_code == 200
+    # 前提講座の候補には、公開中の講座と自分の講座だけが出る
+    assert [c["title"] for c in client.get(f"/api/authoring/courses/{cid}").json()["other_courses"]] == ["統計の基礎"]
+    # 管理者は一般ユーザの講座も編集できる
+    assert admin.get(f"/api/authoring/courses/{cid}").status_code == 200
+
+
+def test_learner_cannot_touch_others_courses(client, admin):
+    # 管理者が作ったサンプル講座(他人の講座)は、一般ユーザからは「見つからない」
+    sample = next(r for r in admin.get("/api/authoring/courses").json() if r["slug"] == "statistics-basics")
+    editor = admin.get(f"/api/authoring/courses/{sample['id']}").json()
+    uid = editor["units"][0]["id"]
+    pid = next(c["problem"]["id"] for c in editor["units"][0]["cells"] if c["problem"])
+    assert client.get(f"/api/authoring/courses/{sample['id']}").status_code == 404
+    assert client.put(f"/api/authoring/courses/{sample['id']}", json={"slug": "x", "title": "x"}).status_code == 404
+    assert client.delete(f"/api/authoring/courses/{sample['id']}").status_code == 404
+    assert client.put(f"/api/authoring/units/{uid}", json={"title": "x", "cells": []}).status_code == 404
+    assert client.post(f"/api/authoring/problems/{pid}/verify", json={"author": {"output": "1"}}).status_code == 404
+    assert client.post(f"/api/authoring/courses/{sample['id']}/unpublish").status_code == 404
+    assert client.delete(f"/api/authoring/datasets/{editor['datasets'][0]['id']}").status_code == 404
+    # 変更されていない
+    assert admin.get(f"/api/authoring/courses/{sample['id']}").json()["status"] == "published"
+
+
+def test_draft_preview_only_for_author(client, admin):
+    # 一般ユーザが作った下書きは、本人だけが受講者表示でプレビューできる(講座一覧にも本人にだけ出る)
+    editor = client.post("/api/authoring/courses", json={"slug": "my-draft", "title": "下書き"}).json()
+    uid = editor["units"][0]["id"]
+    client.put(f"/api/authoring/units/{uid}", json={"title": "単元", "cells": [_exercise_cell()]})
+    assert "my-draft" in [c["slug"] for c in client.get("/api/courses").json()]
+    assert client.get(f"/api/units/{uid}").status_code == 200
+    # ほかの一般ユーザからは見えない
+    from fastapi.testclient import TestClient
+
+    from app.infra import db
+    from app.main import app
+    from app.services.auth_service import create_user
+
+    with db.new_session() as s:
+        create_user(s, "other", "別の受講者", "pw-other", is_admin=False)
+        s.commit()
+    other = TestClient(app)
+    other.post("/api/auth/login", json={"login_name": "other", "password": "pw-other"})
+    assert "my-draft" not in [c["slug"] for c in other.get("/api/courses").json()]
+    assert other.get(f"/api/units/{uid}").status_code == 404
+    assert other.get("/api/courses/my-draft").status_code == 404
 
 
 def test_create_edit_verify_publish(admin):
     # 白紙から講座を作成(単元1つ付き、下書き)
     info = {"slug": "new-course", "title": "新しい講座", "summary": "", "level": "basic"}
-    editor = admin.post("/api/admin/courses", json=info).json()
+    editor = admin.post("/api/authoring/courses", json=info).json()
     assert editor["status"] == "draft" and len(editor["units"]) == 1
     cid, uid = editor["id"], editor["units"][0]["id"]
     # 識別名の重複はエラー
-    dup = admin.post("/api/admin/courses", json={**info, "slug": "statistics-basics"})
+    dup = admin.post("/api/authoring/courses", json={**info, "slug": "statistics-basics"})
     assert dup.status_code == 400 and "使われています" in dup.json()["detail"]
     # 公開前チェック:概要・演習・小テストが足りない
-    check = admin.get(f"/api/admin/courses/{cid}/publish-check").json()
+    check = admin.get(f"/api/authoring/courses/{cid}/publish-check").json()
     assert check["publishable"] is False
     assert {c["key"]: c["ok"] for c in check["checks"]} == {"info": False, "units": False, "exercises": True, "quiz": False}
     # 単元にセル(説明・例題・演習)を保存
     unit = admin.put(
-        f"/api/admin/units/{uid}",
+        f"/api/authoring/units/{uid}",
         json={
             "title": "はじめての演習",
             "goals": ["答えを表示できる", ""],
@@ -67,14 +129,14 @@ def test_create_edit_verify_publish(admin):
     problem = unit["cells"][2]["problem"]
     assert problem["verify_status"] == "todo"
     # 作成者の解答の実行結果で検証(AI の模範解答なし → 作成者の出力が想定出力になる)
-    res = admin.post(f"/api/admin/problems/{problem['id']}/verify", json={"author": {"output": "42\n"}}).json()
+    res = admin.post(f"/api/authoring/problems/{problem['id']}/verify", json={"author": {"output": "42\n"}}).json()
     assert res["verify_status"] == "verified" and res["expected_output"] == "42\n"
     # 実行エラーでは検証できない
-    err = admin.post(f"/api/admin/problems/{problem['id']}/verify", json={"author": {"output": "", "error": "NameError"}})
+    err = admin.post(f"/api/authoring/problems/{problem['id']}/verify", json={"author": {"output": "", "error": "NameError"}})
     assert err.status_code == 400
     # 小テスト(選択式・数値は保存時に検証済み)と講座情報を保存
     quiz = admin.put(
-        f"/api/admin/courses/{cid}/quiz",
+        f"/api/authoring/courses/{cid}/quiz",
         json={
             "questions": [
                 {"answer_format": "choice", "prompt": "正しいのは?", "choices": ["A", "B"], "correct_answer": "B", "related_unit_id": uid},
@@ -83,17 +145,17 @@ def test_create_edit_verify_publish(admin):
         },
     ).json()
     assert [q["verify_status"] for q in quiz] == ["verified", "verified"]
-    admin.put(f"/api/admin/courses/{cid}", json={**info, "summary": "概要です", "tags": ["入門", " "]})
+    admin.put(f"/api/authoring/courses/{cid}", json={**info, "summary": "概要です", "tags": ["入門", " "]})
     # 例題の実行チェックが済んでいなければ公開できない
-    assert admin.post(f"/api/admin/courses/{cid}/publish", json={"examples_ok": False}).status_code == 400
-    published = admin.post(f"/api/admin/courses/{cid}/publish", json={"examples_ok": True}).json()
+    assert admin.post(f"/api/authoring/courses/{cid}/publish", json={"examples_ok": False}).status_code == 400
+    published = admin.post(f"/api/authoring/courses/{cid}/publish", json={"examples_ok": True}).json()
     assert published["status"] == "published"
-    rows = {r["slug"]: r for r in admin.get("/api/admin/courses").json()}
+    rows = {r["slug"]: r for r in admin.get("/api/authoring/courses").json()}
     assert rows["new-course"]["problem_count"] == 3 and rows["new-course"]["verified_count"] == 3
 
     # 公開後に演習の初期コードを変えると、その問題だけ未検証に戻る(内容バージョンが上がる)
     unit = admin.put(
-        f"/api/admin/units/{uid}",
+        f"/api/authoring/units/{uid}",
         json={
             "title": "はじめての演習",
             "cells": [
@@ -107,32 +169,32 @@ def test_create_edit_verify_publish(admin):
     assert changed["content_version"] == 2
     assert len(unit["cells"]) == 2  # 例題セルは削除された
     # ヒントだけの変更では再検証は不要
-    admin.post(f"/api/admin/problems/{problem['id']}/verify", json={"author": {"output": "42"}})
+    admin.post(f"/api/authoring/problems/{problem['id']}/verify", json={"author": {"output": "42"}})
     cell = _exercise_cell(starter="x = ____  # 42 を入れる\nprint(x)", pid=problem["id"])
     cell["problem"]["hint"] = "42 です"
-    unit = admin.put(f"/api/admin/units/{uid}", json={"title": "はじめての演習", "cells": [cell]}).json()
+    unit = admin.put(f"/api/authoring/units/{uid}", json={"title": "はじめての演習", "cells": [cell]}).json()
     assert unit["cells"][0]["problem"]["verify_status"] == "verified"
 
 
 def test_verify_with_ai_answer_mismatch(admin):
     # AI の模範解答がある演習は、作成者の出力と一致しなければ不一致になる
-    editor = admin.post("/api/admin/courses", json={"slug": "ai-course", "title": "AI講座"}).json()
+    editor = admin.post("/api/authoring/courses", json={"slug": "ai-course", "title": "AI講座"}).json()
     uid = editor["units"][0]["id"]
     unit = admin.put(
-        f"/api/admin/units/{uid}",
+        f"/api/authoring/units/{uid}",
         json={"title": "単元", "cells": [_exercise_cell(ai="print(41)")]},
     ).json()
     pid = unit["cells"][0]["problem"]["id"]
     res = admin.post(
-        f"/api/admin/problems/{pid}/verify", json={"author": {"output": "42"}, "ai": {"output": "41"}}
+        f"/api/authoring/problems/{pid}/verify", json={"author": {"output": "42"}, "ai": {"output": "41"}}
     ).json()
     assert res["verify_status"] == "mismatch"
     # 作成者の解答を正とすると検証済みになり、作成者の出力が想定出力になる
-    res = admin.post(f"/api/admin/problems/{pid}/accept-author", json={"output": "42"}).json()
+    res = admin.post(f"/api/authoring/problems/{pid}/accept-author", json={"output": "42"}).json()
     assert res["verify_status"] == "verified" and res["expected_output"] == "42"
     # 一致する場合は AI の出力を想定出力にして検証済み
     res = admin.post(
-        f"/api/admin/problems/{pid}/verify", json={"author": {"output": "42 "}, "ai": {"output": "42"}}
+        f"/api/authoring/problems/{pid}/verify", json={"author": {"output": "42 "}, "ai": {"output": "42"}}
     ).json()
     assert res["verify_status"] == "verified"
 
@@ -168,14 +230,14 @@ def test_members_and_progress(admin):
 
 
 def test_dataset_upload(admin):
-    editor = admin.get("/api/admin/courses").json()[0]
+    editor = admin.get("/api/authoring/courses").json()[0]
     cid = editor["id"]
     # アップロード(同名は置き換え)
-    res = admin.post(f"/api/admin/courses/{cid}/datasets", files={"file": ("extra.csv", b"a,b\n1,2\n", "text/csv")}).json()
+    res = admin.post(f"/api/authoring/courses/{cid}/datasets", files={"file": ("extra.csv", b"a,b\n1,2\n", "text/csv")}).json()
     names = [d["filename"] for d in res["datasets"]]
     assert "extra.csv" in names
-    res = admin.post(f"/api/admin/courses/{cid}/datasets", files={"file": ("extra.csv", b"a,b\n3,4\n", "text/csv")}).json()
+    res = admin.post(f"/api/authoring/courses/{cid}/datasets", files={"file": ("extra.csv", b"a,b\n3,4\n", "text/csv")}).json()
     assert [d["filename"] for d in res["datasets"]].count("extra.csv") == 1
     ds = next(d for d in res["datasets"] if d["filename"] == "extra.csv")
     assert admin.get(ds["url"]).content == b"a,b\n3,4\n"
-    assert admin.delete(f"/api/admin/datasets/{ds['id']}").status_code == 204
+    assert admin.delete(f"/api/authoring/datasets/{ds['id']}").status_code == 204
