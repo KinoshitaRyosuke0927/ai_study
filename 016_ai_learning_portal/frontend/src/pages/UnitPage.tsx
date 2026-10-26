@@ -7,7 +7,7 @@ import { CodeCell } from '../components/CodeCell'
 import { ExerciseCell } from '../components/ExerciseCell'
 import { Header } from '../components/Header'
 import { CheckIcon, ResetIcon } from '../components/Icons'
-import { Markdown, headingId } from '../components/Markdown'
+import { CourseImagesProvider, Markdown, headingId } from '../components/Markdown'
 import { pythonRuntime, useRuntimeStatus } from '../python/runtime'
 import { useLoad } from './useLoad'
 
@@ -80,7 +80,7 @@ export function UnitPage() {
   let exerciseNo = 0
 
   return (
-    <>
+    <CourseImagesProvider slug={unit.course_slug}>
       <Header
         breadcrumb={
           <>
@@ -161,7 +161,9 @@ export function UnitPage() {
                 <div className="goals-title">学習目標</div>
                 <ul>
                   {unit.goals.map((g) => (
-                    <li key={g}>{g}</li>
+                    <li key={g}>
+                      <Markdown source={g} inline />
+                    </li>
                   ))}
                 </ul>
               </section>
@@ -225,6 +227,6 @@ export function UnitPage() {
           </div>
         </main>
       </div>
-    </>
+    </CourseImagesProvider>
   )
 }

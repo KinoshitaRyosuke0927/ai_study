@@ -1,4 +1,4 @@
-// 講座エディタ:講座情報・単元・小テスト・データファイルを編集する
+// 講座エディタ:講座情報・単元・小テスト・データファイル・画像を編集する
 import { useCallback, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
@@ -8,6 +8,7 @@ import { AdminNav } from '../../components/admin/AdminNav'
 import { QuizEditor } from '../../components/admin/QuizEditor'
 import { UnitEditor } from '../../components/admin/UnitEditor'
 import { Header } from '../../components/Header'
+import { CourseImagesProvider } from '../../components/Markdown'
 import { useLoad } from '../useLoad'
 
 /** 単元内の演習の検証済み数 */
@@ -111,7 +112,7 @@ function InfoForm({ editor, onSaved, onDeleted }: { editor: CourseEditor; onSave
           <textarea rows={3} value={outcomes} onChange={(e) => setOutcomes(e.target.value)} />
         </label>
         <fieldset className="check-list">
-          <legend>前提となる講座</legend>
+          <legend>先に受講をおすすめする講座(受講の必須条件にはなりません)</legend>
           {editor.other_courses.length === 0 && <span className="muted small">ほかの講座はまだありません</span>}
           {editor.other_courses.map((c) => (
             <label key={c.id}>
@@ -189,6 +190,98 @@ function DatasetsPanel({ editor, onChanged }: { editor: CourseEditor; onChanged:
         <label className="btn btn-primary">
           ファイルをアップロード
           <input ref={input} type="file" className="sr-only" onChange={(e) => void upload(e.target.files?.[0])} />
+        </label>
+      </div>
+    </div>
+  )
+}
+
+/** 画像の管理(説明・問題文・解説から ![説明](image:ファイル名) で参照する) */
+function ImagesPanel({ editor, onChanged }: { editor: CourseEditor; onChanged: (e: CourseEditor) => void }) {
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const input = useRef<HTMLInputElement>(null)
+
+  // 選んだ画像を1枚ずつアップロードする(失敗した画像はメッセージに出し、残りは続ける)
+  const upload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setUploading(true)
+    setMessage(null)
+    const errors: string[] = []
+    let latest: CourseEditor | null = null
+    for (const file of Array.from(files)) {
+      try {
+        latest = await api.admin.uploadImage(editor.id, file)
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : String(err))
+      }
+    }
+    if (latest) onChanged(latest)
+    setMessage(errors.length ? { ok: false, text: errors.join('\n') } : { ok: true, text: `${files.length} 枚アップロードしました` })
+    setUploading(false)
+    if (input.current) input.current.value = ''
+  }
+
+  const remove = async (id: number, name: string) => {
+    if (!window.confirm(`${name} を削除しますか?この画像を参照している説明・問題文では表示されなくなります。`)) return
+    await api.admin.deleteImage(id)
+    onChanged(await api.admin.editor(editor.id))
+  }
+
+  // 本文に貼り付ける参照の書き方をコピーする
+  const copyRef = async (name: string) => {
+    const ref = `![${name.replace(/\.[^.]+$/, '')}](image:${name})`
+    try {
+      await navigator.clipboard.writeText(ref)
+      setMessage({ ok: true, text: `コピーしました: ${ref}` })
+    } catch {
+      setMessage({ ok: true, text: `本文に次のように書いてください: ${ref}` })
+    }
+  }
+
+  return (
+    <div className="unit-editor">
+      <h2 className="ue-title-static">画像</h2>
+      <p className="muted small">
+        説明・問題文・解説の Markdown に <code>![説明](image:ファイル名)</code> と書くと、その位置に画像が表示されます。
+        PNG / JPEG / GIF / WebP、1枚 2MB まで。ファイル名は半角英数字と <code>. _ -</code> だけにしてください(同じ名前は置き換え)。
+      </p>
+      <div className="image-grid">
+        {editor.images.length === 0 && <div className="muted">画像はありません。</div>}
+        {editor.images.map((img) => (
+          <figure key={img.id} className="card image-card">
+            <a href={img.url} target="_blank" rel="noreferrer" className="image-thumb">
+              <img src={img.url} alt={img.filename} loading="lazy" />
+            </a>
+            <figcaption>
+              <span className="mono small image-name">{img.filename}</span>
+              <span className="muted small">{(img.size / 1024).toFixed(0)} KB</span>
+            </figcaption>
+            <div className="image-actions">
+              <button type="button" className="btn btn-sm" onClick={() => void copyRef(img.filename)}>
+                参照をコピー
+              </button>
+              <button type="button" className="btn btn-sm btn-danger" onClick={() => void remove(img.id, img.filename)}>
+                削除
+              </button>
+            </div>
+          </figure>
+        ))}
+      </div>
+      <div className="save-bar">
+        {message && <span className={`pre-line ${message.ok ? 'accent' : 'warm'}`}>{message.text}</span>}
+        <span className="spacer" />
+        <label className={`btn btn-primary${uploading ? ' btn-disabled' : ''}`}>
+          {uploading ? 'アップロード中…' : '画像をアップロード'}
+          <input
+            ref={input}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            multiple
+            className="sr-only"
+            disabled={uploading}
+            onChange={(e) => void upload(e.target.files)}
+          />
         </label>
       </div>
     </div>
@@ -337,6 +430,9 @@ export function CourseEditorPage() {
           <button type="button" className={`toc-item toc-btn${section === 'data' ? ' toc-current' : ''}`} onClick={() => go('data')}>
             データファイル({editor.datasets.length})
           </button>
+          <button type="button" className={`toc-item toc-btn${section === 'images' ? ' toc-current' : ''}`} onClick={() => go('images')}>
+            画像({editor.images.length})
+          </button>
           <div className="editor-note small">
             「検証」は、作成者が演習・小テストを自分で解き、その結果で正解を確定させることです。すべて検証済みになると公開できます。
           </div>
@@ -346,43 +442,46 @@ export function CourseEditorPage() {
         </nav>
 
         <main className="unit-main">
-          <div className="unit-column editor-column">
-            {section === 'info' && (
-              <InfoForm
-                key={`info-${editor.id}`}
-                editor={editor}
-                onSaved={setOverride}
-                onDeleted={() => navigate('/admin')}
-              />
-            )}
-            {unit && (
-              <UnitEditor
-                key={`unit-${unit.id}`}
-                unit={unit}
-                unitCount={editor.units.length}
-                datasets={editor.datasets}
-                onDirtyChange={setDirty}
-                onSaved={(saved) => setOverride({ ...editor, units: editor.units.map((u) => (u.id === saved.id ? saved : u)) })}
-                onMove={(delta) => void moveUnit(unit, delta)}
-                onDelete={() => void deleteUnit(unit)}
-                onVerified={() => void refresh()}
-              />
-            )}
-            {section.startsWith('unit-') && !unit && <div className="muted">単元が見つかりません。左の一覧から選んでください。</div>}
-            {section === 'quiz' && (
-              <QuizEditor
-                key={`quiz-${editor.id}`}
-                courseId={editor.id}
-                quiz={editor.quiz}
-                units={editor.units}
-                datasets={editor.datasets}
-                onDirtyChange={setDirty}
-                onSaved={(quiz: Problem[]) => setOverride({ ...editor, quiz })}
-                onVerified={() => void refresh()}
-              />
-            )}
-            {section === 'data' && <DatasetsPanel editor={editor} onChanged={setOverride} />}
-          </div>
+          <CourseImagesProvider slug={editor.slug}>
+            <div className="unit-column editor-column">
+              {section === 'info' && (
+                <InfoForm
+                  key={`info-${editor.id}`}
+                  editor={editor}
+                  onSaved={setOverride}
+                  onDeleted={() => navigate('/admin')}
+                />
+              )}
+              {unit && (
+                <UnitEditor
+                  key={`unit-${unit.id}`}
+                  unit={unit}
+                  unitCount={editor.units.length}
+                  datasets={editor.datasets}
+                  onDirtyChange={setDirty}
+                  onSaved={(saved) => setOverride({ ...editor, units: editor.units.map((u) => (u.id === saved.id ? saved : u)) })}
+                  onMove={(delta) => void moveUnit(unit, delta)}
+                  onDelete={() => void deleteUnit(unit)}
+                  onVerified={() => void refresh()}
+                />
+              )}
+              {section.startsWith('unit-') && !unit && <div className="muted">単元が見つかりません。左の一覧から選んでください。</div>}
+              {section === 'quiz' && (
+                <QuizEditor
+                  key={`quiz-${editor.id}`}
+                  courseId={editor.id}
+                  quiz={editor.quiz}
+                  units={editor.units}
+                  datasets={editor.datasets}
+                  onDirtyChange={setDirty}
+                  onSaved={(quiz: Problem[]) => setOverride({ ...editor, quiz })}
+                  onVerified={() => void refresh()}
+                />
+              )}
+              {section === 'data' && <DatasetsPanel editor={editor} onChanged={setOverride} />}
+              {section === 'images' && <ImagesPanel editor={editor} onChanged={setOverride} />}
+            </div>
+          </CourseImagesProvider>
         </main>
       </div>
     </>

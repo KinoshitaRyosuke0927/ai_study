@@ -3,18 +3,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { Quiz, QuizAnswer, QuizQuestion, QuizQuestionResult, QuizResult } from '../api/types'
+import { AnswerInput, FORMAT_LABEL, hasAnswer } from '../components/AnswerInput'
 import { RunButton } from '../components/CodeCell'
 import { CodeEditor } from '../components/CodeEditor'
 import { formatDate } from '../components/format'
 import { Header } from '../components/Header'
 import { CheckIcon } from '../components/Icons'
-import { Markdown } from '../components/Markdown'
+import { CourseImagesProvider, Markdown } from '../components/Markdown'
 import { OutputView } from '../components/OutputView'
 import type { RunResult } from '../python/protocol'
 import { pythonRuntime } from '../python/runtime'
 import { useLoad } from './useLoad'
-
-const FORMAT_LABEL = { choice: '選択式', numeric: '数値入力', code: 'コード' } as const
 
 type RunState = { result: RunResult | null; failure: string | null }
 
@@ -115,7 +114,7 @@ export function QuizPage() {
             error: res.error,
             test_passed: res.test_passed,
           })
-        } else if (answers[q.problem_id]?.trim()) {
+        } else if (hasAnswer(q.answer_format, answers[q.problem_id], q.matrix_rows.length)) {
           payload.push({ problem_id: q.problem_id, answer: answers[q.problem_id] })
         }
       }
@@ -187,12 +186,12 @@ export function QuizPage() {
   const answered = (q: QuizQuestion) =>
     q.answer_format === 'code'
       ? codes[q.problem_id] !== q.starter_code || runs[q.problem_id] !== undefined
-      : Boolean(answers[q.problem_id]?.trim())
+      : hasAnswer(q.answer_format, answers[q.problem_id], q.matrix_rows.length)
   const answeredCount = quiz.questions.filter(answered).length
   const busy = grading || running !== null
 
   return (
-    <>
+    <CourseImagesProvider slug={slug}>
       {header}
       <div className="unit-layout">
         <nav className="unit-toc" aria-label="問題">
@@ -295,34 +294,16 @@ export function QuizPage() {
                   </div>
                   <Markdown source={q.prompt} />
 
-                  {q.answer_format === 'choice' && (
-                    <fieldset className="choices">
-                      <legend className="sr-only">Q{q.position} の選択肢</legend>
-                      {q.choices.map((c) => (
-                        <label key={c} className={`choice${answers[q.problem_id] === c ? ' choice-on' : ''}`}>
-                          <input
-                            type="radio"
-                            name={`q-${q.problem_id}`}
-                            value={c}
-                            checked={answers[q.problem_id] === c}
-                            onChange={() => setAnswers((a) => ({ ...a, [q.problem_id]: c }))}
-                          />
-                          {c}
-                        </label>
-                      ))}
-                    </fieldset>
-                  )}
-
-                  {q.answer_format === 'numeric' && (
-                    <label className="numeric">
-                      解答
-                      <input
-                        inputMode="decimal"
-                        value={answers[q.problem_id] ?? ''}
-                        onChange={(e) => setAnswers((a) => ({ ...a, [q.problem_id]: e.target.value }))}
-                        placeholder="数値を入力"
-                      />
-                    </label>
+                  {q.answer_format !== 'code' && (
+                    <AnswerInput
+                      name={`q-${q.problem_id}`}
+                      label={`Q${q.position}`}
+                      format={q.answer_format}
+                      choices={q.choices}
+                      rows={q.matrix_rows}
+                      value={answers[q.problem_id] ?? ''}
+                      onChange={(v) => setAnswers((a) => ({ ...a, [q.problem_id]: v }))}
+                    />
                   )}
 
                   {q.answer_format === 'code' && (
@@ -362,6 +343,6 @@ export function QuizPage() {
           </div>
         </main>
       </div>
-    </>
+    </CourseImagesProvider>
   )
 }

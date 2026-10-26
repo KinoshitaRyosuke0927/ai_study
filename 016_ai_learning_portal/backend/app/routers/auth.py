@@ -34,7 +34,7 @@ def _user_out(user: User) -> UserOut:
 
 
 @router.post("/login", response_model=UserOut)
-def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)) -> UserOut:
+def login(req: LoginRequest, request: Request, db: Session = Depends(get_db, scope="function")) -> UserOut:
     """
     ログインする
 

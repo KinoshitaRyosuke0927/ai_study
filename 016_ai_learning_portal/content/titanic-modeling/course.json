@@ -1,0 +1,33 @@
+{
+  "slug": "titanic-modeling",
+  "title": "タイタニックで学ぶデータ分析 3:モデルの学習と評価",
+  "summary": "タイタニック号の乗客データから生存を予測するシリーズの3講座目です。前の講座で作った特徴量の表を使って、scikit-learn でロジスティック回帰・決定木・ランダムフォレストを学習させ、検証用のデータでの評価、過学習の見つけ方、正解率以外の評価指標(適合率・再現率・AUC)、交差検証によるモデルの比較を、実際にコードを書きながら身につけます。データは Vanderbilt 大学 生物統計学科が公開している titanic3(Thomas Cason が Encyclopedia Titanica をもとに作成。原典の一つは Eaton & Haas (1994) Titanic: Triumph and Tragedy)を、学習用と予測用に分けて前処理したものを使っています。Data obtained from http://hbiostat.org/data courtesy of the Vanderbilt University Department of Biostatistics.",
+  "level": "intermediate",
+  "tags": [
+    "データ分析",
+    "機械学習",
+    "scikit-learn",
+    "モデル評価",
+    "タイタニック"
+  ],
+  "outcomes": [
+    "学習用と検証用に分け、fit・predict・score の流れでモデルを学習・評価できる",
+    "ロジスティック回帰の確率・係数・しきい値の意味を説明できる",
+    "決定木の深さと過学習の関係を調べ、ハイパーパラメータで複雑さを調整できる",
+    "ランダムフォレストを学習させ、特徴量の重要度を調べられる",
+    "混同行列・適合率・再現率・F1 スコア・AUC で、モデルの間違い方を評価できる",
+    "交差検証でモデルを比べ、選ぶことができる"
+  ],
+  "libraries": ["pandas", "numpy", "matplotlib", "scikit-learn"],
+  "prerequisites": ["titanic-eda", "titanic-features"],
+  "status": "draft",
+  "units": [
+    { "file": "01_workflow.ipynb", "minutes": 35 },
+    { "file": "02_logistic.ipynb", "minutes": 40 },
+    { "file": "03_tree.ipynb", "minutes": 40 },
+    { "file": "04_forest.ipynb", "minutes": 35 },
+    { "file": "05_metrics.ipynb", "minutes": 40 },
+    { "file": "06_cross_validation.ipynb", "minutes": 40 }
+  ],
+  "quiz": "quiz.ipynb"
+}

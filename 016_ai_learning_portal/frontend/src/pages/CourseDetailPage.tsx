@@ -150,7 +150,8 @@ export function CourseDetailPage() {
           )}
           {course.prerequisites.length > 0 && (
             <section className="card side-card">
-              <h2>前提となる講座</h2>
+              <h2>先に受講をおすすめする講座</h2>
+              <p className="muted small">修了していなくても、この講座を受講できます。</p>
               {course.prerequisites.map((p) => (
                 <div key={p.slug} className="prereq">
                   {p.completed && <CheckIcon />}

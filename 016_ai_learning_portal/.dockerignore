@@ -4,3 +4,4 @@
 **/.pytest_cache
 **/.env
 frontend/dist
+backend/var

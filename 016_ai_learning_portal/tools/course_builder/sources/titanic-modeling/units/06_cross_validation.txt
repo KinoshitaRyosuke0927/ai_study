@@ -1,0 +1,215 @@
+#%% md
+# 交差検証でモデルを比べる
+1回の分け方での検証用の正解率は、たまたまの分け方に左右されます。データを何回かに分けて評価をくり返す「交差検証」で、より確かにモデルを比べる方法を学びます。
+
+#%% md
+## 学習目標
+- 1回の分け方による正解率が、分け方によってばらつくことを確かめられる
+- 交差検証(k 分割交差検証)のしくみを説明できる
+- `cross_val_score` で交差検証を行い、平均と標準偏差で評価できる
+- 交差検証の結果でモデルを比べ、選ぶことができる
+
+#%% md
+## 分け方によるばらつき
+
+これまでは `random_state=0` の1通りの分け方だけで評価してきました。分け方(`random_state`)を変えると、同じモデルでも検証用の正解率が変わります。
+
+#%% code
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+
+# 特徴量の表を読み込む
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+
+# 分け方(random_state)だけを変えて、深さ 3 の決定木の検証用の正解率を求める
+for seed in range(5):
+    X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=seed, stratify=y)
+    model = DecisionTreeClassifier(max_depth=3, random_state=0).fit(X_train, y_train)
+    print(f"random_state={seed}: 正解率 {model.score(X_valid, y_valid):.3f}")
+
+#%% md
+同じモデルなのに、分け方によって正解率が数 % 変わります。2つのモデルの正解率の差が 1〜2% しかないとき、1回の分け方だけでは、どちらが本当に良いかわかりません。
+
+## 交差検証のしくみ
+
+**k 分割交差検証** では、データを k 個のグループ(フォールド)に分け、そのうち1つを検証用、残りを学習用にして評価することを、検証用のグループを入れ替えながら k 回くり返します。k 回の正解率の **平均** でモデルを評価し、**標準偏差** でばらつきを確かめます。
+
+| 回 | フォールド1 | フォールド2 | フォールド3 | フォールド4 | フォールド5 |
+|---|---|---|---|---|---|
+| 1回目 | 検証 | 学習 | 学習 | 学習 | 学習 |
+| 2回目 | 学習 | 検証 | 学習 | 学習 | 学習 |
+| 3回目 | 学習 | 学習 | 検証 | 学習 | 学習 |
+| 4回目 | 学習 | 学習 | 学習 | 検証 | 学習 |
+| 5回目 | 学習 | 学習 | 学習 | 学習 | 検証 |
+
+すべてのデータが1回ずつ検証に使われるので、データを無駄なく使えます。
+
+#%% code
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 5 分割の分け方を決める(shuffle=True で並べ替えてから分け、各フォールドで生存者の割合をそろえる)
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 深さ 3 の決定木で、5 分割交差検証を行う(学習用 891 人すべてを使う)
+model = DecisionTreeClassifier(max_depth=3, random_state=0)
+scores = cross_val_score(model, X, y, cv=cv)
+
+# 5 回の正解率と、その平均・標準偏差を表示する
+print("各回の正解率:", scores.round(3).tolist())
+print("平均:", round(scores.mean(), 3), " 標準偏差:", round(scores.std(), 3))
+
+#%% md
+5 回の正解率は 77.7%〜85.4% で、平均は 80.5% です。`cross_val_score` は、フォールドごとにモデルを学習し直して評価してくれます。
+
+## モデルを比べる
+
+これまでのモデルを、同じ交差検証で比べます。
+
+#%% code
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+
+# 比べるモデル(名前 → モデル)
+models = {
+    "logistic regression": LogisticRegression(max_iter=1000),
+    "decision tree (depth 3)": DecisionTreeClassifier(max_depth=3, random_state=0),
+    "decision tree (no limit)": DecisionTreeClassifier(random_state=0),
+    "random forest (depth 5)": RandomForestClassifier(n_estimators=100, max_depth=5, random_state=0),
+}
+
+# 同じ分け方(cv)で交差検証し、平均と標準偏差を表示する
+for name, model in models.items():
+    scores = cross_val_score(model, X, y, cv=cv)
+    print(f"{name:26s} 平均 {scores.mean():.3f}  標準偏差 {scores.std():.3f}")
+
+#%% md
+- 深さを制限しない決定木(73.3%)は、交差検証でも明らかに低く、過学習していることがわかります
+- ロジスティック回帰(81.6%)とランダムフォレスト(81.7%)はほぼ同じで、深さ 3 の決定木(80.5%)もそれに近い値です
+
+差が標準偏差(約 2%)より十分小さいときは、「ほぼ同じ性能」と考えます。次の講座では、ハイパーパラメータの調整や別のモデル(勾配ブースティング)で、さらに精度を上げることに挑戦します。
+
+**注意**:ロジスティック回帰はここでは標準化せずに使っています。標準化を含めて交差検証するには、前処理とモデルを1つにまとめる「パイプライン」が必要です(次の講座で扱います)。
+
+#%% md
+## 演習
+
+#%% md
+`min_samples_leaf=5` の決定木(`random_state=0`)について、解説と同じ分け方(`StratifiedKFold(n_splits=5, shuffle=True, random_state=0)`)で 5 分割交差検証を行い、正解率の平均と標準偏差を、この順に小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.tree import DecisionTreeClassifier
+
+# 特徴量の表を読み込む
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+
+# 5 分割の分け方を決める
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 交差検証を行う(____ に、交差検証を行う関数の名前を入れる)
+model = DecisionTreeClassifier(min_samples_leaf=5, random_state=0)
+scores = ____(model, X, y, cv=cv)
+
+# 平均と標準偏差を表示する
+print(round(scores.mean(), 3))
+print(round(scores.std(), 3))
+
+#%% code
+# @solution
+# @title: 交差検証で評価する
+# @hint: cross_val_score(モデル, X, y, cv=分け方) で、各回の正解率の配列が返ります。
+# @explanation: min_samples_leaf=5 の決定木の平均は約 78.8% で、深さを制限しない決定木(73.3%)より大きく改善しました。標準偏差も約 0.9% と小さく、どのフォールドでも安定した正解率です。
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.tree import DecisionTreeClassifier
+
+# 特徴量の表を読み込む
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+
+# 5 分割の分け方を決める
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# cross_val_score で交差検証を行う(各回の正解率の配列が返る)
+model = DecisionTreeClassifier(min_samples_leaf=5, random_state=0)
+scores = cross_val_score(model, X, y, cv=cv)
+
+# 平均と標準偏差を表示する
+print(round(scores.mean(), 3))
+print(round(scores.std(), 3))
+
+#%% md
+ランダムフォレスト(木の本数 100、`random_state=0`)の各木の深さを **3・5・7** と変えて、それぞれ 5 分割交差検証(解説と同じ分け方)の正解率の平均を求めてください。深さと平均(小数第3位まで)を1行ずつ表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込む
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+
+# 5 分割の分け方を決める
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 深さを変えながら交差検証を行う(____ に、深さを指定してモデルを作る式を書く)
+for depth in [3, 5, 7]:
+    model = ____
+    scores = cross_val_score(model, X, y, cv=cv)
+    print(depth, round(scores.mean(), 3))
+
+#%% code
+# @solution
+# @title: 深さを変えたランダムフォレストの比較
+# @hint: RandomForestClassifier(n_estimators=100, max_depth=depth, random_state=0) のように、ループの変数 depth を max_depth に渡します。
+# @explanation: 平均の正解率は深さ 5 が約 81.7% で最も高く、深さ 3 は約 80.9%、深さ 7 は約 80.5% です。差は 1% 程度で、深くしすぎるとかえって下がることもわかります。このように候補を並べて交差検証で比べる作業を、次の講座では GridSearchCV でまとめて行います。
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込む
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+
+# 5 分割の分け方を決める
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 深さ(max_depth)を変えながら、ランダムフォレストを交差検証する
+for depth in [3, 5, 7]:
+    model = RandomForestClassifier(n_estimators=100, max_depth=depth, random_state=0)
+    scores = cross_val_score(model, X, y, cv=cv)
+    print(depth, round(scores.mean(), 3))
+
+#%% md
+<!-- @question
+type: choice
+answer: 1回の分け方による正解率は分け方に左右されるので、複数回の評価の平均で比べた方が確かだから。
+title: 交差検証を使う理由
+hint: 分け方(random_state)を変えたとき、同じモデルの正解率はどうなりましたか。
+explanation: 1回の分け方での検証用の正解率は、どのデータがたまたま検証用に入ったかで数 % 変わります。交差検証では検証用のグループを入れ替えて複数回評価し、その平均で比べるので、分け方による偶然の影響が小さくなります。交差検証をしてもモデル自体の精度が上がるわけではありません。
+-->
+モデルを比べるときに、1回の `train_test_split` ではなく交差検証を使う理由として最も適切なものを選べ。
+
+- 交差検証をすると、モデルの精度そのものが上がるから。
+- 1回の分け方による正解率は分け方に左右されるので、複数回の評価の平均で比べた方が確かだから。
+- 交差検証では、予測用のデータ(test.csv)の正解を使って評価できるから。
+- 交差検証をすると、学習にかかる時間が短くなるから。
+
+#%% md
+## まとめ
+
+- 1回の分け方による正解率は、分け方によって数 % ばらつく。
+- k 分割交差検証は、検証用のグループを入れ替えて k 回評価し、平均と標準偏差でモデルを評価する。`StratifiedKFold` と `cross_val_score` で行う。
+- 交差検証では、ロジスティック回帰と深さ 5 のランダムフォレストがほぼ同じ(約 81.6〜81.7%)で、制限のない決定木は過学習で低い。

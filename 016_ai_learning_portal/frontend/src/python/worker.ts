@@ -12,6 +12,8 @@ import ast, base64, io, os, sys, traceback, warnings
 
 # グラフは画像として取り出すため、画面を持たない描画方式にする
 os.environ["MPLBACKEND"] = "Agg"
+# グラフの共通スタイル(matplotlibrc)を置く場所。ファイルは起動時に書き込む
+os.environ["MPLCONFIGDIR"] = "/tmp/mplconfig"
 warnings.filterwarnings("ignore", message=".*non-interactive.*")
 
 # 実行コンテキスト(単元)ごとの名前空間。同じ単元のセルは変数を共有する
@@ -76,8 +78,20 @@ def _figures():
     return images
 
 
+def _snapshot():
+    # 作業ディレクトリのファイル(名前 → 更新時刻・サイズ)。隠しファイルとフォルダは除く
+    files = {}
+    for entry in os.scandir("."):
+        if entry.is_file() and not entry.name.startswith("."):
+            st = entry.stat()
+            files[entry.name] = (st.st_mtime_ns, st.st_size)
+    return files
+
+
 def _run(ctx, src, test_src):
     ns = _ns(ctx)
+    # セルの実行で作成・更新されたファイルを見つけるため、実行前の状態を記録する
+    before = _snapshot()
     out, err = io.StringIO(), io.StringIO()
     saved = sys.stdout, sys.stderr
     sys.stdout, sys.stderr = out, err
@@ -107,11 +121,15 @@ def _run(ctx, src, test_src):
     except Exception as e:
         images = []
         err.write(f"グラフの取り出しに失敗しました: {e}\n")
+    # 作成・更新されたファイル(受講者がダウンロードできるようにする)
+    after = _snapshot()
+    files = [{"name": name, "size": size} for name, (mtime, size) in sorted(after.items()) if before.get(name) != (mtime, size)]
     return {
         "output": out.getvalue(),
         "stderr": err.getvalue(),
         "error": error,
         "images": images,
+        "files": files,
         "test_passed": test_passed,
         "test_message": test_message,
     }
@@ -119,8 +137,8 @@ def _run(ctx, src, test_src):
 
 let pyodide: any = null
 
-function post(message: WorkerResponse) {
-  ;(self as unknown as Worker).postMessage(message)
+function post(message: WorkerResponse, transfer: Transferable[] = []) {
+  ;(self as unknown as Worker).postMessage(message, transfer)
 }
 
 async function handle(req: WorkerRequest): Promise<void> {
@@ -129,6 +147,9 @@ async function handle(req: WorkerRequest): Promise<void> {
       // Pyodide 本体を読み込み、補助関数を定義する(配信元は設定で差し替えられるため実行時に決める)
       const mod = await import(/* @vite-ignore */ `${req.baseUrl}pyodide.mjs`)
       pyodide = await mod.loadPyodide({ indexURL: req.baseUrl })
+      // 受講者のコードで描くグラフにも講座の図と同じスタイルを適用する(matplotlib の読み込み時に読まれる)
+      pyodide.FS.mkdirTree('/tmp/mplconfig')
+      pyodide.FS.writeFile('/tmp/mplconfig/matplotlibrc', req.matplotlibrc)
       pyodide.runPython(HELPER)
       post({ id: req.id, type: 'done' })
       return
@@ -139,6 +160,17 @@ async function handle(req: WorkerRequest): Promise<void> {
         pyodide.FS.writeFile(file.name, new Uint8Array(file.data))
       }
       post({ id: req.id, type: 'done' })
+      return
+    }
+    case 'read': {
+      // 作業ディレクトリのファイルを読み出す(セルで作成したファイルのダウンロード用)
+      if (!pyodide.FS.analyzePath(req.name).exists) {
+        post({ id: req.id, type: 'fatal', message: `ファイル ${req.name} が見つかりません。セルを実行し直してください。` })
+        return
+      }
+      const bytes: Uint8Array = pyodide.FS.readFile(req.name)
+      const data = bytes.slice().buffer
+      post({ id: req.id, type: 'file', data }, [data])
       return
     }
     case 'reset': {

@@ -3,7 +3,7 @@
     python -m app.cli create-user --login yamada --name "山田 太郎" [--admin]
     python -m app.cli set-password --login yamada
     python -m app.cli delete-user --login yamada
-    python -m app.cli import-course ../content/statistics-basics [--author yamada] [--replace]
+    python -m app.cli import-course ../content/stats2-descriptive [--author yamada] [--replace]
     python -m app.cli db-state | db-start | db-stop       (Azure の MySQL サーバーの状態確認・起動・停止)
     python -m app.cli db-idle-stop [--idle-minutes 60]    (一定時間アクセスが無ければ DB を停止)
 """

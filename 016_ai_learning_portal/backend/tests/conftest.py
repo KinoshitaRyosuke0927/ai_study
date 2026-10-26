@@ -10,18 +10,23 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.pool import StaticPool
 
 from app.infra import db
+from app.infra.image_store import LocalImageStore, set_image_store
 from app.models import Base
 from app.services.auth_service import create_user
 from app.services.notebook_import import import_course
 
-# サンプル講座のフォルダ
-SAMPLE_COURSE = Path(__file__).resolve().parents[2] / "content" / "statistics-basics"
+# テスト用のサンプル講座(コード演習・データファイルを含む)
+SAMPLE_COURSE = Path(__file__).resolve().parent / "fixtures" / "sample-course"
 
 
 @pytest.fixture()
-def engine():
+def engine(tmp_path):
     """
-    テスト用のインメモリ DB を用意する
+    テスト用のインメモリ DB を用意する(画像の保存先も一時フォルダに差し替える)
+
+    Args
+    -----------------
+    - tmp_path: Path,                   テストごとの一時フォルダ
 
     Returns
     -----------------
@@ -38,17 +43,27 @@ def engine():
     def _fk_on(dbapi_conn, _):
         dbapi_conn.execute("PRAGMA foreign_keys=ON")
 
-    # テーブルを作成し、アプリのエンジンを差し替える
+    # テーブルを作成し、アプリのエンジンと画像の保存先を差し替える
     Base.metadata.create_all(eng)
     db.configure(eng)
+    set_image_store(LocalImageStore(tmp_path / "images"))
+    # AI が作ったコードの実行環境(Node.js)は使わない(必要なテストだけ偽の実行環境に差し替える)
+    from app.ai.executor import set_runner
+    from app.config.settings import get_settings
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(get_settings(), "ai_runner_enabled", False)
     yield eng
-    # 差し替えた AI・DB 操作・アクセス記録の状態を元に戻す
+    # 差し替えた AI・実行環境・DB 操作・アクセス記録・画像の保存先の状態を元に戻す
     from app.ai.client import set_ai_client
     from app.infra.db_power import set_db_power
     from app.services.activity_service import reset_throttle
 
+    monkeypatch.undo()
+    set_runner(None)
     set_ai_client(None)
     set_db_power(None)
+    set_image_store(None)
     reset_throttle()
     eng.dispose()
 

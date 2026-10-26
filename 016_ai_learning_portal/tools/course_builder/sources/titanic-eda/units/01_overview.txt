@@ -1,0 +1,189 @@
+#%% md
+# 分析の目的とデータの全体像
+タイタニック号の乗客データから「どの乗客が生き残ったか」を予測するという課題と、使うデータの全体像を確認します。データを読み込み、行数・列・型を確かめ、学習用と予測用のデータの違いを理解します。
+
+#%% md
+## 学習目標
+- 分析の目的(生存の予測)と、学習用データ・予測用データの役割を説明できる
+- pandas でデータを読み込み、行数・列数・先頭の行・列の型を確認できる
+- 各列の意味を理解し、予測に使える列と使えない列を見分けられる
+
+#%% md
+## 分析の目的
+
+1912 年、豪華客船タイタニック号は氷山に衝突して沈没し、乗客・乗員の多くが亡くなりました。このシリーズでは、乗客の情報(性別・年齢・客室の等級など)から **その乗客が生き残ったかどうか** を予測するモデルを作ります。
+
+| データ | 行数 | 役割 |
+|---|---|---|
+| `train.csv` | 891 人 | **学習用**。生存したか(`Survived`)の正解が付いている。分析とモデルの学習に使う |
+| `test.csv` | 418 人 | **予測用**。正解が付いていない。作ったモデルで生存を予測し、提出ファイルを作る |
+
+これは Kaggle のタイタニック コンペティションと同じ形の課題です。正解が 0(死亡)か 1(生存)の2通りなので、**2値分類** と呼ばれます。
+
+> **データの出典**:Vanderbilt 大学 生物統計学科が公開している titanic3 データ(Thomas Cason が Encyclopedia Titanica をもとに作成、1999 年 8 月時点。原典の一つは Eaton & Haas (1994) *Titanic: Triumph and Tragedy*)を、この講座用に学習用と予測用に分けて使っています。
+> Data obtained from http://hbiostat.org/data courtesy of the Vanderbilt University Department of Biostatistics.
+
+#%% md
+## データを読み込む
+
+CSV ファイルは `pd.read_csv` で読み込みます。まず、行数と列数(`shape`)と、先頭の数行(`head`)を確認しましょう。
+列が多い表は途中の列が `...` で省略されるため、最初に表示の設定を変えておきます(出力欄は横にスクロールできます)。
+
+#%% code
+# 表形式のデータを扱うライブラリ pandas を、pd という短い名前で読み込む
+import pandas as pd
+
+# 表を省略せずに表示する(列は 20 列まで、1 行の幅は 200 文字まで)
+pd.set_option("display.max_columns", 20)
+pd.set_option("display.width", 200)
+
+# CSV ファイルを読み込み、表(DataFrame)として変数に入れる
+train = pd.read_csv("train.csv")  # 学習用(正解あり)
+test = pd.read_csv("test.csv")    # 予測用(正解なし)
+
+# shape は (行数, 列数) を表す
+print(train.shape)
+print(test.shape)
+
+#%% code
+# 先頭の 3 行を表示する(セルの最後の行に書いた値は、print しなくても表示される)
+train.head(3)
+
+#%% md
+学習用は 891 行 15 列、予測用は 418 行 11 列です。列の数が違うことに注意してください(理由は後で確認します)。
+
+## 列の意味
+
+| 列 | 意味 | 例 |
+|---|---|---|
+| `PassengerId` | 乗客の番号(この講座で振ったもの) | 1 |
+| `Survived` | 生存したか(0 = 死亡、1 = 生存)。**予測の対象** | 1 |
+| `Pclass` | 客室の等級(1 = 1等、2 = 2等、3 = 3等) | 1 |
+| `Name` | 名前(敬称 Mr. / Mrs. / Miss. などを含む) | Bucknell, Mrs. William Robert |
+| `Sex` | 性別 | female |
+| `Age` | 年齢(1 歳未満は小数) | 60.0 |
+| `SibSp` | 一緒に乗船した兄弟姉妹・配偶者の人数 | 0 |
+| `Parch` | 一緒に乗船した親・子の人数 | 0 |
+| `Ticket` | 切符の番号 | 11813 |
+| `Fare` | 運賃(ポンド) | 76.2917 |
+| `Cabin` | 客室の番号 | D15 |
+| `Embarked` | 乗船した港(C = Cherbourg、Q = Queenstown、S = Southampton) | C |
+| `Boat` | 乗った救命ボートの番号 | 8 |
+| `Body` | 遺体が収容されたときの番号 | |
+| `HomeDest` | 自宅・目的地 | Philadelphia, PA |
+
+#%% md
+## 列の型を確認する
+
+`dtypes` で各列の型を確認します。`int64`・`float64` は数値、`str` は文字列です。`Age` が小数(`float64`)なのは、1 歳未満の乳児の年齢が小数で記録されていることと、空欄(欠損値)を含むためです。
+
+#%% code
+# 各列の型を表示する
+train.dtypes
+
+#%% md
+## 学習用と予測用の列の違い
+
+予測用のデータにない列を調べます。列名の集合の差をとると簡単です。
+
+#%% code
+# set(...) で列名の集合を作り、「学習用の列 − 予測用の列」で予測用にない列を求める
+only_in_train = set(train.columns) - set(test.columns)
+# 集合は順番を持たないので、sorted で並べてから表示する
+print(sorted(only_in_train))
+
+#%% md
+予測用のデータには、正解の `Survived` のほか、`Boat`・`Body`・`HomeDest` がありません。
+
+特に `Boat`(乗った救命ボート)と `Body`(遺体の番号)は、**事故の後で決まった情報** です。救命ボートに乗った人はほぼ生存し、遺体番号がある人は死亡しているので、これらを使うと「答えを見ながら予測する」ことになってしまいます。このように、予測の時点では手に入らないはずの情報が学習に混ざることを **リーク(データリーク)** といいます。予測に使う列は、予測用のデータにもある列から選びます。
+
+#%% md
+## 演習
+
+#%% md
+予測用のデータ `test.csv` を読み込み、行数と列数を表示してください。続けて、予測用のデータの列名を **リストにして** 表示してください。空欄 `____` を埋めて実行し、提出してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 予測用のデータを読み込む
+test = pd.read_csv("test.csv")
+
+# 行数と列数を表示する(____ に、(行数, 列数) を表す属性の名前を入れる)
+print(test.____)
+# 列名の一覧をリストにして表示する(____ に、列名の一覧を表す属性の名前を入れる)
+print(list(test.____))
+
+#%% code
+# @solution
+# @title: 予測用データの形と列
+# @hint: 行数と列数は shape、列名の一覧は columns で取り出せます。
+# @explanation: 予測用のデータは 418 行 11 列で、Survived(正解)・Boat・Body・HomeDest の列がありません。
+import pandas as pd
+
+# 予測用のデータを読み込む
+test = pd.read_csv("test.csv")
+
+# 行数と列数を表示する
+print(test.shape)
+# 列名の一覧(columns)をリストにして表示する
+print(list(test.columns))
+
+#%% md
+学習用のデータ `train.csv` のうち、**数値の列**(型が `int64` または `float64` の列)の名前だけをリストにして表示してください。`select_dtypes` を使います。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# select_dtypes で、指定した型の列だけを取り出し、その列名を得る
+# (____ に、整数と小数の両方をまとめて表す型の指定を文字列で入れる)
+numeric_cols = train.select_dtypes(include="____").columns
+
+# 列名をリストにして表示する
+print(list(numeric_cols))
+
+#%% code
+# @solution
+# @title: 数値の列を取り出す
+# @hint: select_dtypes(include="number") で、整数・小数のどちらの型の列も選べます。
+# @explanation: 数値の列は PassengerId・Survived・Pclass・Age・SibSp・Parch・Fare・Body の 8 列です。Pclass は数値で記録されていますが、意味としては等級(順序のあるカテゴリ)です。型だけでなく、列の意味もあわせて確認しましょう。
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# select_dtypes で数値(整数・小数)の列だけを取り出し、その列名を得る
+numeric_cols = train.select_dtypes(include="number").columns
+
+# 列名をリストにして表示する
+print(list(numeric_cols))
+
+#%% md
+<!-- @question
+type: matrix
+answer: 使える, 使えない(リーク), 使える, 使えない(リーク), 使えない(正解)
+title: 予測に使える列
+hint: 予測用のデータ(test.csv)にもあり、事故の前から分かっている情報だけが予測に使えます。
+explanation: Pclass(客室の等級)と Fare(運賃)は乗船前から分かっていて、予測用のデータにもあるので使えます。Boat(救命ボート)と Body(遺体番号)は事故の後に決まる情報で、使うと答えを見ながら予測することになります(リーク)。Survived は予測したい正解そのものです。
+-->
+生存を予測するモデルの入力として、次の列は使えるか。行ごとに最も適切なものを選べ。
+
+| 列 | 使える | 使えない(リーク) | 使えない(正解) |
+|---|---|---|---|
+| Pclass(客室の等級) | | | |
+| Boat(乗った救命ボート) | | | |
+| Fare(運賃) | | | |
+| Body(遺体の番号) | | | |
+| Survived(生存したか) | | | |
+
+#%% md
+## まとめ
+
+- 課題は、乗客の情報から生存(0 / 1)を予測する 2 値分類。`train.csv` で学習し、`test.csv` を予測する。
+- `pd.read_csv` で読み込み、`shape`・`head`・`dtypes` で全体像を確認する。
+- 予測用のデータにない列や、事故の後に決まる情報(`Boat`・`Body`)は予測に使わない(リーク)。

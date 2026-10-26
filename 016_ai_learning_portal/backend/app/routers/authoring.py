@@ -9,11 +9,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypeVar
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.ai.client import AIUnavailableError, ai_available
+from app.ai.executor import RunnerError, get_runner, summarize_datasets
 from app.ai.generator import AIOutputError
 from app.ai.schemas import CourseOutline, OutlineRequest
 from app.config.settings import get_settings
@@ -27,6 +28,7 @@ from app.schemas_admin import (
     AIStatusOut,
     CourseEditorOut,
     CourseInfoIn,
+    AIDataSummaryOut,
     DraftCreateIn,
     ProblemOut,
     PublishCheckOut,
@@ -41,7 +43,9 @@ from app.schemas_admin import (
 )
 from app.services import admin_course_service as courses
 from app.services import ai_course_service as ai_courses
+from app.services import image_service as images
 from app.services.admin_course_service import MAX_DATASET_BYTES, MAX_IMPORT_BYTES, AdminInputError
+from app.services.image_service import MAX_IMAGE_BYTES
 from app.services.course_access import course_id_of, editable_course
 from app.services.course_service import NotFoundError
 
@@ -70,6 +74,9 @@ def _call(fn: Callable[[], T]) -> T:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e))
     except AIOutputError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"AI の応答を読み取れませんでした。もう一度お試しください。({e})")
+    # コードの実行環境が使えない・実行に失敗した
+    except RunnerError as e:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e))
     # 対象が見つからない(他人の講座を含む)
     except NotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "対象が見つかりません")
@@ -105,7 +112,7 @@ def _guard_of(db: Session, user: User, kind: str, object_id: int) -> int:
     -----------------
     - db: Session,                      DB セッション
     - user: User,                       ログイン中ユーザ
-    - kind: str,                        対象の種類(unit / problem / dataset / job)
+    - kind: str,                        対象の種類(unit / problem / dataset / image / job)
     - object_id: int,                   対象の ID
 
     Returns
@@ -119,7 +126,7 @@ def _guard_of(db: Session, user: User, kind: str, object_id: int) -> int:
 
 # ---------- 講座 ----------
 @router.get("/courses", response_model=list[AdminCourseRowOut])
-def list_courses(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[AdminCourseRowOut]:
+def list_courses(user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> list[AdminCourseRowOut]:
     """
     講座管理の一覧を返す(管理者はすべての講座、一般ユーザは自分が作成した講座だけ)
 
@@ -139,7 +146,7 @@ def list_courses(user: User = Depends(get_current_user), db: Session = Depends(g
 
 @router.post("/courses", response_model=CourseEditorOut)
 def create_course(
-    info: CourseInfoIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    info: CourseInfoIn, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> CourseEditorOut:
     """
     下書きの講座を作成し、エディタの表示内容を返す(作成者はログイン中ユーザ)
@@ -161,7 +168,7 @@ def create_course(
 
 
 @router.get("/courses/{course_id}", response_model=CourseEditorOut)
-def get_editor(course_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CourseEditorOut:
+def get_editor(course_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> CourseEditorOut:
     """
     講座エディタの表示内容を返す
 
@@ -183,7 +190,7 @@ def get_editor(course_id: int, user: User = Depends(get_current_user), db: Sessi
 
 @router.put("/courses/{course_id}", response_model=CourseEditorOut)
 def update_info(
-    course_id: int, info: CourseInfoIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    course_id: int, info: CourseInfoIn, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> CourseEditorOut:
     """
     講座情報を更新する
@@ -207,7 +214,7 @@ def update_info(
 
 
 @router.delete("/courses/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_course(course_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+def delete_course(course_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> None:
     """
     講座を削除する(受講記録も削除される)
 
@@ -225,7 +232,7 @@ def delete_course(course_id: int, user: User = Depends(get_current_user), db: Se
 
 @router.post("/courses/{course_id}/units", response_model=UnitAdminOut)
 def add_unit(
-    course_id: int, info: UnitInfoIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    course_id: int, info: UnitInfoIn, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> UnitAdminOut:
     """
     単元を末尾に追加する
@@ -249,7 +256,7 @@ def add_unit(
 
 @router.put("/courses/{course_id}/units/order", status_code=status.HTTP_204_NO_CONTENT)
 def reorder_units(
-    course_id: int, req: ReorderIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    course_id: int, req: ReorderIn, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> None:
     """
     単元の並び順を変更する
@@ -269,7 +276,7 @@ def reorder_units(
 
 @router.put("/units/{unit_id}", response_model=UnitAdminOut)
 def save_unit(
-    unit_id: int, req: UnitContentIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    unit_id: int, req: UnitContentIn, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> UnitAdminOut:
     """
     単元(基本情報とセル一式)を保存する
@@ -292,7 +299,7 @@ def save_unit(
 
 
 @router.delete("/units/{unit_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_unit(unit_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+def delete_unit(unit_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> None:
     """
     単元を削除する
 
@@ -310,7 +317,7 @@ def delete_unit(unit_id: int, user: User = Depends(get_current_user), db: Sessio
 
 @router.put("/courses/{course_id}/quiz", response_model=list[ProblemOut])
 def save_quiz(
-    course_id: int, req: QuizContentIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    course_id: int, req: QuizContentIn, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> list[ProblemOut]:
     """
     小テストの問題一式を保存する
@@ -335,7 +342,7 @@ def save_quiz(
 # ---------- 検証 ----------
 @router.post("/problems/{problem_id}/verify", response_model=VerifyOut)
 def verify(
-    problem_id: int, req: VerifyIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    problem_id: int, req: VerifyIn, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> VerifyOut:
     """
     ブラウザで実行した結果からコード問題を検証する
@@ -359,7 +366,7 @@ def verify(
 
 @router.post("/problems/{problem_id}/accept-author", response_model=VerifyOut)
 def accept_author(
-    problem_id: int, req: AcceptAuthorIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    problem_id: int, req: AcceptAuthorIn, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> VerifyOut:
     """
     AI の想定と不一致の問題を、作成者の解答を正として検証済みにする
@@ -382,7 +389,7 @@ def accept_author(
 
 
 @router.post("/problems/{problem_id}/confirm", response_model=VerifyOut)
-def confirm_problem(problem_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> VerifyOut:
+def confirm_problem(problem_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> VerifyOut:
     """
     選択式・数値入力の問題を、作成者が内容を確認したものとして検証済みにする
 
@@ -404,7 +411,7 @@ def confirm_problem(problem_id: int, user: User = Depends(get_current_user), db:
 
 # ---------- 公開 ----------
 @router.get("/courses/{course_id}/publish-check", response_model=PublishCheckOut)
-def publish_check(course_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> PublishCheckOut:
+def publish_check(course_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> PublishCheckOut:
     """
     公開前チェックを行う
 
@@ -426,7 +433,7 @@ def publish_check(course_id: int, user: User = Depends(get_current_user), db: Se
 
 @router.post("/courses/{course_id}/publish", response_model=PublishCheckOut)
 def publish(
-    course_id: int, req: PublishIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    course_id: int, req: PublishIn, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> PublishCheckOut:
     """
     講座を公開する(公開前チェックをすべて満たす場合のみ)
@@ -450,7 +457,7 @@ def publish(
 
 
 @router.post("/courses/{course_id}/unpublish", response_model=PublishCheckOut)
-def unpublish(course_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> PublishCheckOut:
+def unpublish(course_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> PublishCheckOut:
     """
     講座を下書きに戻す
 
@@ -474,7 +481,7 @@ def unpublish(course_id: int, user: User = Depends(get_current_user), db: Sessio
 # ---------- データファイル ----------
 @router.post("/courses/{course_id}/datasets", response_model=CourseEditorOut)
 async def upload_dataset(
-    course_id: int, file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    course_id: int, file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> CourseEditorOut:
     """
     データファイルをアップロードする(同名は置き換え)
@@ -500,7 +507,7 @@ async def upload_dataset(
 
 
 @router.delete("/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_dataset(dataset_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+def delete_dataset(dataset_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> None:
     """
     データファイルを削除する
 
@@ -516,10 +523,59 @@ def delete_dataset(dataset_id: int, user: User = Depends(get_current_user), db: 
     _call(lambda: courses.delete_dataset(db, dataset_id))
 
 
+# ---------- 画像 ----------
+@router.post("/courses/{course_id}/images", response_model=CourseEditorOut)
+async def upload_image(
+    course_id: int, file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
+) -> CourseEditorOut:
+    """
+    講座の画像をアップロードする(同名は置き換え。PNG / JPEG / GIF / WebP、2MB まで)
+
+    Args
+    -----------------
+    - course_id: int,                   講座 ID
+    - file: UploadFile,                 アップロードされた画像
+    - user: User,                       ログイン中ユーザ
+    - db: Session,                      DB セッション
+
+    Returns
+    -----------------
+    - editor: CourseEditorOut,          更新後の講座エディタ表示内容
+
+    """
+    # 編集できることを確認する
+    _guard(db, user, course_id)
+    # 上限を少し超えるところまで読み、サイズ超過を検出する
+    data = await file.read(MAX_IMAGE_BYTES + 1)
+    # 形式・サイズの誤りは、そのまま画面に表示する
+    try:
+        _call(lambda: images.add_image(db, course_id, file.filename or "", data))
+    except images.ImageInputError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+    return courses.get_editor(db, course_id, user)
+
+
+@router.delete("/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_image(image_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> None:
+    """
+    講座の画像を削除する
+
+    Args
+    -----------------
+    - image_id: int,                    画像 ID
+    - user: User,                       ログイン中ユーザ
+    - db: Session,                      DB セッション
+
+    """
+    # 画像の講座を編集できることを確認して、削除
+    _guard_of(db, user, "image", image_id)
+    _call(lambda: images.delete_image(db, image_id))
+
+
 # ---------- .ipynb の取り込み ----------
 @router.post("/courses/{course_id}/import-unit", response_model=UnitAdminOut)
 async def import_unit(
-    course_id: int, file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    course_id: int, file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> UnitAdminOut:
     """
     .ipynb を1つ取り込み、講座の末尾に単元として追加する
@@ -557,11 +613,16 @@ def ai_status() -> AIStatusOut:
     """
     # 設定から利用可否とモデル名を返却
     settings = get_settings()
-    return AIStatusOut(enabled=ai_available(), model_outline=settings.ai_model_outline, model_draft=settings.ai_model_draft)
+    return AIStatusOut(
+        enabled=ai_available(),
+        model_outline=settings.ai_model_outline,
+        model_draft=settings.ai_model_draft,
+        runner_enabled=get_runner() is not None,
+    )
 
 
 @router.post("/ai/outline", response_model=CourseOutline)
-def ai_outline(req: OutlineRequest, db: Session = Depends(get_db)) -> CourseOutline:
+def ai_outline(req: OutlineRequest, db: Session = Depends(get_db, scope="function")) -> CourseOutline:
     """
     題材から講座の構成案を作る(保存はしない。画面で編集してから下書きを作る)
 
@@ -579,20 +640,67 @@ def ai_outline(req: OutlineRequest, db: Session = Depends(get_db)) -> CourseOutl
     return _call(lambda: ai_courses.generate_outline(db, req))
 
 
+@router.post("/ai/datasets/summary", response_model=AIDataSummaryOut)
+async def ai_data_summary(files: list[UploadFile] = File(...)) -> AIDataSummaryOut:
+    """
+    講座のデータファイルの要約(列・型・欠損・先頭の行)を作る(構成案・下書きを作る AI に渡す)
+
+    Args
+    -----------------
+    - files: list[UploadFile],          データファイル(CSV)
+
+    Returns
+    -----------------
+    - summary: AIDataSummaryOut,        要約
+
+    """
+    # ファイルを読み込み(サイズの上限を確認)、要約を作って返却
+    contents = await _read_datasets(files)
+    return AIDataSummaryOut(summary=_call(lambda: summarize_datasets(contents)))
+
+
+async def _read_datasets(files: list[UploadFile]) -> dict[str, bytes]:
+    """
+    アップロードされたデータファイルを読み込む(上限を超えるファイルは受け付けない)
+
+    Args
+    -----------------
+    - files: list[UploadFile],          アップロードされたファイル
+
+    Returns
+    -----------------
+    - contents: dict[str, bytes],       ファイル名 → 内容
+
+    """
+    contents: dict[str, bytes] = {}
+    for f in files:
+        # 上限を少し超えるところまで読み、サイズ超過を検出する
+        data = await f.read(MAX_DATASET_BYTES + 1)
+        if len(data) > MAX_DATASET_BYTES:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{f.filename}: ファイルが大きすぎます(上限 20MB)")
+        contents[(f.filename or "").replace("\\", "/").rsplit("/", 1)[-1]] = data
+    return contents
+
+
 @router.post("/ai/drafts", response_model=AIJobOut)
-def ai_create_draft(
-    req: DraftCreateIn,
+async def ai_create_draft(
     background: BackgroundTasks,
+    payload: str = Form(...),
+    files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> AIJobOut:
     """
     構成案から講座(下書き)を作り、単元・小テストの下書き生成をバックグラウンドで始める
 
+    データファイルを一緒に送ると、講座のデータファイルとして登録してから下書きを作る
+    (AI はそのデータを読むコードを書き、作ったコードはそのデータで実行して確かめる)。
+
     Args
     -----------------
-    - req: DraftCreateIn,               識別名・元の依頼・編集した構成案
     - background: BackgroundTasks,      バックグラウンド処理
+    - payload: str,                     識別名・元の依頼・編集した構成案(DraftCreateIn の JSON)
+    - files: list[UploadFile],          講座のデータファイル(任意)
     - user: User,                       ログイン中ユーザ(作成者になる)
     - db: Session,                      DB セッション
 
@@ -603,12 +711,16 @@ def ai_create_draft(
     """
     # 入力の形式を確認
     try:
+        req = DraftCreateIn.model_validate_json(payload)
         request = OutlineRequest.model_validate(req.request)
         outline = CourseOutline.model_validate(req.outline)
     except ValidationError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"構成案の内容を確認してください: {e.error_count()} 件の誤り")
-    # 講座・単元・ジョブを登録して確定(バックグラウンド処理から読めるようにする)
+    contents = await _read_datasets(files)
+    # 講座・単元・ジョブを登録し、データファイルを講座に追加して確定(バックグラウンド処理から読めるようにする)
     job = _call(lambda: ai_courses.create_draft_job(db, user, req.slug, request, outline))
+    for name, data in contents.items():
+        _call(lambda: courses.add_dataset(db, job.course_id, name, "text/csv", data))
     db.commit()
     # 応答を返した後に下書きの生成を始める
     background.add_task(ai_courses.run_draft_job, job.id)
@@ -616,7 +728,7 @@ def ai_create_draft(
 
 
 @router.get("/ai/jobs/{job_id}", response_model=AIJobOut)
-def ai_job(job_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> AIJobOut:
+def ai_job(job_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> AIJobOut:
     """
     下書き生成ジョブの状態を返す(画面から数秒ごとに問い合わせる)
 
@@ -638,7 +750,7 @@ def ai_job(job_id: int, user: User = Depends(get_current_user), db: Session = De
 
 @router.post("/ai/jobs/{job_id}/resume", response_model=AIJobOut)
 def ai_resume_job(
-    job_id: int, background: BackgroundTasks, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    job_id: int, background: BackgroundTasks, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> AIJobOut:
     """
     失敗・中断したジョブを続きから再開する(中身がまだ無い単元と小テストだけを作る)

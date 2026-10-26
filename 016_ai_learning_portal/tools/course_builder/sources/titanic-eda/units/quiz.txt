@@ -1,0 +1,242 @@
+#%% md
+# 小テスト:タイタニックで学ぶデータ分析 1 データの理解(EDA)
+全10問です。コードを書く問題と、分析の考え方を問う選択式の問題があります。データは学習用の `train.csv` と予測用の `test.csv` を使います。満点で講座修了になります。何度でも受け直せます。
+
+#%% md
+<!-- @question
+type: code
+unit: 1
+-->
+学習用のデータ `train.csv` について、切符の番号 `Ticket` の **種類の数**(重複を除いた値の数)を表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# Ticket 列の、重複を除いた値の数を表示する(____ に式を書く)
+print(____)
+
+#%% code
+# @solution
+# @explanation: nunique() で重複を除いた値の数が求まります。891 人に対して切符の種類はそれより少なく、同じ切符で複数の乗客(家族やグループ)が乗船していたことがわかります。
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# nunique() で、重複を除いた値の数を求める
+print(train["Ticket"].nunique())
+
+#%% md
+<!-- @question
+type: choice
+answer: 予測の時点では手に入らないはずの情報が、学習に混ざること。
+unit: 1
+explanation: リーク(データリーク)は、予測の時点では手に入らないはずの情報(事故の後に決まった救命ボートの番号など)が学習に混ざることです。リークがあると、学習用のデータでは高い精度が出ても、実際の予測では使えないモデルになります。
+-->
+データ分析における「リーク(データリーク)」の説明として最も適切なものを選べ。
+
+- 学習用のデータの一部が欠損していること。
+- 予測の時点では手に入らないはずの情報が、学習に混ざること。
+- 学習用のデータと予測用のデータで、行数が異なること。
+- 個人情報がデータに含まれていること。
+
+#%% md
+<!-- @question
+type: code
+unit: 2
+-->
+学習用のデータで、乗船した港 `Embarked` が欠損している乗客の `PassengerId` を、**リストにして** 表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# Embarked が欠損している行だけを取り出す
+# (train[条件] で、条件が True の行を取り出せる。____ に、欠損かどうかを判定するメソッドの名前を入れる)
+missing = train[train["Embarked"].____()]
+
+# 取り出した行の PassengerId をリストにして表示する
+print(list(missing["PassengerId"]))
+
+#%% code
+# @solution
+# @explanation: isna() で欠損している行を True にし、その条件で行を取り出します。乗船した港が欠損しているのは 2 人だけです。
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# Embarked が欠損している行だけを取り出す
+missing = train[train["Embarked"].isna()]
+
+# 取り出した行の PassengerId をリストにして表示する
+print(list(missing["PassengerId"]))
+
+#%% md
+<!-- @question
+type: choice
+answer: 客室番号の記録の有無そのものを、新しい特徴量として使う。
+unit: 2
+explanation: 客室番号は約 8 割が欠損していますが、記録の有無で生存率が大きく違いました(記録あり 64%、なし 30%)。欠損していること自体が情報を持つので、「客室番号があるかどうか」を特徴量にするのが有効です。欠損の多い列をすぐに削除すると、この情報を失います。
+-->
+学習用のデータで、客室番号 `Cabin` は約 78% が欠損しているが、記録の有無で生存率が大きく異なっていた。`Cabin` の扱い方として最も適切なものを選べ。
+
+- 欠損が多いので、分析から完全に除外する。
+- 欠損値をすべて最も多い客室番号で埋めて、そのまま使う。
+- 客室番号の記録の有無そのものを、新しい特徴量として使う。
+- 客室番号が記録されている乗客だけで分析する。
+
+#%% md
+<!-- @question
+type: code
+unit: 3
+-->
+学習用のデータで、年齢 `Age` の平均と中央値を、それぞれ小数第2位まで表示してください(平均、中央値の順に1行ずつ)。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# 1 行目に平均、2 行目に中央値を表示する(round(値, 2) で小数第2位までに丸める)
+# (それぞれの ____ に、平均・中央値を求めるメソッドの名前を入れる)
+print(round(train["Age"].____(), 2))
+print(round(train["Age"].____(), 2))
+
+#%% code
+# @solution
+# @explanation: 年齢の平均は約 30.48 歳、中央値は 29.0 歳で、運賃ほど大きな差はありません。年齢の分布は運賃ほど偏っていないためです。
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# 年齢の平均と中央値を、小数第2位まで表示する(欠損値は除いて計算される)
+print(round(train["Age"].mean(), 2))
+print(round(train["Age"].median(), 2))
+
+#%% md
+<!-- @question
+type: choice
+answer: 右に裾の長い分布の偏りが小さくなり、分布の形が見やすくなる。
+unit: 3
+explanation: 運賃のように右に裾の長い変数は、対数をとると大きな値ほど強く縮められるため、偏りが小さくなり分布の形が見やすくなります。運賃 0 の乗客がいるので、log(0) にならないよう 1 を足してから対数をとる log1p を使います。
+-->
+運賃 `Fare` のヒストグラムを、`np.log1p` で変換してから描いた。この変換の効果として最も適切なものを選べ。
+
+- 欠損値が自動的に補完される。
+- 右に裾の長い分布の偏りが小さくなり、分布の形が見やすくなる。
+- 運賃の平均と中央値が必ず等しくなる。
+- 運賃が 0 の乗客がデータから取り除かれる。
+
+#%% md
+<!-- @question
+type: code
+unit: 4
+-->
+学習用のデータで、**3 等の乗客だけ** について、性別 `Sex` ごとの生存率を小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# 3 等の乗客の行だけを取り出す(____ に、Pclass が 3 であるという条件の式を書く)
+third = train[____]
+
+# 性別ごとの生存率を、小数第3位まで表示する
+print(third.groupby("Sex")["Survived"].mean().round(3))
+
+#%% code
+# @solution
+# @explanation: 3 等の乗客に絞ると、女性の生存率は約 49%、男性は約 15% です。女性の生存率は 1 等・2 等(90% 以上)よりずっと低くなります。
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# 3 等の乗客の行だけを取り出す(== は「等しい」かどうかの比較)
+third = train[train["Pclass"] == 3]
+
+# 性別ごとの生存率を、小数第3位まで表示する
+print(third.groupby("Sex")["Survived"].mean().round(3))
+
+#%% md
+<!-- @question
+type: choice
+answer: 2つの変数の関係が、両方に関係する別の変数によって生じている(見かけの関係)。
+unit: 4
+explanation: 交絡とは、2つの変数の関係が、その両方と関係する別の変数(交絡因子)によって生じていることです。乗船した港と生存率の関係は、港によって 1 等の乗客の割合が違うこと(等級)で、その多くを説明できる可能性がありました。
+-->
+「交絡」の説明として最も適切なものを選べ。
+
+- 2つの変数の値が、データの中で入れ替わって記録されていること。
+- 2つの変数の関係が、両方に関係する別の変数によって生じている(見かけの関係)。
+- 2つの変数の相関係数が、ちょうど 0 であること。
+- 同じ乗客が、データの中に2回以上記録されていること。
+
+#%% md
+<!-- @question
+type: code
+unit: 5
+-->
+学習用のデータで、年齢 `Age` を **人数がほぼ等しい 4 つの区間** に分け、区間ごとの生存率を小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# 年齢を、人数がほぼ等しい 4 つの区間に分ける(____ に、区間に分ける式を書く)
+age_group = ____
+
+# 区間ごとの生存率を、小数第3位まで表示する
+print(train.groupby(age_group, observed=True)["Survived"].mean().round(3))
+
+#%% code
+# @solution
+# @explanation: pd.qcut(train["Age"], 4) で四分位に分けます。どの区間も生存率は約 36〜43% で、四分位の区切りでは差が小さく見えます。子どもの高い生存率は、最も若い区間(21 歳以下)の中に薄まってしまうためです。区切り方によって見え方が変わることに注意しましょう。
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# 年齢を、人数がほぼ等しい 4 つの区間(四分位)に分ける
+age_group = pd.qcut(train["Age"], 4)
+
+# 区間ごとの生存率を、小数第3位まで表示する
+print(train.groupby(age_group, observed=True)["Survived"].mean().round(3))
+
+#%% md
+<!-- @question
+type: choice
+answer: I と III のみ
+unit: 6
+explanation: I. 家族の人数(SibSp + Parch + 1)は予測用のデータからも計算でき、生存率との関係もあったので適切。II. Body(遺体の番号)は事故の後に決まる情報(リーク)で、予測用のデータにもないので不適切。III. 敬称は名前から取り出せ、性別・年齢層の情報を持つので適切。
+-->
+次の講座で作る特徴量の案 I〜III のうち、適切なものの組み合わせを選べ。
+
+I. `SibSp + Parch + 1` で求めた家族の人数
+
+II. 遺体の番号 `Body` が記録されているかどうか
+
+III. 名前 `Name` から取り出した敬称
+
+- I のみ
+- II のみ
+- I と II のみ
+- I と III のみ
+- I と II と III

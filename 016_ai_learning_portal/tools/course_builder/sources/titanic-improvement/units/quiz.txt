@@ -1,0 +1,313 @@
+#%% md
+# 小テスト:タイタニックで学ぶデータ分析 4 精度の改善と提出ファイルの作成
+全10問です。コードを書く問題と、考え方を問う選択式の問題があります。データは特徴量の表 `train_prepared.csv`・`test_prepared.csv` を使います。交差検証は、これまでの単元と同じ分け方(`StratifiedKFold(n_splits=5, shuffle=True, random_state=0)`)を使います。満点で講座修了になります。何度でも受け直せます。
+
+#%% md
+<!-- @question
+type: code
+unit: 1
+-->
+ランダムフォレスト(`n_estimators=50`、`random_state=0`)の `max_depth` を 4・6 の2通りで `GridSearchCV` により探索し、最も良い組み合わせを表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# max_depth を 4・6 で探索する(____ に、探索する候補の辞書を書く)
+search = GridSearchCV(RandomForestClassifier(n_estimators=50, random_state=0), ____, cv=cv)
+search.fit(X, y)
+
+# 最も良い組み合わせを表示する
+print(search.best_params_)
+
+#%% code
+# @solution
+# @explanation: 探索する候補は {"max_depth": [4, 6]} のような「ハイパーパラメータの名前 → 試す値のリスト」の辞書で渡します。最も良い組み合わせは best_params_ に入ります。
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# max_depth を 4・6 で探索する(ハイパーパラメータの名前 → 試す値のリスト)
+search = GridSearchCV(RandomForestClassifier(n_estimators=50, random_state=0), {"max_depth": [4, 6]}, cv=cv)
+search.fit(X, y)
+
+# 最も良い組み合わせを表示する
+print(search.best_params_)
+
+#%% md
+<!-- @question
+type: choice
+answer: 決定木の深さの上限
+unit: 1
+explanation: ハイパーパラメータは、学習の前に人が決める設定です。決定木の深さの上限(max_depth)はハイパーパラメータです。ロジスティック回帰の係数や決定木の分岐の質問は、学習によってデータから決まるパラメータです。
+-->
+次のうち、ハイパーパラメータ(学習の前に人が決める設定)にあたるものを選べ。
+
+- ロジスティック回帰の係数
+- 決定木の各分岐の質問(どの特徴量のどの値で分けるか)
+- 決定木の深さの上限
+- 予測した生存の確率
+
+#%% md
+<!-- @question
+type: code
+unit: 2
+-->
+LightGBM(`n_estimators=100`、`learning_rate=0.05`、`num_leaves=15`、`random_state=0`、`verbose=-1`)の交差検証の正解率の平均を、小数第3位まで表示してください。
+
+#%% code
+# @starter
+import lightgbm as lgb
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# LightGBM のモデルを作る(____ に、指定された設定でモデルを作る式を書く)
+model = ____
+
+# 交差検証して、平均を表示する
+print(round(cross_val_score(model, X, y, cv=cv).mean(), 3))
+
+#%% code
+# @solution
+# @explanation: LightGBM のモデルも、scikit-learn のモデルと同じく cross_val_score で評価できます。葉の数 15 では、葉 7 のとき(81.4%)とほぼ同じ正解率です。
+import lightgbm as lgb
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 木 100 本、学習率 0.05、葉 15 枚までの LightGBM
+model = lgb.LGBMClassifier(n_estimators=100, learning_rate=0.05, num_leaves=15, random_state=0, verbose=-1)
+
+# 交差検証して、平均を表示する
+print(round(cross_val_score(model, X, y, cv=cv).mean(), 3))
+
+#%% md
+<!-- @question
+type: choice
+answer: 木の本数を増やす。
+unit: 2
+explanation: 学習率を小さくすると、各木の予測を少しずつしか足さないため、同じ木の本数では学習が足りなくなります。学習率を下げたら、そのぶん木の本数を増やすのが基本です。
+-->
+勾配ブースティングで学習率 `learning_rate` を小さくしたとき、あわせて調整するとよいこととして最も適切なものを選べ。
+
+- 木の本数を増やす。
+- 木の本数を減らす。
+- 特徴量を標準化する。
+- 交差検証の分割数を減らす。
+
+#%% md
+<!-- @question
+type: code
+unit: 3
+-->
+港の特徴量(`Embarked_C`・`Embarked_Q`・`Embarked_S`)を取り除いたとき、ランダムフォレスト(`n_estimators=100`、`max_depth=5`、`min_samples_leaf=5`、`random_state=0`)の交差検証の正解率の平均を、小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=5, random_state=0)
+
+# 港の 3 列を取り除いた特徴量にする(____ に、取り除く式を書く)
+X_reduced = ____
+
+# 交差検証して、平均を表示する
+print(round(cross_val_score(model, X_reduced, y, cv=cv).mean(), 3))
+
+#%% code
+# @solution
+# @explanation: 港の特徴量を取り除いても、正解率はすべての特徴量のとき(81.8%)とほとんど変わりません。港の情報は、等級など他の特徴量でほぼ説明できるためと考えられます。
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=5, random_state=0)
+
+# drop(columns=...) で港の 3 列を取り除く
+X_reduced = X.drop(columns=["Embarked_C", "Embarked_Q", "Embarked_S"])
+
+# 交差検証して、平均を表示する
+print(round(cross_val_score(model, X_reduced, y, cv=cv).mean(), 3))
+
+#%% md
+<!-- @question
+type: choice
+answer: すでにある特徴量と同じ情報しか持たない特徴量は、加えても精度が上がらないことがある。
+unit: 3
+explanation: 新しい特徴量が既存の特徴量と同じ情報しか持たない場合(子どもかどうかの情報が、年齢や敬称にすでに含まれているなど)、加えても精度は上がらず、かえって下がることもあります。特徴量を加えたら、必ず交差検証で確かめます。
+-->
+特徴量を加えることについて述べた次の記述のうち、最も適切なものを選べ。
+
+- 特徴量は多いほど、必ず精度が上がる。
+- すでにある特徴量と同じ情報しか持たない特徴量は、加えても精度が上がらないことがある。
+- 特徴量を加えたかどうかは、学習用のデータでの正解率で判断すればよい。
+- 特徴量を加えると、交差検証の標準偏差は必ず 0 になる。
+
+#%% md
+<!-- @question
+type: code
+unit: 4
+-->
+標準化と `LogisticRegression(max_iter=1000)` のパイプラインで、`C` を 0.1・1 の2通りで `GridSearchCV` により探索し、最も良い組み合わせを表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 標準化とロジスティック回帰のパイプライン
+pipe = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+
+# パイプラインの中の C を探索する(____ に、「手順の名前__パラメータ名」をキーにした候補の辞書を書く)
+search = GridSearchCV(pipe, ____, cv=cv)
+search.fit(X, y)
+print(search.best_params_)
+
+#%% code
+# @solution
+# @explanation: パイプラインの中のハイパーパラメータは、手順の名前(logisticregression)とパラメータ名(C)をアンダースコア 2 つでつないだ "logisticregression__C" で指定します。
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 標準化とロジスティック回帰のパイプライン
+pipe = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+
+# 「手順の名前__パラメータ名」で、パイプラインの中の C を探索する
+search = GridSearchCV(pipe, {"logisticregression__C": [0.1, 1]}, cv=cv)
+search.fit(X, y)
+print(search.best_params_)
+
+#%% md
+<!-- @question
+type: choice
+answer: 学習用のデータで求めた値での標準化を含めて予測されるので、予測用のデータの前処理をし忘れる心配がない。
+unit: 4
+explanation: best_estimator_ は、標準化とモデルが入ったパイプラインです。予測用の特徴量をそのまま渡すと、学習用のデータで求めた平均・標準偏差で標準化してから予測してくれるので、前処理のし忘れや、予測用のデータで標準化し直す間違いを防げます。
+-->
+標準化とロジスティック回帰のパイプラインを `GridSearchCV` で探索し、`best_estimator_` で予測用のデータを予測する。この方法の利点として最も適切なものを選べ。
+
+- 学習用のデータで求めた値での標準化を含めて予測されるので、予測用のデータの前処理をし忘れる心配がない。
+- 予測用のデータの正解を使って、最も良い設定を選び直してくれる。
+- 予測用のデータで標準化の値を求め直すので、精度が上がる。
+- 標準化をしないので、計算が速くなる。
+
+#%% md
+<!-- @question
+type: code
+unit: 5
+-->
+深さ 5 の決定木(`random_state=0`)を学習用の特徴量の表全体で学習させ、予測用の特徴量の表を予測して、提出ファイルの形の表(`PassengerId`・`Survived`)を作ってください。表の **列名のリスト** と **行数** を、この順に表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.tree import DecisionTreeClassifier
+
+# 学習用・予測用の特徴量の表を読み込む
+train = pd.read_csv("train_prepared.csv")
+test = pd.read_csv("test_prepared.csv")
+X = train.drop(columns=["PassengerId", "Survived"])
+y = train["Survived"]
+X_test = test.drop(columns=["PassengerId"])
+
+# 深さ 5 の決定木を、学習用のデータ全体で学習させる
+model = DecisionTreeClassifier(max_depth=5, random_state=0).fit(X, y)
+
+# 予測して、提出ファイルの形の表を作る(____ に、表を作る式を書く)
+submission = ____
+
+# 列名のリストと行数を表示する
+print(list(submission.columns))
+print(len(submission))
+
+#%% code
+# @solution
+# @explanation: pd.DataFrame({"PassengerId": test["PassengerId"], "Survived": model.predict(X_test)}) で、提出ファイルの形の表が作れます。列は 2 列、行数は予測用のデータと同じ 418 行です。
+import pandas as pd
+from sklearn.tree import DecisionTreeClassifier
+
+# 学習用・予測用の特徴量の表を読み込む
+train = pd.read_csv("train_prepared.csv")
+test = pd.read_csv("test_prepared.csv")
+X = train.drop(columns=["PassengerId", "Survived"])
+y = train["Survived"]
+X_test = test.drop(columns=["PassengerId"])
+
+# 深さ 5 の決定木を、学習用のデータ全体で学習させる
+model = DecisionTreeClassifier(max_depth=5, random_state=0).fit(X, y)
+
+# 予測用のデータを予測し、PassengerId と予測(Survived)の 2 列の表を作る
+submission = pd.DataFrame({"PassengerId": test["PassengerId"], "Survived": model.predict(X_test)})
+
+# 列名のリストと行数を表示する
+print(list(submission.columns))
+print(len(submission))
+
+#%% md
+<!-- @question
+type: choice
+answer: 行番号の列が余分に書き出され、提出ファイルの形式(2 列)と合わなくなる。
+unit: 5
+explanation: to_csv は既定で行番号(インデックス)も1列目として書き出します。提出ファイルは PassengerId と Survived の 2 列なので、index=False を指定して行番号を書き出さないようにします。
+-->
+提出ファイルを `submission.to_csv("submission.csv")` のように、`index=False` を付けずに保存した場合に起きる問題として最も適切なものを選べ。
+
+- Survived の値が文字列になる。
+- 行番号の列が余分に書き出され、提出ファイルの形式(2 列)と合わなくなる。
+- 予測用のデータの行が並べ替えられる。
+- PassengerId の列が書き出されなくなる。

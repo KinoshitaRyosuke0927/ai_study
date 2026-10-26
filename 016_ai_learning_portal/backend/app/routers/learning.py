@@ -1,15 +1,17 @@
-"""受講 API(講座一覧・講座詳細・単元・データファイル・演習の提出)。"""
+"""受講 API(講座一覧・講座詳細・単元・データファイル・画像・演習の提出)。"""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
+from app.ai.figure_style import MATPLOTLIBRC
 from app.config.settings import get_settings
 from app.infra.db import get_db
 from app.models import User
 from app.routers.deps import get_current_user
 from app.schemas import (
+    AnswerSubmitRequest,
     AppConfigOut,
     CodeSubmitRequest,
     CourseDetailOut,
@@ -22,7 +24,7 @@ from app.schemas import (
     SubmitResultOut,
     UnitDetailOut,
 )
-from app.services import course_service, dashboard_service, quiz_service, submission_service
+from app.services import course_service, dashboard_service, image_service, quiz_service, submission_service
 from app.services.course_service import NotFoundError
 from app.services.quiz_service import QuizLockedError
 
@@ -40,16 +42,16 @@ def app_config(user: User = Depends(get_current_user)) -> AppConfigOut:
 
     Returns
     -----------------
-    - config: AppConfigOut,             Pyodide の配信元など
+    - config: AppConfigOut,             Pyodide の配信元、グラフの共通スタイルなど
 
     """
     # 設定から必要な項目だけを返却
-    return AppConfigOut(pyodide_base_url=get_settings().pyodide_base_url)
+    return AppConfigOut(pyodide_base_url=get_settings().pyodide_base_url, matplotlibrc=MATPLOTLIBRC)
 
 
 @router.get("/courses", response_model=list[CourseSummaryOut])
 def list_courses(
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> list[CourseSummaryOut]:
     """
     講座一覧を返す
@@ -70,7 +72,7 @@ def list_courses(
 
 @router.get("/courses/{slug}", response_model=CourseDetailOut)
 def get_course(
-    slug: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    slug: str, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> CourseDetailOut:
     """
     講座詳細を返す
@@ -95,7 +97,7 @@ def get_course(
 
 @router.get("/units/{unit_id}", response_model=UnitDetailOut)
 def get_unit(
-    unit_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    unit_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> UnitDetailOut:
     """
     単元の表示内容を返す
@@ -120,7 +122,7 @@ def get_unit(
 
 @router.get("/datasets/{dataset_id}")
 def get_dataset(
-    dataset_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    dataset_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> Response:
     """
     データファイルを返す(ブラウザの Python 実行環境に配置するため)
@@ -145,12 +147,44 @@ def get_dataset(
     return Response(content=dataset.content, media_type=dataset.content_type)
 
 
+@router.get("/courses/{slug}/images/{filename}")
+def get_image(
+    slug: str, filename: str, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
+) -> Response:
+    """
+    講座の画像を返す(説明・問題文の Markdown の image:ファイル名 から参照される)
+
+    Args
+    -----------------
+    - slug: str,                        講座の識別名
+    - filename: str,                    ファイル名
+    - user: User,                       ログイン中のユーザ
+    - db: Session,                      DB セッション
+
+    Returns
+    -----------------
+    - response: Response,               画像
+
+    """
+    # 閲覧できる講座の画像を読み込む(見つからなければ 404)
+    try:
+        data, content_type = image_service.load_image(db, user, slug, filename)
+    except NotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "画像が見つかりません")
+    # 画像として返却(形式の推測をさせない。短時間だけブラウザにキャッシュさせる)
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300"},
+    )
+
+
 @router.post("/problems/{problem_id}/submit-code", response_model=SubmitResultOut)
 def submit_code(
     problem_id: int,
     req: CodeSubmitRequest,
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> SubmitResultOut:
     """
     コード問題を提出して採点する
@@ -174,9 +208,38 @@ def submit_code(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "問題が見つかりません")
 
 
+@router.post("/problems/{problem_id}/submit-answer", response_model=SubmitResultOut)
+def submit_answer(
+    problem_id: int,
+    req: AnswerSubmitRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db, scope="function"),
+) -> SubmitResultOut:
+    """
+    演習(選択式・数値入力・表形式の選択)の回答を提出して採点する
+
+    Args
+    -----------------
+    - problem_id: int,                  問題 ID
+    - req: AnswerSubmitRequest,         回答
+    - user: User,                       ログイン中のユーザ
+    - db: Session,                      DB セッション
+
+    Returns
+    -----------------
+    - result: SubmitResultOut,          採点結果
+
+    """
+    # 採点して記録(見つからなければ 404)
+    try:
+        return submission_service.submit_answer(db, user, problem_id, req)
+    except NotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "問題が見つかりません")
+
+
 @router.get("/courses/{slug}/quiz", response_model=QuizOut)
 def get_quiz(
-    slug: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    slug: str, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
 ) -> QuizOut:
     """
     小テストの表示内容を返す
@@ -204,7 +267,7 @@ def submit_quiz(
     slug: str,
     req: QuizSubmitRequest,
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> QuizResultOut:
     """
     小テストを提出して採点する
@@ -231,7 +294,7 @@ def submit_quiz(
 
 
 @router.get("/home", response_model=HomeOut)
-def home(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> HomeOut:
+def home(user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> HomeOut:
     """
     ホーム画面の表示内容を返す
 
@@ -250,7 +313,7 @@ def home(user: User = Depends(get_current_user), db: Session = Depends(get_db)) 
 
 
 @router.get("/me/summary", response_model=MyPageOut)
-def my_page(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> MyPageOut:
+def my_page(user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> MyPageOut:
     """
     マイページの表示内容を返す(ログイン中のユーザ本人の分のみ)
 

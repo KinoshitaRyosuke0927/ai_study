@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import math
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -44,6 +43,7 @@ from app.schemas_admin import (
     CheckItemOut,
     CheckOut,
     CourseEditorOut,
+    CourseImageOut,
     CourseInfoIn,
     ProblemIn,
     ProblemOut,
@@ -55,8 +55,10 @@ from app.schemas_admin import (
     VerifyIn,
     VerifyOut,
 )
+from app.services.answer_check import answer_key_error
 from app.services.course_service import NotFoundError, dataset_out
 from app.services.grading import outputs_match
+from app.services.image_service import delete_course_images
 from app.services.notebook_import import NotebookFormatError, add_parsed_unit, parse_notebook
 
 # 採点に関わる項目(変更したら再検証が必要)
@@ -66,6 +68,7 @@ _GRADED_FIELDS = (
     "grading",
     "test_code",
     "choices",
+    "matrix_rows",
     "correct_answer",
     "tolerance",
     "author_answer",
@@ -152,6 +155,7 @@ def _problem_out(p: Problem) -> ProblemOut:
         grading=p.grading,
         test_code=p.test_code,
         choices=list(p.choices or []),
+        matrix_rows=list(p.matrix_rows or []),
         correct_answer=p.correct_answer,
         tolerance=p.tolerance,
         explanation=p.explanation,
@@ -354,9 +358,10 @@ def delete_course(session: Session, course_id: int) -> None:
     - course_id: int,                   講座 ID
 
     """
-    # 講座を取得して削除
+    # 講座を取得して削除し、画像の中身も保存先から削除
     session.delete(_get_course(session, course_id))
     session.flush()
+    delete_course_images(course_id)
 
 
 def get_editor(session: Session, course_id: int, user: User) -> CourseEditorOut:
@@ -381,6 +386,7 @@ def get_editor(session: Session, course_id: int, user: User) -> CourseEditorOut:
         .options(
             selectinload(Course.units).selectinload(Unit.cells).selectinload(Cell.problem),
             selectinload(Course.datasets),
+            selectinload(Course.images),
             selectinload(Course.prerequisites),
         )
     )
@@ -414,6 +420,16 @@ def get_editor(session: Session, course_id: int, user: User) -> CourseEditorOut:
         units=[_unit_out(u) for u in course.units],
         quiz=[_problem_out(p) for p in quiz],
         datasets=[dataset_out(d) for d in course.datasets],
+        images=[
+            CourseImageOut(
+                id=img.id,
+                filename=img.filename,
+                content_type=img.content_type,
+                size=img.size,
+                url=f"/api/courses/{course.slug}/images/{img.filename}",
+            )
+            for img in course.images
+        ],
         other_courses=[{"id": i, "title": t} for i, t in others],
     )
 
@@ -436,12 +452,19 @@ def _apply_problem(problem: Problem, data: ProblemIn, is_new: bool) -> None:
     if data.answer_format == AnswerFormat.CODE and data.grading not in Grading.ALL:
         raise AdminInputError("採点方式の指定が正しくありません")
     choices = [c.strip() for c in data.choices if c.strip()]
-    # 採点に関わる項目が変わったか(新規は常に変更扱い)
+    rows = [r.strip() for r in data.matrix_rows if r.strip()] if data.answer_format == AnswerFormat.MATRIX else []
+    # 採点に関わる項目が変わったか(新規・回答形式の変更は常に変更扱い)
     new_values = data.model_dump()
     new_values["choices"] = choices
-    changed = is_new or any(
-        getattr(problem, f) != new_values[f] for f in _GRADED_FIELDS if f != "choices"
-    ) or list(problem.choices or []) != choices
+    new_values["matrix_rows"] = rows
+    new_values["correct_answer"] = data.correct_answer.strip()
+    changed = (
+        is_new
+        or problem.answer_format != data.answer_format
+        or any(getattr(problem, f) != new_values[f] for f in _GRADED_FIELDS if f not in ("choices", "matrix_rows"))
+        or list(problem.choices or []) != choices
+        or list(problem.matrix_rows or []) != rows
+    )
     # 項目を反映
     problem.answer_format = data.answer_format
     problem.title = data.title.strip()
@@ -451,7 +474,8 @@ def _apply_problem(problem: Problem, data: ProblemIn, is_new: bool) -> None:
     problem.grading = data.grading
     problem.test_code = data.test_code
     problem.choices = choices
-    problem.correct_answer = data.correct_answer.strip()
+    problem.matrix_rows = rows
+    problem.correct_answer = new_values["correct_answer"]
     problem.tolerance = data.tolerance
     problem.explanation = data.explanation
     problem.ai_model_answer = data.ai_model_answer
@@ -461,15 +485,9 @@ def _apply_problem(problem: Problem, data: ProblemIn, is_new: bool) -> None:
     # 変更があれば内容バージョンを上げる(既存の問題のみ)
     if not is_new:
         problem.content_version = (problem.content_version or 1) + 1
-    # 選択式・数値入力は正解が正しく設定されていれば検証済み
-    if data.answer_format == AnswerFormat.CHOICE:
-        valid = len(choices) >= 2 and problem.correct_answer in choices
-        problem.verify_status = VerifyStatus.VERIFIED if valid else VerifyStatus.TODO
-    elif data.answer_format == AnswerFormat.NUMERIC:
-        try:
-            valid = math.isfinite(float(problem.correct_answer))
-        except ValueError:
-            valid = False
+    # 選択式・数値入力・表形式は正解が正しく設定されていれば検証済み
+    if data.answer_format in AnswerFormat.KEYED:
+        valid = answer_key_error(data.answer_format, choices, rows, problem.correct_answer) is None
         problem.verify_status = VerifyStatus.VERIFIED if valid else VerifyStatus.TODO
     # コード問題はブラウザでの検証が必要
     else:
@@ -543,12 +561,12 @@ def save_unit(session: Session, unit_id: int, data: UnitContentIn) -> UnitAdminO
         if cell_in.cell_type not in CellType.ALL:
             raise AdminInputError("セルの種類の指定が正しくありません")
         problem_id = None
-        # 演習セル: 問題を作成・更新する(演習はコード問題のみ)
+        # 演習セル: 問題を作成・更新する(コード・選択式・数値入力・表形式)
         if cell_in.cell_type == CellType.EXERCISE:
             if cell_in.problem is None:
                 raise AdminInputError("演習セルの内容がありません")
             exercise_no += 1
-            p_in = cell_in.problem.model_copy(update={"answer_format": AnswerFormat.CODE})
+            p_in = cell_in.problem
             problem = problems_by_id.get(p_in.id) if p_in.id else None
             is_new = problem is None
             if problem is None:
@@ -790,7 +808,7 @@ def accept_author(session: Session, problem_id: int, output: str) -> VerifyOut:
 
 def confirm_problem(session: Session, problem_id: int) -> VerifyOut:
     """
-    選択式・数値入力の問題を、作成者が内容を確認したものとして検証済みにする(AI が作った問題など)
+    選択式・数値入力・表形式の問題を、作成者が内容を確認したものとして検証済みにする(AI が作った問題など)
 
     Args
     -----------------
@@ -802,22 +820,18 @@ def confirm_problem(session: Session, problem_id: int) -> VerifyOut:
     - result: VerifyOut,                検証結果
 
     """
-    # 問題を取得(選択式・数値入力のみ対象)
+    # 問題を取得(選択式・数値入力・表形式のみ対象)
     problem = session.get(Problem, problem_id)
     if problem is None:
         raise NotFoundError(problem_id)
     if problem.answer_format == AnswerFormat.CODE:
         raise AdminInputError("コード問題は「解答を実行して検証」で検証してください")
     # 正解が正しく設定されていることを確認
-    if problem.answer_format == AnswerFormat.CHOICE:
-        if len(problem.choices or []) < 2 or problem.correct_answer not in (problem.choices or []):
-            raise AdminInputError("選択肢を2つ以上用意し、正解を選んで保存してください")
-    else:
-        try:
-            if not math.isfinite(float(problem.correct_answer)):
-                raise ValueError
-        except ValueError:
-            raise AdminInputError("正解の数値を入力して保存してください")
+    error = answer_key_error(
+        problem.answer_format, list(problem.choices or []), list(problem.matrix_rows or []), problem.correct_answer
+    )
+    if error:
+        raise AdminInputError(f"{error}(保存してから確認してください)")
     # 検証済みにする
     problem.verify_status = VerifyStatus.VERIFIED
     session.flush()

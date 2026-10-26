@@ -2,14 +2,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
-import { emptyProblem, type AdminUnit, type CellIn, type ProblemIn, type VerifyStatus } from '../../api/adminTypes'
+import { emptyProblem, type AdminUnit, type AnswerFormat, type CellIn, type ProblemIn, type VerifyStatus } from '../../api/adminTypes'
 import type { Dataset } from '../../api/types'
+import { FORMAT_LABEL } from '../AnswerInput'
 import { CodeEditor } from '../CodeEditor'
 import { RunButton } from '../CodeCell'
 import { Markdown } from '../Markdown'
 import { OutputView } from '../OutputView'
 import { useCellRunner } from '../useCellRunner'
 import { CodeProblemEditor } from './CodeProblemEditor'
+import { KeyedProblemEditor } from './KeyedProblemEditor'
+import { VerifyBadge } from './VerifyBadge'
 import { verifyProblem } from './verify'
 
 interface DraftCell {
@@ -147,8 +150,8 @@ export function UnitEditor({ unit, unitCount, datasets, onSaved, onDirtyChange, 
     setCells((cs) => cs.filter((c) => c.key !== key))
     setDirty(true)
   }
-  const add = (type: CellIn['cell_type']) => {
-    const problem = type === 'exercise' ? emptyProblem('code') : null
+  const add = (type: CellIn['cell_type'], format: AnswerFormat = 'code') => {
+    const problem = type === 'exercise' ? emptyProblem(format) : null
     setCells((cs) => [...cs, { key: nextKey(), id: null, cell_type: type, source: '', problem, status: 'new', expected: '', aiGenerated: false }])
     setDirty(true)
   }
@@ -204,6 +207,22 @@ export function UnitEditor({ unit, unitCount, datasets, onSaved, onDirtyChange, 
     onVerified()
     setCells((cs) => cs.map((c, i) => (i === index ? { ...c, status: res.verify_status, expected: res.expected_output } : c)))
     return res
+  }
+
+  /** 選択式・数値入力・表形式の演習を、作成者が内容を確認したものとして検証済みにする */
+  const confirmAt = async (index: number) => {
+    const id = cells[index].problem?.id
+    if (!id || dirty) {
+      setMessage({ ok: false, text: '先に単元を保存してください' })
+      return
+    }
+    try {
+      const res = await api.admin.confirm(id)
+      setCells((cs) => cs.map((c, i) => (i === index ? { ...c, status: res.verify_status } : c)))
+      onVerified()
+    } catch (err) {
+      setMessage({ ok: false, text: err instanceof Error ? err.message : String(err) })
+    }
   }
 
   let exerciseNo = 0
@@ -290,7 +309,11 @@ export function UnitEditor({ unit, unitCount, datasets, onSaved, onDirtyChange, 
               <span className="ue-cell-type">
                 {TYPE_LABEL[c.cell_type]}
                 {c.cell_type === 'exercise' && ` ${unit.position}-${exerciseNo}`}
+                {c.problem && c.problem.answer_format !== 'code' && `(${FORMAT_LABEL[c.problem.answer_format]})`}
               </span>
+              {c.problem && c.problem.answer_format !== 'code' && (
+                <VerifyBadge status={c.status} unsaved={dirty && c.status !== 'new'} />
+              )}
               {c.aiGenerated && <span className="tag tag-ai">AI 生成</span>}
               <span className="spacer" />
               <button type="button" className="icon-btn" aria-label="上へ移動" onClick={() => move(i, -1)} disabled={i === 0}>
@@ -307,7 +330,17 @@ export function UnitEditor({ unit, unitCount, datasets, onSaved, onDirtyChange, 
             {c.cell_type === 'code' && (
               <ExampleCell ctx={`editor-unit-${unit.id}`} value={c.source} onChange={(v) => update(c.key, { source: v })} datasets={datasets} />
             )}
-            {c.cell_type === 'exercise' && c.problem && (
+            {c.cell_type === 'exercise' && c.problem && c.problem.answer_format !== 'code' && (
+              <KeyedProblemEditor
+                problem={c.problem}
+                name={c.key}
+                status={c.status}
+                withTitle
+                onChange={(patch) => updateProblem(c.key, patch)}
+                onConfirm={() => void confirmAt(i)}
+              />
+            )}
+            {c.cell_type === 'exercise' && c.problem && c.problem.answer_format === 'code' && (
               <CodeProblemEditor
                 problem={c.problem}
                 status={c.status}
@@ -331,7 +364,16 @@ export function UnitEditor({ unit, unitCount, datasets, onSaved, onDirtyChange, 
           ＋ コード(例題)
         </button>
         <button type="button" className="btn btn-sm" onClick={() => add('exercise')}>
-          ＋ 演習
+          ＋ 演習(コード)
+        </button>
+        <button type="button" className="btn btn-sm" onClick={() => add('exercise', 'choice')}>
+          ＋ 演習(選択式)
+        </button>
+        <button type="button" className="btn btn-sm" onClick={() => add('exercise', 'numeric')}>
+          ＋ 演習(数値入力)
+        </button>
+        <button type="button" className="btn btn-sm" onClick={() => add('exercise', 'matrix')}>
+          ＋ 演習(表形式の選択)
         </button>
       </div>
 

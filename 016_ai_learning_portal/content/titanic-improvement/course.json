@@ -1,0 +1,31 @@
+{
+  "slug": "titanic-improvement",
+  "title": "タイタニックで学ぶデータ分析 4:精度の改善と提出ファイルの作成",
+  "summary": "タイタニック号の乗客データから生存を予測するシリーズの4講座目(まとめ)です。ハイパーパラメータの探索(GridSearchCV)、勾配ブースティング(LightGBM)、特徴量の見直し、パイプラインによる前処理とモデルのまとめ方を学び、精度の改善に取り組みます。最後に、元のデータから前処理・学習・予測までを1つの流れで行い、Kaggle と同じ形式の提出ファイルを作ってダウンロードします。データは Vanderbilt 大学 生物統計学科が公開している titanic3(Thomas Cason が Encyclopedia Titanica をもとに作成。原典の一つは Eaton & Haas (1994) Titanic: Triumph and Tragedy)を、学習用(train.csv)と予測用(test.csv)に分けて使っています。Data obtained from http://hbiostat.org/data courtesy of the Vanderbilt University Department of Biostatistics.",
+  "level": "intermediate",
+  "tags": [
+    "データ分析",
+    "機械学習",
+    "ハイパーパラメータ",
+    "LightGBM",
+    "タイタニック"
+  ],
+  "outcomes": [
+    "GridSearchCV でハイパーパラメータの組み合わせを交差検証で比べ、選べる",
+    "LightGBM の学習率・木の本数・葉の数を調整して評価できる",
+    "特徴量を取り除いたり加えたりして、精度への効果を交差検証で確かめられる",
+    "パイプラインで前処理とモデルをまとめ、正しく交差検証・探索できる",
+    "最終的なモデルで予測し、提出ファイルを作って形式を確認し、ダウンロードできる"
+  ],
+  "libraries": ["pandas", "numpy", "scikit-learn", "lightgbm"],
+  "prerequisites": ["titanic-features", "titanic-modeling"],
+  "status": "draft",
+  "units": [
+    { "file": "01_grid_search.ipynb", "minutes": 40 },
+    { "file": "02_lightgbm.ipynb", "minutes": 40 },
+    { "file": "03_feature_review.ipynb", "minutes": 35 },
+    { "file": "04_pipeline.ipynb", "minutes": 35 },
+    { "file": "05_submission.ipynb", "minutes": 45 }
+  ],
+  "quiz": "quiz.ipynb"
+}

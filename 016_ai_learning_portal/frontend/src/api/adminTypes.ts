@@ -1,8 +1,8 @@
 // 管理者向け API(app/schemas_admin.py)と対応する型定義
-import type { CourseLevel, Dataset, MyPage } from './types'
+import type { AnswerFormat, CourseLevel, Dataset, MyPage } from './types'
 
+export type { AnswerFormat }
 export type VerifyStatus = 'todo' | 'verified' | 'mismatch'
-export type AnswerFormat = 'code' | 'choice' | 'numeric'
 
 export interface AdminCourseRow {
   id: number
@@ -39,8 +39,9 @@ export interface ProblemIn {
   starter_code: string
   grading: 'output' | 'test'
   test_code: string
-  choices: string[]
-  correct_answer: string
+  choices: string[] // 選択式の選択肢(表形式では列の選択肢)
+  matrix_rows: string[] // 表形式の行
+  correct_answer: string // 表形式は行ごとの正解を並べた JSON 配列の文字列
   tolerance: number
   explanation: string
   related_unit_id: number | null
@@ -89,7 +90,17 @@ export interface CourseEditor extends CourseInfo {
   units: AdminUnit[]
   quiz: Problem[]
   datasets: Dataset[]
+  images: CourseImage[]
   other_courses: { id: number; title: string }[]
+}
+
+/** 講座の画像(Markdown から ![説明](image:ファイル名) で参照する) */
+export interface CourseImage {
+  id: number
+  filename: string
+  content_type: string
+  size: number
+  url: string
 }
 
 export interface RunIn {
@@ -177,8 +188,9 @@ export function emptyProblem(format: AnswerFormat): ProblemIn {
     starter_code: '',
     grading: 'output',
     test_code: '',
-    choices: format === 'choice' ? ['', ''] : [],
-    correct_answer: '',
+    choices: format === 'choice' || format === 'matrix' ? ['', ''] : [],
+    matrix_rows: format === 'matrix' ? [''] : [],
+    correct_answer: format === 'matrix' ? '[""]' : '',
     tolerance: 1e-6,
     explanation: '',
     related_unit_id: null,
@@ -192,10 +204,17 @@ export interface AIStatus {
   enabled: boolean
   model_outline: string
   model_draft: string
+  runner_enabled: boolean // AI が作ったコードをサーバで実行して確かめられるか
 }
+
+/** AI で作る講座のタイプ(concept: 概念理解型・コードなし / practice: 実践型・コーディング中心) */
+export type CourseType = 'concept' | 'practice'
 
 export interface OutlineRequest {
   title: string
+  course_type: CourseType
+  purpose: string // 講座の目的
+  data_summary: string // データファイルの要約(画面で選んだファイルからサーバが作る)
   topic: string
   level: CourseLevel
   unit_count: number

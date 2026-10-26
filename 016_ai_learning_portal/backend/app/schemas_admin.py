@@ -50,15 +50,16 @@ class ProblemIn(BaseModel):
     """演習・小テストの問題の保存(id が無ければ新規)。"""
 
     id: int | None = None
-    answer_format: str = "code"  # code / choice / numeric
+    answer_format: str = "code"  # code / choice / numeric / matrix
     title: str = Field(default="", max_length=200)
     prompt: str = ""
     hint: str = ""
     starter_code: str = ""
     grading: str = "output"
     test_code: str = ""
-    choices: list[str] = []
-    correct_answer: str = ""
+    choices: list[str] = []  # 選択式の選択肢(表形式では列の選択肢)
+    matrix_rows: list[str] = []  # 表形式の行
+    correct_answer: str = ""  # 表形式は行ごとの正解を並べた JSON 配列の文字列
     tolerance: float = 1e-6
     explanation: str = ""
     related_unit_id: int | None = None
@@ -128,6 +129,16 @@ class QuizContentIn(BaseModel):
     questions: list[ProblemIn]
 
 
+class CourseImageOut(BaseModel):
+    """講座の画像(Markdown から image:ファイル名 で参照する)。"""
+
+    id: int
+    filename: str
+    content_type: str
+    size: int
+    url: str  # 表示用の URL
+
+
 class CourseEditorOut(BaseModel):
     """講座エディタの表示内容。"""
 
@@ -144,6 +155,7 @@ class CourseEditorOut(BaseModel):
     units: list[UnitAdminOut]
     quiz: list[ProblemOut]
     datasets: list[DatasetOut]
+    images: list[CourseImageOut]
     other_courses: list[dict]  # 前提講座の候補 [{id, title}]
 
 
@@ -286,6 +298,14 @@ class AIStatusOut(BaseModel):
     enabled: bool
     model_outline: str
     model_draft: str
+    # AI が作ったコードをサーバで実行して確かめられるか(Node.js + Pyodide)
+    runner_enabled: bool = False
+
+
+class AIDataSummaryOut(BaseModel):
+    """講座のデータファイルの要約(AI に渡す)。"""
+
+    summary: str
 
 
 class DraftCreateIn(BaseModel):

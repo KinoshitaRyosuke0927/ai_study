@@ -80,10 +80,14 @@ export function AIJobPage() {
               </span>
             </div>
             <ProgressBar done={job.done_steps} total={job.total_steps} />
-            {running && <p className="muted small">単元ごとに AI が説明・例題・演習を作っています。1単元に 30 秒〜1 分ほどかかります。このページを閉じても作成は続きます。</p>}
+            {running && (
+              <p className="muted small">
+                単元ごとに AI が説明・例題・演習を作り、コードを実行して数値や正解を確かめながら直しています。1単元に 2〜4 分ほどかかります。このページを閉じても作成は続きます。
+              </p>
+            )}
             {job.message && (
               <div className="form-error">
-                <b>うまく作成できなかった部分があります</b>
+                <b>うまく作成できなかった部分・確認が必要な点があります(「要確認」は、AI が直しきれなかった実行結果との食い違いです)</b>
                 <pre className="job-message">{job.message}</pre>
               </div>
             )}

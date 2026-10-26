@@ -1,0 +1,31 @@
+{
+  "slug": "titanic-features",
+  "title": "タイタニックで学ぶデータ分析 2:前処理と特徴量の作成",
+  "summary": "タイタニック号の乗客データから生存を予測するシリーズの2講座目です。機械学習のモデルに入れられる形にデータを整える前処理(欠損値の補完・カテゴリ変数の数値化)と、分析で見つけたことを生かした特徴量の作成を、実際にコードを書きながら身につけます。最後に前処理を関数にまとめ、次の講座で使う特徴量の表を作ります。データは Vanderbilt 大学 生物統計学科が公開している titanic3(Thomas Cason が Encyclopedia Titanica をもとに作成。原典の一つは Eaton & Haas (1994) Titanic: Triumph and Tragedy)を、学習用(train.csv)と予測用(test.csv)に分けて使っています。Data obtained from http://hbiostat.org/data courtesy of the Vanderbilt University Department of Biostatistics.",
+  "level": "intermediate",
+  "tags": [
+    "データ分析",
+    "前処理",
+    "特徴量エンジニアリング",
+    "pandas",
+    "タイタニック"
+  ],
+  "outcomes": [
+    "前処理のルール(学習用と予測用に同じ処理をする、補完の値は学習用から求める)を説明できる",
+    "最頻値・中央値・グループごとの中央値で欠損値を補完できる",
+    "2値の変数の 0 / 1 化とワンホットエンコーディングで、カテゴリ変数を数値にできる",
+    "家族の人数・敬称のまとめ・対数変換などの特徴量を作り、生存との関係を確かめられる",
+    "前処理を関数にまとめて学習用・予測用に適用し、結果を CSV ファイルに保存できる"
+  ],
+  "libraries": ["pandas", "numpy"],
+  "prerequisites": ["titanic-eda"],
+  "status": "draft",
+  "units": [
+    { "file": "01_policy.ipynb", "minutes": 30 },
+    { "file": "02_imputation.ipynb", "minutes": 40 },
+    { "file": "03_encoding.ipynb", "minutes": 35 },
+    { "file": "04_features.ipynb", "minutes": 35 },
+    { "file": "05_pipeline.ipynb", "minutes": 45 }
+  ],
+  "quiz": "quiz.ipynb"
+}

@@ -12,8 +12,8 @@
 ### 含まれるデータ
 
 - ユーザ 2名(下表。デモ用のサンプルユーザ)
-- 講座「統計の基礎」:5単元・演習6問・小テスト10問・データファイル `scores.csv`
 - Alembic の版数:取り込み後に `alembic upgrade head` を実行しても何も変わりません。
+- 講座は含みません(講座の画像は DB ではなくファイルで管理するため)。手順2のあとに、`content/` の講座を CLI で取り込みます。
 
 ### デモ用のサンプルユーザ
 
@@ -68,6 +68,16 @@ cd ../frontend && npm install && npm run build
 cd ../backend && uvicorn app.main:app --port 8000
 ```
 
+### 3. 講座を取り込む
+
+`backend/` で、`content/` の講座を取り込みます。統計検定2級対策の講座は前提講座を指定しているため、講座 1→6 の順に取り込みます。
+
+```bash
+for s in stats2-descriptive stats2-probability stats2-sampling-estimation stats2-hypothesis-testing stats2-regression-doe stats2-practice-exam; do
+  python -m app.cli import-course ../content/$s --author admin
+done
+```
+
 ブラウザで http://localhost:8000 を開き、上の「デモ用のサンプルユーザ」でログインします。
 
 ## 注意
@@ -78,7 +88,7 @@ cd ../backend && uvicorn app.main:app --port 8000
 
 ## データを最新にし直す(作成元の環境で実行)
 
-作成元の DB の内容で `02_schema_and_data.sql` を作り直す場合:
+作成元の DB の内容で `02_schema_and_data.sql` を作り直す場合(講座を含めないため、先頭の説明コメントのとおり講座は除いてから書き出す):
 
 ```bash
 mysqldump -u root -p --single-transaction --hex-blob --set-gtid-purged=OFF --no-tablespaces \

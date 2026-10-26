@@ -1,0 +1,33 @@
+{
+  "slug": "stats2-descriptive",
+  "title": "統計検定2級対策 1:記述統計",
+  "summary": "統計検定2級の出題範囲のうち、データの記述と要約(1変数・2変数以上のデータ、単回帰、時系列)を扱います。度数分布・代表値・散らばり・歪度とジニ係数・標準化・相関と偏相関・クロス集計・最小二乗法・移動平均と自己相関までを、図表を使った解説と、試験形式の読み取り問題・手計算の演習で身につけ、試験で問われる計算と読み取りができるようになることを目指します。",
+  "level": "basic",
+  "tags": [
+    "統計検定2級",
+    "記述統計"
+  ],
+  "outcomes": [
+    "データの種類に応じて度数分布表・グラフ・代表値を使い分け、図表から分布の形を読み取れる",
+    "分散・四分位範囲・歪度・尖度・ジニ係数などを手計算し、意味を説明できる",
+    "標準化・偏差値・変動係数・指数化で、単位や水準の違うデータを比較できる",
+    "相関係数・偏相関係数・クロス表で変数間の関係を調べ、見かけの相関を見抜ける",
+    "最小二乗法で回帰直線を求め、決定係数・分散分析表・統計ソフトの出力を読み取れる",
+    "成長率・幾何平均・移動平均・自己相関で時系列データを分析できる"
+  ],
+  "libraries": [],
+  "prerequisites": [],
+  "status": "draft",
+  "units": [
+    { "file": "01_distribution.ipynb", "minutes": 30 },
+    { "file": "02_central_tendency.ipynb", "minutes": 30 },
+    { "file": "03_dispersion.ipynb", "minutes": 35 },
+    { "file": "04_shape_inequality.ipynb", "minutes": 30 },
+    { "file": "05_standardization.ipynb", "minutes": 25 },
+    { "file": "06_correlation.ipynb", "minutes": 35 },
+    { "file": "07_crosstab.ipynb", "minutes": 25 },
+    { "file": "08_regression.ipynb", "minutes": 40 },
+    { "file": "09_time_series.ipynb", "minutes": 35 }
+  ],
+  "quiz": "quiz.ipynb"
+}

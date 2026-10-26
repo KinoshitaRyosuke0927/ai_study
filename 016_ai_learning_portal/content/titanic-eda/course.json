@@ -1,0 +1,31 @@
+{
+  "slug": "titanic-eda",
+  "title": "タイタニックで学ぶデータ分析 1:データの理解(EDA)",
+  "summary": "タイタニック号の乗客データから生存を予測するシリーズの1講座目です。pandas でデータを読み込み、欠損値・分布・変数と生存の関係を集計とグラフで調べる探索的データ分析(EDA)を、実際にコードを書きながら身につけます。分析で見つけたことは、次の講座の特徴量づくりにつなげます。データは Vanderbilt 大学 生物統計学科が公開している titanic3(Thomas Cason が Encyclopedia Titanica をもとに作成。原典の一つは Eaton & Haas (1994) Titanic: Triumph and Tragedy)を、学習用(train.csv)と予測用(test.csv)に分けて使っています。Data obtained from http://hbiostat.org/data courtesy of the Vanderbilt University Department of Biostatistics.",
+  "level": "intermediate",
+  "tags": [
+    "データ分析",
+    "EDA",
+    "pandas",
+    "タイタニック"
+  ],
+  "outcomes": [
+    "分析の目的を確認し、データの行数・列・型を調べて全体像をつかめる",
+    "欠損値の数・割合と、その偏りを調べられる",
+    "要約統計量・度数・ヒストグラムで、変数の分布を確認できる",
+    "groupby・pivot_table・crosstab で、変数と生存の関係を集計できる",
+    "区間に分けた集計や変数の組み合わせで、見かけの関係やリークに注意しながら特徴を見つけられる"
+  ],
+  "libraries": ["pandas", "numpy", "matplotlib"],
+  "prerequisites": [],
+  "status": "draft",
+  "units": [
+    { "file": "01_overview.ipynb", "minutes": 30 },
+    { "file": "02_missing.ipynb", "minutes": 30 },
+    { "file": "03_distribution.ipynb", "minutes": 35 },
+    { "file": "04_categorical.ipynb", "minutes": 40 },
+    { "file": "05_numeric.ipynb", "minutes": 40 },
+    { "file": "06_combination.ipynb", "minutes": 40 }
+  ],
+  "quiz": "quiz.ipynb"
+}

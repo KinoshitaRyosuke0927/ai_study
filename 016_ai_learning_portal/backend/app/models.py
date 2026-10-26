@@ -18,6 +18,7 @@ from sqlalchemy import (
     LargeBinary,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects import mysql
@@ -80,6 +81,9 @@ class Course(TimestampMixin, Base):
     datasets: Mapped[list[Dataset]] = relationship(
         back_populates="course", cascade="all, delete-orphan"
     )
+    images: Mapped[list[CourseImage]] = relationship(
+        back_populates="course", cascade="all, delete-orphan", order_by="CourseImage.filename"
+    )
     prerequisites: Mapped[list[CoursePrerequisite]] = relationship(
         foreign_keys="CoursePrerequisite.course_id", cascade="all, delete-orphan"
     )
@@ -140,8 +144,10 @@ class Problem(TimestampMixin, Base):
     grading: Mapped[str] = mapped_column(String(16), default=Grading.OUTPUT)
     expected_output: Mapped[str] = mapped_column(LongText, default="")  # 受講者には返さない
     test_code: Mapped[str] = mapped_column(LongText, default="")
-    choices: Mapped[list] = mapped_column(JSON, default=list)  # 選択式の選択肢
-    correct_answer: Mapped[str] = mapped_column(Text, default="")  # 選択式・数値の正解
+    choices: Mapped[list] = mapped_column(JSON, default=list)  # 選択式の選択肢(表形式では列の選択肢)
+    matrix_rows: Mapped[list] = mapped_column(JSON, default=list)  # 表形式の行(分類する項目)
+    # 選択式・数値の正解(表形式は行ごとの正解を並べた JSON 配列の文字列)
+    correct_answer: Mapped[str] = mapped_column(Text, default="")
     tolerance: Mapped[float] = mapped_column(Float, default=1e-6)  # 数値比較の許容誤差
     explanation: Mapped[str] = mapped_column(LongText, default="")  # 正解後に表示する解説
     related_unit_id: Mapped[int | None] = mapped_column(
@@ -184,6 +190,24 @@ class Dataset(TimestampMixin, Base):
     content: Mapped[bytes] = mapped_column(LongBlob)
 
     course: Mapped[Course] = relationship(back_populates="datasets")
+
+
+class CourseImage(TimestampMixin, Base):
+    """講座の画像(説明・問題文などの Markdown から image:ファイル名 で参照する)。
+
+    画像の中身は画像の保存先(app/infra/image_store.py)に「講座 ID/ファイル名」のキーで置く。
+    """
+
+    __tablename__ = "course_images"
+    __table_args__ = (UniqueConstraint("course_id", "filename"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
+    filename: Mapped[str] = mapped_column(String(100))
+    content_type: Mapped[str] = mapped_column(String(50))
+    size: Mapped[int] = mapped_column(Integer)
+
+    course: Mapped[Course] = relationship(back_populates="images")
 
 
 class UnitProgress(Base):

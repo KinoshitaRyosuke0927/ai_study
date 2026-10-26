@@ -1,0 +1,8 @@
+{
+  "name": "course-builder",
+  "private": true,
+  "description": "手本講座の .ipynb・図・データを、アプリと同じ Pyodide で作るツール",
+  "dependencies": {
+    "pyodide": "314.0.7"
+  }
+}

@@ -252,6 +252,30 @@ az containerapp logs show -g $RG -n ca-ai-learning-portal --follow
 - **DB の手動操作**:`az mysql flexible-server start|stop|show -g $RG -n $MYSQL --query state`。
 - **ユーザ管理**:管理者でログインし「管理 › メンバー管理」から行います(コンテナ内で CLI を使う必要はありません)。
 
+## 講座の画像の保存先(次回のデプロイまでに対応)
+
+講座の画像(講座エディタの「画像」、講座フォルダの `images/`)は、ローカルでは `backend/var/images` に保存している
+(設定 `IMAGE_STORE=local`)。Container Apps のコンテナ内のファイルは再起動で消えるため、Azure では
+**Azure Blob Storage** に保存する(ユーザ決定 2026-10-25)。次回のデプロイ時に次を行う。
+
+1. ストレージアカウントとコンテナ(例:`stailearningportal` / `course-images`)を作成する。非公開(匿名アクセスなし)にする。
+   画像はアプリ経由で配信し、下書き講座の画像は作成者・管理者だけが見られるようにしているため。
+2. `backend/app/infra/image_store.py` に Blob Storage 版の保存先を追加し、`IMAGE_STORE=azure_blob` で切り替える
+   (キーは「講座 ID/ファイル名」のまま。`delete_prefix` は講座の削除時に使う)。
+3. 接続はアプリのマネージド ID(ロール「ストレージ BLOB データ共同作成者」)で行う。ロールの割り当て権限が無い場合は接続文字列をシークレットで渡す。
+4. 既存の画像があれば、ローカルの `backend/var/images` の中身を同じキーでコンテナにアップロードする。
+
+## AI が作ったコードの実行環境(次回のデプロイまでに確認)
+
+AI による講座作成では、AI が作ったコード(例題・模範解答・正解の根拠・図)をサーバ側の Node.js + Pyodide で実行して確かめる
+(`backend/runner/`、2026-10 追加)。コンテナイメージには node 本体と Pyodide が入る(Dockerfile の `runner` ステージ)。次回のデプロイ時に次を確認する。
+
+1. **外向きの通信**:Pyodide のパッケージ(pandas・scikit-learn など)は、初回の実行時に CDN(cdn.jsdelivr.net)から取得する。
+   Container App から CDN へ通信できること(受講者のブラウザと同じ取得元)。
+2. **メモリ**:1回の実行で Pyodide とパッケージを読み込むため、数百 MB を使う。現在の `memory: 1Gi` では足りない可能性があるので、
+   `infra/containerapp.json` の Container App を `cpu: 1.0` / `memory: 2Gi` に上げることを検討する。
+3. 実行環境を使わない場合は `AI_RUNNER_ENABLED=false` にする(AI が作った下書きをそのまま保存する。作成画面に「コードの実行確認:なし」と表示される)。
+
 ## 自動起動・停止を有効にする(ロールの割り当てができるようになったら)
 
 1. 所有者(またはユーザー アクセス管理者)の権限を持つ人に、手順 7 のロールの割り当てを実行してもらう

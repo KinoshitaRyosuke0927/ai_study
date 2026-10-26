@@ -1,0 +1,33 @@
+{
+  "slug": "stats2-sampling-estimation",
+  "title": "統計検定2級対策 3:標本分布と推定",
+  "summary": "統計検定2級の出題範囲のうち、標本分布(標本平均の分布、大数の法則・中心極限定理、正規分布・t 分布・カイ二乗分布・F 分布)と推定(推定量の性質、母平均・母比率・母分散・相関係数の区間推定、2つの母集団の区間推定)を扱います。図表を使った解説と、分布表を使う手計算の演習で、確率の計算と信頼区間の構成ができるようになることを目指します。",
+  "level": "basic",
+  "tags": [
+    "統計検定2級",
+    "標本分布",
+    "推定"
+  ],
+  "outcomes": [
+    "標本平均の期待値・分散・標準誤差を求め、標本の大きさとの関係を説明できる",
+    "大数の法則・中心極限定理・チェビシェフの不等式を使って確率を評価できる",
+    "標準正規分布表や t・カイ二乗・F 分布表を使って確率と上側確率点を求められる",
+    "不偏性・一致性・有効性の観点から推定量を比べられる",
+    "母平均・母比率・母分散・相関係数の信頼区間を手計算で求め、正しく解釈できる",
+    "2つの母集団の差や比の信頼区間を求め、検定の結論と対応づけられる"
+  ],
+  "libraries": [],
+  "prerequisites": ["stats2-descriptive", "stats2-probability"],
+  "status": "draft",
+  "units": [
+    { "file": "01_sampling.ipynb", "minutes": 30 },
+    { "file": "02_lln_clt.ipynb", "minutes": 30 },
+    { "file": "03_normal.ipynb", "minutes": 35 },
+    { "file": "04_t_chi2_f.ipynb", "minutes": 30 },
+    { "file": "05_point_estimation.ipynb", "minutes": 30 },
+    { "file": "06_mean_interval.ipynb", "minutes": 35 },
+    { "file": "07_proportion_variance_correlation.ipynb", "minutes": 35 },
+    { "file": "08_two_populations.ipynb", "minutes": 35 }
+  ],
+  "quiz": "quiz.ipynb"
+}

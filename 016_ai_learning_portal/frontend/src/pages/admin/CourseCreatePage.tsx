@@ -1,8 +1,8 @@
 // 講座を作成:作成方法(AI で作成 / 白紙から作成)を選んで下書きを作る
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
-import type { CourseOutline, OutlineRequest, OutlineUnit } from '../../api/adminTypes'
+import type { CourseOutline, CourseType, OutlineRequest, OutlineUnit } from '../../api/adminTypes'
 import { LEVEL_LABEL, type CourseLevel } from '../../api/types'
 import { AdminNav } from '../../components/admin/AdminNav'
 import { Header } from '../../components/Header'
@@ -13,6 +13,20 @@ type Method = 'ai' | 'blank'
 const METHODS: { key: Method; label: string; desc: string }[] = [
   { key: 'ai', label: '題材から AI で作成', desc: '題材を入力すると AI が構成案を作ります。構成案を編集してから下書きを作ります' },
   { key: 'blank', label: '白紙から作成', desc: 'エディタで説明・例題・演習を一から書きます' },
+]
+
+// AI で作る講座のタイプ(タイプによって説明・演習の作り方が大きく変わる)
+const COURSE_TYPES: { key: CourseType; label: string; desc: string }[] = [
+  {
+    key: 'concept',
+    label: '概念理解型(コードなし)',
+    desc: '概念の理解と手計算の力を身につける講座。図表と文章で説明し、演習は選択式・数値入力・表形式で出題します',
+  },
+  {
+    key: 'practice',
+    label: '実践型(コーディング中心)',
+    desc: '実際のデータ分析の技術を身につける講座。例題コードを実行して結果を読み取り、コードを書く演習で学びます',
+  },
 ]
 
 const splitList = (s: string) => s.split(/[,、]/).map((x) => x.trim()).filter(Boolean)
@@ -58,19 +72,68 @@ function SlugField({ value, onChange }: { value: string; onChange: (v: string) =
 function AICreate() {
   const navigate = useNavigate()
   const { data: status } = useLoad(() => api.admin.aiStatus(), [])
-  const [req, setReq] = useState<OutlineRequest>({ title: '', topic: '', level: 'basic', unit_count: 5, libraries: ['pandas'], audience: '' })
+  const [req, setReq] = useState<OutlineRequest>({
+    title: '',
+    course_type: 'practice',
+    purpose: '',
+    data_summary: '',
+    topic: '',
+    level: 'basic',
+    unit_count: 5,
+    libraries: ['pandas'],
+    audience: '',
+  })
   const [libraries, setLibraries] = useState('pandas')
   const [slug, setSlug] = useState('')
   const [outline, setOutline] = useState<CourseOutline | null>(null)
   const [busy, setBusy] = useState<'outline' | 'draft' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // 講座のデータファイル(下書きの作成時に講座に登録する)と、その要約の作成状態
+  const [files, setFiles] = useState<File[]>([])
+  const [summarizing, setSummarizing] = useState(false)
+
+  const summaryRequest = useRef(0)
+
+  // データファイルが変わったら、要約(列・型・欠損・先頭の行)を作り直して依頼に含める
+  const updateFiles = async (next: File[]) => {
+    setFiles(next)
+    setError(null)
+    // 後から始めた要約だけを反映する(続けて選び直したときに古い要約で上書きしない)
+    const requestId = ++summaryRequest.current
+    if (next.length === 0) {
+      setReq((r) => ({ ...r, data_summary: '' }))
+      setSummarizing(false)
+      return
+    }
+    setSummarizing(true)
+    try {
+      const { summary } = await api.admin.aiDataSummary(next)
+      if (requestId === summaryRequest.current) setReq((r) => ({ ...r, data_summary: summary }))
+    } catch (err) {
+      if (requestId === summaryRequest.current) setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      if (requestId === summaryRequest.current) setSummarizing(false)
+    }
+  }
+
+  // 選んだファイルを追加する(同じ名前のファイルは置き換え)
+  const addFiles = (list: FileList | null) => {
+    const chosen = Array.from(list ?? [])
+    if (chosen.length === 0) return
+    const names = new Set(chosen.map((f) => f.name))
+    void updateFiles([...files.filter((f) => !names.has(f.name)), ...chosen])
+  }
+
+  // 登録したファイルを1つ取り除く
+  const removeFile = (name: string) => void updateFiles(files.filter((f) => f.name !== name))
 
   const genOutline = async (e?: FormEvent) => {
     e?.preventDefault()
     setBusy('outline')
     setError(null)
     try {
-      const request = { ...req, libraries: splitList(libraries) }
+      // 概念理解型はコードを書かないので、使用ライブラリは送らない
+      const request = { ...req, libraries: req.course_type === 'concept' ? [] : splitList(libraries) }
       setReq(request)
       setOutline(await api.admin.aiOutline(request))
     } catch (err) {
@@ -85,7 +148,7 @@ function AICreate() {
     setBusy('draft')
     setError(null)
     try {
-      const job = await api.admin.aiCreateDraft(slug.trim(), req, outline)
+      const job = await api.admin.aiCreateDraft(slug.trim(), req, outline, files)
       navigate(`/admin/ai-jobs/${job.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -110,6 +173,21 @@ function AICreate() {
   return (
     <div className="ai-create">
       <form className="card create-form form-stack" onSubmit={(e) => void genOutline(e)}>
+        <div className="field-label">講座のタイプ</div>
+        <div className="method-grid">
+          {COURSE_TYPES.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              className={`method${req.course_type === t.key ? ' method-on' : ''}`}
+              aria-pressed={req.course_type === t.key}
+              onClick={() => setReq({ ...req, course_type: t.key })}
+            >
+              <span className="method-label">{t.label}</span>
+              <span className="method-desc">{t.desc}</span>
+            </button>
+          ))}
+        </div>
         <div className="ue-info-row">
           <label className="field spacer">
             講座タイトル(仮)
@@ -117,6 +195,20 @@ function AICreate() {
           </label>
           <LevelSelect value={req.level} onChange={(level) => setReq({ ...req, level })} />
         </div>
+        <label className="field">
+          講座の目的(受講後にできるようになってほしいこと)
+          <textarea
+            rows={2}
+            value={req.purpose}
+            onChange={(e) => setReq({ ...req, purpose: e.target.value })}
+            required
+            placeholder={
+              req.course_type === 'concept'
+                ? '例:統計検定2級の記述統計の範囲を理解し、試験形式の問題を手計算で解けるようになる。'
+                : '例:売上データの時系列分析を、自分でコードを書いて一通り実施できるようになる。'
+            }
+          />
+        </label>
         <label className="field">
           題材・扱いたい内容
           <textarea
@@ -132,20 +224,64 @@ function AICreate() {
             単元数の目安
             <input type="number" min={1} max={12} value={req.unit_count} onChange={(e) => setReq({ ...req, unit_count: clamp(e.target.value, 1, 12, 1) })} />
           </label>
-          <label className="field spacer">
-            使用ライブラリ(カンマ区切り)
-            <input className="mono" value={libraries} onChange={(e) => setLibraries(e.target.value)} />
-          </label>
+          {req.course_type === 'practice' && (
+            <label className="field spacer">
+              使用ライブラリ(カンマ区切り)
+              <input className="mono" value={libraries} onChange={(e) => setLibraries(e.target.value)} />
+            </label>
+          )}
         </div>
+        <div className="field">
+          データファイル(任意・CSV)
+          <label className="file-drop">
+            クリックして CSV ファイルを選択(複数可)
+            <input
+              type="file"
+              className="sr-only"
+              accept=".csv,text/csv"
+              multiple
+              onChange={(e) => {
+                addFiles(e.target.files)
+                // 同じファイルを取り除いた後に選び直せるよう、選択をリセットする
+                e.target.value = ''
+              }}
+            />
+          </label>
+          {files.length > 0 && (
+            <div className="card list-card">
+              {files.map((f) => (
+                <div key={f.name} className="list-row">
+                  <span className="mono spacer">{f.name}</span>
+                  <span className="muted small">{Math.max(1, Math.round(f.size / 1024))} KB</span>
+                  <button type="button" className="btn btn-sm btn-danger" disabled={busy !== null} onClick={() => removeFile(f.name)}>
+                    削除
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <span className="muted small">
+            講座で使うデータがあれば選んでください。AI がデータの列・型を読んでコードを書き、下書きの作成時に講座のデータファイルとして登録します。
+          </span>
+        </div>
+        {summarizing && <div className="muted small">データファイルの内容を読み取っています…</div>}
+        {req.data_summary && (
+          <details className="data-summary">
+            <summary className="small">AI に渡すデータの要約({files.length} ファイル)</summary>
+            <pre className="mono small">{req.data_summary}</pre>
+          </details>
+        )}
         <label className="field">
           対象者・前提知識(任意)
           <input value={req.audience} onChange={(e) => setReq({ ...req, audience: e.target.value })} placeholder="例:「統計の基礎」を修了した人" />
         </label>
         <div className="save-bar">
           <span className="spacer muted small">
-            {status ? `構成案:${status.model_outline} ・ 下書き:${status.model_draft}` : ''}
+            {status
+              ? `構成案:${status.model_outline} ・ 下書き:${status.model_draft} ・ コードの実行確認:${status.runner_enabled ? 'あり' : 'なし'}`
+              : ''}
           </span>
-          <button type="submit" className="btn btn-primary" disabled={busy !== null}>
+          <button type="submit" className="btn btn-primary" disabled={busy !== null || summarizing}>
             {busy === 'outline' ? '構成案を作成中…(10秒ほど)' : outline ? '構成案を作り直す' : 'AI で構成案を作成'}
           </button>
         </div>
@@ -187,7 +323,7 @@ function AICreate() {
                 <div className="outline-meta">
                   <label className="small">
                     演習
-                    <input type="number" min={1} max={3} value={u.exercise_count} onChange={(e) => setUnit(i, { exercise_count: clamp(e.target.value, 1, 3, 1) })} />
+                    <input type="number" min={1} max={5} value={u.exercise_count} onChange={(e) => setUnit(i, { exercise_count: clamp(e.target.value, 1, 5, 3) })} />
                     問
                   </label>
                   <label className="small">
@@ -217,7 +353,7 @@ function AICreate() {
             <button
               type="button"
               className="btn btn-ghost btn-sm"
-              onClick={() => setOutline({ ...outline, units: [...outline.units, { title: '新しい単元', summary: '', goals: [], minutes: 20, exercise_count: 1 }] })}
+              onClick={() => setOutline({ ...outline, units: [...outline.units, { title: '新しい単元', summary: '', goals: [], minutes: 30, exercise_count: 3 }] })}
             >
               ＋ 単元を追加
             </button>
@@ -229,7 +365,7 @@ function AICreate() {
           <SlugField value={slug} onChange={setSlug} />
           <div className="save-bar">
             <span className="spacer muted small">
-              単元 {outline.units.length} ・ 演習 {outline.units.reduce((n, u) => n + u.exercise_count, 0)}問 ・ 小テスト {outline.quiz_count}問。作成には数分かかります。
+              単元 {outline.units.length} ・ 演習 {outline.units.reduce((n, u) => n + u.exercise_count, 0)}問 ・ 小テスト {outline.quiz_count}問。作成には10〜20分ほどかかります(コードの実行確認を含む)。
             </span>
             <button type="button" className="btn btn-primary" onClick={() => void createDraft()} disabled={busy !== null || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)}>
               {busy === 'draft' ? '開始しています…' : 'この構成で下書きを作成'}

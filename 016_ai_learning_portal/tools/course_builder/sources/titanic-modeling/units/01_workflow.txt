@@ -1,0 +1,225 @@
+#%% md
+# 機械学習の流れ
+前の講座で作った特徴量の表を使って、はじめての予測モデルを作ります。データを学習用と検証用に分け、モデルを学習させ、検証用のデータで正解率を測るまでの、機械学習の基本の流れを身につけます。
+
+#%% md
+## 学習目標
+- 特徴量 `X` と正解 `y` に分けられる
+- `train_test_split` で、学習に使うデータと精度の確認に使うデータ(検証用)に分けられる
+- scikit-learn のモデルで `fit`(学習)・`predict`(予測)・`score`(正解率)を使える
+- 何も学習しない予測(ベースライン)と比べて、モデルの精度を評価できる
+
+#%% md
+## 使うデータ
+
+前の講座(前処理と特徴量の作成)の最後に保存した特徴量の表を使います。この講座では、同じ内容のファイルが講座のデータとして用意されています。
+
+| ファイル | 内容 |
+|---|---|
+| `train_prepared.csv` | 学習用 891 人の特徴量(17 列)と正解 `Survived`、`PassengerId` |
+| `test_prepared.csv` | 予測用 418 人の特徴量と `PassengerId`(正解なし。次の講座で使う) |
+
+#%% code
+import pandas as pd
+
+# 前の講座で作った、学習用の特徴量の表を読み込む
+df = pd.read_csv("train_prepared.csv")
+
+# 特徴量 X:正解(Survived)と、乗客の番号(PassengerId)以外のすべての列
+X = df.drop(columns=["PassengerId", "Survived"])
+# 正解 y:Survived の列
+y = df["Survived"]
+
+print(X.shape, y.shape)
+print(list(X.columns))
+
+#%% md
+## 学習用と検証用に分ける
+
+モデルの精度は、**学習に使っていないデータ** で測る必要があります。学習に使ったデータで測ると、答えを覚えているだけのモデルでも高い精度が出てしまうからです(単元3で確かめます)。
+
+`test.csv` には正解がないので、学習用の 891 人をさらに **学習に使うデータ** と **精度の確認に使うデータ(検証用)** に分けます。`train_test_split` を使います。
+
+#%% code
+from sklearn.model_selection import train_test_split
+
+# 25% を検証用、残り 75% を学習用に分ける
+#   random_state=0 : 分け方を毎回同じにする(乱数の種)
+#   stratify=y     : 学習用・検証用で、生存者の割合がそろうように分ける
+X_train, X_valid, y_train, y_valid = train_test_split(
+    X, y, test_size=0.25, random_state=0, stratify=y
+)
+
+print("学習用:", X_train.shape, " 検証用:", X_valid.shape)
+print("検証用の生存率:", round(y_valid.mean(), 3))
+
+#%% md
+学習用は 668 人、検証用は 223 人です。`stratify=y` を指定したので、検証用の生存率(37.2%)は全体とほぼ同じです。
+
+## ベースライン
+
+モデルを作る前に、**何も学習しない予測** の正解率を求めておきます。全員を多い方の答え(死亡 = 0)と予測すると、検証用での正解率は「死亡者の割合」になります。
+
+#%% code
+# 全員を「死亡(0)」と予測したときの正解率 = 検証用の死亡者の割合
+baseline = (y_valid == 0).mean()
+print("ベースライン:", round(baseline, 3))
+
+#%% md
+ベースラインは 62.8% です。作ったモデルは、少なくともこれを上回る必要があります。
+
+#%% md
+## モデルを学習させて予測する
+
+scikit-learn のモデルは、どれも同じ手順で使えます。
+
+| 手順 | メソッド | 内容 |
+|---|---|---|
+| 1. モデルを作る | `LogisticRegression()` など | 学習する前の、空のモデルを用意する |
+| 2. 学習させる | `model.fit(X_train, y_train)` | 特徴量と正解から、予測のしかたを学ぶ |
+| 3. 予測する | `model.predict(X_valid)` | 特徴量から、0 / 1 を予測する |
+| 4. 正解率を求める | `model.score(X_valid, y_valid)` | 予測と正解が一致した割合を求める |
+
+最初のモデルとして、**ロジスティック回帰**(次の単元で詳しく学びます)を使います。
+
+#%% code
+from sklearn.linear_model import LogisticRegression
+
+# 1. モデルを作る(max_iter は学習の計算をくり返す上限の回数)
+model = LogisticRegression(max_iter=1000)
+
+# 2. 学習用のデータで学習させる
+model.fit(X_train, y_train)
+
+# 3. 検証用のデータの先頭 5 人を予測して、正解と並べる(tolist() で普通のリストにして表示する)
+print("予測:", model.predict(X_valid.head(5)).tolist())
+print("正解:", y_valid.head(5).tolist())
+
+# 4. 検証用のデータでの正解率を求める
+print("正解率:", round(model.score(X_valid, y_valid), 3))
+
+#%% md
+検証用のデータでの正解率は 80.7% で、ベースライン(62.8%)を大きく上回りました。
+
+#%% md
+## 演習
+
+#%% md
+特徴量を **性別 `Sex` だけ** にして、同じ手順(同じ分け方)でロジスティック回帰を学習させ、検証用のデータでの正解率を小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+
+# 特徴量の表を読み込み、特徴量 X(性別だけ)と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df[["Sex"]]  # [[ ]] で囲むと、1 列だけの表(DataFrame)になる
+y = df["Survived"]
+
+# 解説と同じ分け方で、学習用と検証用に分ける
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# モデルを作って学習させる(____ に、学習させるメソッドを書く)
+model = LogisticRegression(max_iter=1000)
+model.____(X_train, y_train)
+
+# 検証用のデータでの正解率を、小数第3位まで表示する(____ に、正解率を求めるメソッドを書く)
+print(round(model.____(X_valid, y_valid), 3))
+
+#%% code
+# @solution
+# @title: 性別だけのモデル
+# @hint: 学習は fit(X_train, y_train)、正解率は score(X_valid, y_valid) で求めます。
+# @explanation: 性別だけでも正解率は 77.1% になり、ベースライン(62.8%)を大きく上回ります。性別は生存の予測に非常に役立つ特徴量です。すべての特徴量を使ったモデル(80.7%)は、さらにそれを上回っています。
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+
+# 特徴量の表を読み込み、特徴量 X(性別だけ)と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df[["Sex"]]  # [[ ]] で囲むと、1 列だけの表(DataFrame)になる
+y = df["Survived"]
+
+# 解説と同じ分け方で、学習用と検証用に分ける
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# モデルを作り、fit で学習させる
+model = LogisticRegression(max_iter=1000)
+model.fit(X_train, y_train)
+
+# score で検証用のデータでの正解率を求め、小数第3位まで表示する
+print(round(model.score(X_valid, y_valid), 3))
+
+#%% md
+すべての特徴量を使ったロジスティック回帰について、**学習用のデータでの正解率** と **検証用のデータでの正解率** を、この順に小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+
+# 学習用と検証用に分ける
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# モデルを作って学習させる
+model = LogisticRegression(max_iter=1000)
+model.fit(X_train, y_train)
+
+# 学習用・検証用それぞれでの正解率を表示する(____ に、それぞれのデータを入れる)
+print(round(model.score(____, ____), 3))
+print(round(model.score(____, ____), 3))
+
+#%% code
+# @solution
+# @title: 学習用と検証用の正解率
+# @hint: score の引数に、学習用なら X_train と y_train、検証用なら X_valid と y_valid を渡します。
+# @explanation: 学習用での正解率は 82.3%、検証用は 80.7% で、差は小さいです。学習に使ったデータでの正解率は、使っていないデータより高くなるのが普通です。この差が大きいときは、モデルが学習用のデータを覚えすぎている(過学習)可能性があります(単元3)。
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+
+# 学習用と検証用に分ける
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# モデルを作って学習させる
+model = LogisticRegression(max_iter=1000)
+model.fit(X_train, y_train)
+
+# 学習用・検証用それぞれでの正解率を表示する
+print(round(model.score(X_train, y_train), 3))
+print(round(model.score(X_valid, y_valid), 3))
+
+#%% md
+<!-- @question
+type: choice
+answer: 学習に使ったデータで測ると、答えを覚えているだけのモデルでも高い正解率になり、新しいデータでの精度がわからないため。
+title: 検証用のデータを分ける理由
+hint: 本当に知りたいのは、まだ見たことのない乗客(予測用のデータ)をどれくらい正しく予測できるかです。
+explanation: モデルの目的は、まだ見たことのないデータを正しく予測することです。学習に使ったデータで精度を測ると、答えを覚えているだけのモデルでも高い正解率になってしまいます。学習に使っていない検証用のデータで測ることで、新しいデータでの精度を見積もれます。
+-->
+学習用のデータの一部を検証用に分けて、モデルの正解率を検証用のデータで測る理由として最も適切なものを選べ。
+
+- 学習に使うデータが少ないほど、モデルの精度が上がるため。
+- 学習に使ったデータで測ると、答えを覚えているだけのモデルでも高い正解率になり、新しいデータでの精度がわからないため。
+- 検証用のデータには正解がないため。
+- scikit-learn のモデルは、学習に使ったデータでは score が計算できないため。
+
+#%% md
+## まとめ
+
+- 特徴量 `X` と正解 `y` に分け、`train_test_split` で学習用と検証用に分ける(`stratify=y` で正解の割合をそろえる)。
+- モデルは「作る → `fit` で学習 → `predict` で予測 → `score` で正解率」の流れで使う。
+- 精度は学習に使っていない検証用のデータで測り、ベースライン(全員死亡と予測:62.8%)と比べる。

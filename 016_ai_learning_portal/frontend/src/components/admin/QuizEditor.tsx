@@ -1,10 +1,11 @@
-// 小テストの編集:選択式・数値入力・コードの問題を追加・並べ替え・保存・検証する
+// 小テストの編集:選択式・数値入力・表形式・コードの問題を追加・並べ替え・保存・検証する
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { emptyProblem, type AdminUnit, type AnswerFormat, type Problem, type ProblemIn, type VerifyStatus } from '../../api/adminTypes'
 import type { Dataset } from '../../api/types'
-import { Markdown } from '../Markdown'
+import { FORMAT_LABEL } from '../AnswerInput'
 import { CodeProblemEditor } from './CodeProblemEditor'
+import { KeyedProblemEditor } from './KeyedProblemEditor'
 import { VerifyBadge } from './VerifyBadge'
 import { verifyProblem } from './verify'
 
@@ -18,8 +19,6 @@ interface DraftQuestion {
 let keySeq = 0
 const toDrafts = (quiz: Problem[]): DraftQuestion[] =>
   quiz.map((p) => ({ key: `q-${p.id}`, problem: { ...p }, status: p.verify_status, expected: p.expected_output }))
-
-const FORMAT_LABEL: Record<AnswerFormat, string> = { choice: '選択式', numeric: '数値入力', code: 'コード' }
 
 interface Props {
   courseId: number
@@ -37,7 +36,6 @@ export function QuizEditor({ courseId, quiz, units, datasets, onSaved, onDirtyCh
   const [dirty, setDirtyState] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
-  const [preview, setPreview] = useState<Record<string, boolean>>({})
 
   const setDirty = useCallback(
     (v: boolean) => {
@@ -121,7 +119,7 @@ export function QuizEditor({ courseId, quiz, units, datasets, onSaved, onDirtyCh
     return res
   }
 
-  /** 選択式・数値入力を、作成者が内容を確認したものとして検証済みにする */
+  /** 選択式・数値入力・表形式を、作成者が内容を確認したものとして検証済みにする */
   const confirmAt = async (index: number) => {
     const id = questions[index].problem.id
     if (!id || dirty) {
@@ -146,8 +144,11 @@ export function QuizEditor({ courseId, quiz, units, datasets, onSaved, onDirtyCh
           <div className="mono warm small">小テスト</div>
           <h2 className="ue-title-static">小テスト</h2>
           <div className="muted small">
-            全{questions.length}問(選択式 {formats.filter((f) => f === 'choice').length}・数値入力 {formats.filter((f) => f === 'numeric').length}・コード{' '}
-            {formats.filter((f) => f === 'code').length})。満点で講座修了です。単元の内容に合わせて、最も適した形式を選んでください。
+            全{questions.length}問(
+            {(['choice', 'numeric', 'matrix', 'code'] as const)
+              .map((f) => `${FORMAT_LABEL[f]} ${formats.filter((x) => x === f).length}`)
+              .join('・')}
+            )。満点で講座修了です。単元の内容に合わせて、最も適した形式を選んでください。
           </div>
         </div>
       </div>
@@ -201,93 +202,14 @@ export function QuizEditor({ courseId, quiz, units, datasets, onSaved, onDirtyCh
                 onAcceptAuthor={(output) => acceptAt(i, output)}
               />
             ) : (
-              <div className="form-stack qe-body">
-                <div className="field">
-                  <div className="field-head">
-                    <span>問題文(Markdown)</span>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPreview((v) => ({ ...v, [q.key]: !v[q.key] }))}>
-                      {preview[q.key] ? '編集' : 'プレビュー'}
-                    </button>
-                  </div>
-                  {preview[q.key] ? (
-                    <div className="md-preview">
-                      <Markdown source={p.prompt || '(問題文がありません)'} />
-                    </div>
-                  ) : (
-                    <textarea rows={3} value={p.prompt} onChange={(e) => patch(q.key, { prompt: e.target.value })} />
-                  )}
-                </div>
-
-                {p.answer_format === 'choice' && (
-                  <fieldset className="choice-edit">
-                    <legend>選択肢(正解を1つ選ぶ)</legend>
-                    {p.choices.map((c, ci) => (
-                      <div key={ci} className="choice-edit-row">
-                        <input
-                          type="radio"
-                          name={`correct-${q.key}`}
-                          aria-label={`選択肢 ${ci + 1} を正解にする`}
-                          checked={c !== '' && p.correct_answer === c}
-                          onChange={() => patch(q.key, { correct_answer: c })}
-                        />
-                        <input
-                          className="spacer"
-                          value={c}
-                          aria-label={`選択肢 ${ci + 1}`}
-                          onChange={(e) => {
-                            const choices = [...p.choices]
-                            const wasCorrect = p.correct_answer === choices[ci]
-                            choices[ci] = e.target.value
-                            patch(q.key, { choices, ...(wasCorrect ? { correct_answer: e.target.value } : {}) })
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          aria-label={`選択肢 ${ci + 1} を削除`}
-                          onClick={() => patch(q.key, { choices: p.choices.filter((_, x) => x !== ci) })}
-                          disabled={p.choices.length <= 2}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => patch(q.key, { choices: [...p.choices, ''] })}>
-                      ＋ 選択肢を追加
-                    </button>
-                  </fieldset>
-                )}
-
-                {p.answer_format === 'numeric' && (
-                  <div className="ue-info-row">
-                    <label className="field field-narrow">
-                      正解の数値
-                      <input className="mono" value={p.correct_answer} onChange={(e) => patch(q.key, { correct_answer: e.target.value })} />
-                    </label>
-                    <label className="field field-narrow">
-                      許容誤差
-                      <input
-                        className="mono"
-                        value={String(p.tolerance)}
-                        onChange={(e) => patch(q.key, { tolerance: Number(e.target.value) || 0 })}
-                      />
-                    </label>
-                  </div>
-                )}
-
-                <label className="field">
-                  解説(正解したときに表示)
-                  <textarea rows={2} value={p.explanation} onChange={(e) => patch(q.key, { explanation: e.target.value })} />
-                </label>
-                {q.status !== 'verified' && p.id && (
-                  <div className="pe-verify qe-confirm">
-                    <span className="spacer muted small">問題文・選択肢・正解が正しいことを確認したら、検証済みにしてください(AI が作った問題など)。</span>
-                    <button type="button" className="btn btn-sm btn-primary" onClick={() => void confirmAt(i)}>
-                      内容を確認して検証済みにする
-                    </button>
-                  </div>
-                )}
-              </div>
+              <KeyedProblemEditor
+                problem={p}
+                name={q.key}
+                status={q.status}
+                withTitle={false}
+                onChange={(pp) => patch(q.key, pp)}
+                onConfirm={() => void confirmAt(i)}
+              />
             )}
           </div>
         )
@@ -299,6 +221,9 @@ export function QuizEditor({ courseId, quiz, units, datasets, onSaved, onDirtyCh
         </button>
         <button type="button" className="btn btn-sm" onClick={() => add('numeric')}>
           ＋ 数値入力
+        </button>
+        <button type="button" className="btn btn-sm" onClick={() => add('matrix')}>
+          ＋ 表形式の選択
         </button>
         <button type="button" className="btn btn-sm" onClick={() => add('code')}>
           ＋ コード

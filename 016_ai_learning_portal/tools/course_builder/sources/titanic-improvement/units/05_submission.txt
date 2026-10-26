@@ -1,0 +1,271 @@
+#%% md
+# 予測と提出ファイルの作成
+シリーズのまとめとして、元のデータ(`train.csv`・`test.csv`)から、前処理・モデルの学習・予測までを1つの流れで行い、Kaggle と同じ形式の提出ファイル `submission.csv` を作ってダウンロードします。
+
+#%% md
+## 学習目標
+- 最終的なモデルを選び、学習用のデータ全体で学習し直せる
+- 元のデータから提出ファイルまでを、1つのコードの流れで作れる
+- 提出ファイルの形式(列・行数・値)を確認できる
+- 作った提出ファイルを CSV で保存し、ダウンロードできる
+
+#%% md
+## 最終的なモデルを選ぶ
+
+この講座で比べたモデルの、交差検証の正解率は次のとおりでした。
+
+| モデル | 交差検証の正解率 |
+|---|---|
+| ランダムフォレスト(`max_depth=5`、`min_samples_leaf=5`) | 81.8% |
+| LightGBM(木 300 本、学習率 0.02、葉 7 枚) | 81.7% |
+| ロジスティック回帰(標準化、`C=0.1`) | 81.6% |
+
+差はわずかで、どれを選んでも大きな違いはありません。ここでは、交差検証の正解率が最も高く、設定も単純なランダムフォレストを使います。
+
+**学習用のデータ全体で学習し直す**:交差検証や検証用のデータは、モデルや設定を選ぶためのものでした。選んだ後は、学習用の 891 人 **すべて** を使って学習し直します。学習に使えるデータが多いほど、予測の精度が上がることが期待できるからです。
+
+#%% md
+## 元のデータから提出ファイルまで
+
+講座2の前処理の関数と、選んだモデルを組み合わせて、元のデータから予測までを1つの流れで書きます。このコードがあれば、データが変わっても同じ手順で提出ファイルを作り直せます。
+
+#%% code
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+
+# ---------- 1. 元のデータを読み込む ----------
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
+
+
+# ---------- 2. 前処理(講座2と同じ) ----------
+def extract_title(name):
+    """名前から敬称を取り出し、主な 4 つ以外を Rare にまとめる"""
+    title = name.str.extract(r",\s*([^.]+)\.")[0]
+    title = title.replace({"Mlle": "Miss", "Ms": "Miss", "Mme": "Mrs"})
+    return title.where(title.isin(["Mr", "Mrs", "Miss", "Master"]), "Rare").rename("Title")
+
+
+# 補完に使う値は、学習用のデータだけから求める
+age_by_title = train.groupby(extract_title(train["Name"]))["Age"].median()
+fare_median = train["Fare"].median()
+embarked_mode = train["Embarked"].mode()[0]
+
+
+def preprocess(df):
+    """元のデータ df から、モデルに入れる特徴量の表を作って返す"""
+    out = pd.DataFrame({"PassengerId": df["PassengerId"]})
+    out["Pclass"] = df["Pclass"]
+    out["SibSp"] = df["SibSp"]
+    out["Parch"] = df["Parch"]
+    out["Sex"] = (df["Sex"] == "female").astype(int)
+    title = extract_title(df["Name"])
+    out["Age"] = df["Age"].fillna(title.map(age_by_title))
+    out["LogFare"] = np.log1p(df["Fare"].fillna(fare_median))
+    out["HasCabin"] = df["Cabin"].notna().astype(int)
+    out["FamilySize"] = df["SibSp"] + df["Parch"] + 1
+    out["IsAlone"] = (out["FamilySize"] == 1).astype(int)
+    embarked = pd.get_dummies(df["Embarked"].fillna(embarked_mode), prefix="Embarked", dtype=int)
+    titles = pd.get_dummies(title, prefix="Title", dtype=int)
+    return pd.concat([out, embarked, titles], axis=1)
+
+
+train_x = preprocess(train)
+# 予測用の列を学習用とそろえる
+test_x = preprocess(test).reindex(columns=train_x.columns, fill_value=0)
+
+# 特徴量(PassengerId を除く)と正解に分ける
+X = train_x.drop(columns=["PassengerId"])
+y = train["Survived"]
+X_test = test_x.drop(columns=["PassengerId"])
+
+# ---------- 3. 選んだモデルを、学習用のデータ全体で学習させる ----------
+model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=5, random_state=0)
+model.fit(X, y)
+
+# ---------- 4. 予測用のデータを予測する ----------
+pred = model.predict(X_test)
+
+# ---------- 5. 提出ファイルの形の表にする ----------
+submission = pd.DataFrame({"PassengerId": test["PassengerId"], "Survived": pred})
+submission.head()
+
+#%% md
+## 提出ファイルを確認する
+
+提出する前に、形式が正しいかを確認します。Kaggle のタイタニックの提出ファイルは、次の形式です。
+
+| 確認すること | 正しい状態 |
+|---|---|
+| 列 | `PassengerId` と `Survived` の 2 列 |
+| 行数 | 予測用のデータと同じ 418 行(見出しの行を除く) |
+| `Survived` の値 | 0 または 1 の整数だけ |
+| `PassengerId` | 予測用のデータの乗客の番号と一致し、重複がない |
+
+#%% code
+# 形式を確認する
+print("列        :", list(submission.columns))
+print("行数      :", len(submission))
+print("値の種類  :", sorted(submission["Survived"].unique().tolist()))
+print("番号の重複:", submission["PassengerId"].duplicated().sum())
+# 予測の傾向も確認する(生存と予測した割合が、学習用の生存率 約 37% と大きく違わないか)
+print("生存と予測した割合:", round(submission["Survived"].mean(), 3))
+
+#%% md
+形式はすべて正しく、生存と予測した割合(39.2%)も、学習用のデータの生存率(37.4%)と大きく違いません。予測が極端に偏っている(例えば全員 0)ときは、どこかで間違えている可能性があります。
+
+## CSV で保存してダウンロードする
+
+`to_csv` で保存します。行番号は不要なので `index=False` を指定します。セルの下の「作成したファイル」の **ダウンロード** ボタンで、自分のパソコンに保存できます。
+
+#%% code
+# 提出ファイルを CSV で保存する(行番号は書き出さない)
+submission.to_csv("submission.csv", index=False)
+print("submission.csv を保存しました")
+
+#%% md
+これで、元のデータの理解から、前処理・特徴量の作成・モデルの学習と評価・精度の改善を経て、提出ファイルを作るまでの一連の流れが完成しました。
+
+#%% md
+## 演習
+
+#%% md
+単元4のパイプライン(標準化 + `LogisticRegression(C=0.1, max_iter=1000)`)を、学習用の特徴量の表 `train_prepared.csv` 全体で学習させ、予測用の特徴量の表 `test_prepared.csv` を予測して、提出ファイルの形の表を作ってください。表の **行数** と **生存と予測した人数** を、この順に表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+# 学習用・予測用の特徴量の表を読み込む
+train = pd.read_csv("train_prepared.csv")
+test = pd.read_csv("test_prepared.csv")
+X = train.drop(columns=["PassengerId", "Survived"])
+y = train["Survived"]
+X_test = test.drop(columns=["PassengerId"])
+
+# パイプラインを、学習用のデータ全体で学習させる
+pipe = make_pipeline(StandardScaler(), LogisticRegression(C=0.1, max_iter=1000))
+pipe.fit(X, y)
+
+# 予測して、提出ファイルの形の表を作る(____ に、PassengerId の列と予測の列を指定する)
+submission = pd.DataFrame({"PassengerId": ____, "Survived": ____})
+
+# 行数と、生存と予測した人数を表示する
+print(len(submission))
+print(submission["Survived"].sum())
+
+#%% code
+# @solution
+# @title: ロジスティック回帰で提出ファイルを作る
+# @hint: PassengerId は予測用の表の test["PassengerId"]、予測は pipe.predict(X_test) です。
+# @explanation: 行数は予測用のデータと同じ 418 行です。ロジスティック回帰が生存と予測した人数は、ランダムフォレストとは少し違います。交差検証の正解率がほぼ同じモデルでも、個々の乗客の予測は異なることがあります。
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+# 学習用・予測用の特徴量の表を読み込む
+train = pd.read_csv("train_prepared.csv")
+test = pd.read_csv("test_prepared.csv")
+X = train.drop(columns=["PassengerId", "Survived"])
+y = train["Survived"]
+X_test = test.drop(columns=["PassengerId"])
+
+# パイプラインを、学習用のデータ全体で学習させる
+pipe = make_pipeline(StandardScaler(), LogisticRegression(C=0.1, max_iter=1000))
+pipe.fit(X, y)
+
+# 予測して、PassengerId と予測(Survived)の 2 列の表を作る
+submission = pd.DataFrame({"PassengerId": test["PassengerId"], "Survived": pipe.predict(X_test)})
+
+# 行数と、生存と予測した人数を表示する
+print(len(submission))
+print(submission["Survived"].sum())
+
+#%% md
+提出ファイルの形式を確認する関数 `check_submission` を完成させてください。表を受け取り、形式が正しければ `True`、正しくなければ `False` を返します。完成したら、正しい表と、値に 2 が混ざった表の2つで確かめ、結果を表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+
+def check_submission(sub, n_rows=418):
+    """提出ファイルの形式が正しければ True を返す"""
+    # 列が PassengerId と Survived の 2 列か
+    if list(sub.columns) != ["PassengerId", "Survived"]:
+        return False
+    # 行数が予測用のデータと同じか
+    if len(sub) != n_rows:
+        return False
+    # Survived の値が 0 か 1 だけか(____ に、すべての値が 0 か 1 であるかを判定する式を書く)
+    if not ____:
+        return False
+    # PassengerId に重複がないか
+    if sub["PassengerId"].duplicated().any():
+        return False
+    return True
+
+
+# 正しい表と、値に 2 が混ざった表で確かめる(3 行だけの小さな例)
+good = pd.DataFrame({"PassengerId": [892, 893, 894], "Survived": [0, 1, 0]})
+bad = pd.DataFrame({"PassengerId": [892, 893, 894], "Survived": [0, 2, 0]})
+print(check_submission(good, n_rows=3))
+print(check_submission(bad, n_rows=3))
+
+#%% code
+# @solution
+# @title: 提出ファイルの形式を確認する関数
+# @hint: sub["Survived"].isin([0, 1]).all() で、すべての値が 0 か 1 なら True になります。
+# @explanation: isin([0, 1]) で各値が 0 か 1 かを判定し、all() ですべてが True かを確かめます。このような確認を関数にしておくと、提出前に毎回同じ確認ができ、形式の間違いによる提出の失敗を防げます。
+import pandas as pd
+
+
+def check_submission(sub, n_rows=418):
+    """提出ファイルの形式が正しければ True を返す"""
+    # 列が PassengerId と Survived の 2 列か
+    if list(sub.columns) != ["PassengerId", "Survived"]:
+        return False
+    # 行数が予測用のデータと同じか
+    if len(sub) != n_rows:
+        return False
+    # Survived の値が 0 か 1 だけか(isin で 0 か 1 かを判定し、all ですべて True かを確かめる)
+    if not sub["Survived"].isin([0, 1]).all():
+        return False
+    # PassengerId に重複がないか
+    if sub["PassengerId"].duplicated().any():
+        return False
+    return True
+
+
+# 正しい表と、値に 2 が混ざった表で確かめる(3 行だけの小さな例)
+good = pd.DataFrame({"PassengerId": [892, 893, 894], "Survived": [0, 1, 0]})
+bad = pd.DataFrame({"PassengerId": [892, 893, 894], "Survived": [0, 2, 0]})
+print(check_submission(good, n_rows=3))
+print(check_submission(bad, n_rows=3))
+
+#%% md
+<!-- @question
+type: choice
+answer: 選んだモデルと設定で、学習用のデータ全体を使って学習し直してから、予測用のデータを予測する。
+title: 最終的なモデルの学習
+hint: 交差検証や検証用のデータは、モデルや設定を「選ぶ」ためのものでした。選んだ後は、学習に使えるデータをどうしますか。
+explanation: 交差検証や検証用のデータでモデルと設定を選んだ後は、学習用のデータ全体(891 人)で学習し直してから予測します。学習に使えるデータが多いほど、予測の精度が上がることが期待できます。予測用のデータには正解がないので、学習には使えません。
+-->
+交差検証でモデルと設定を選んだ後、提出ファイルを作るための進め方として最も適切なものを選べ。
+
+- 選んだモデルと設定で、学習用のデータ全体を使って学習し直してから、予測用のデータを予測する。
+- 交差検証の 5 回のうち、最も正解率の高かった回のモデルで予測する。
+- 予測用のデータも学習に加えてから、予測用のデータを予測する。
+- 学習用のデータの 75% だけで学習したモデルで予測する。
+
+#%% md
+## まとめ
+
+- 交差検証の結果から最終的なモデルを選び、学習用のデータ全体で学習し直してから予測する。
+- 元のデータから、前処理・学習・予測・提出ファイルまでを1つの流れのコードにしておくと、いつでも作り直せる。
+- 提出前に、列・行数・値・番号の重複と、予測の傾向を確認する。`to_csv(..., index=False)` で保存し、ダウンロードする。

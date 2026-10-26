@@ -1,0 +1,33 @@
+{
+  "slug": "stats2-probability",
+  "title": "統計検定2級対策 2:データ収集と確率・確率分布",
+  "summary": "統計検定2級の出題範囲のうち、データの集め方(標本調査の抽出法、実験計画の考え方、観察研究と実験研究)と、確率(確率の基本法則、条件付き確率、ベイズの定理)・確率分布(確率変数の期待値と分散、代表的な離散型・連続型の分布)を扱います。図表を使った解説と手計算の演習で、偏りのないデータの集め方を判断し、確率や期待値・分散を計算できるようになることを目指します。",
+  "level": "basic",
+  "tags": [
+    "統計検定2級",
+    "標本調査",
+    "確率",
+    "確率分布"
+  ],
+  "outcomes": [
+    "標本調査の抽出法を区別し、比例配分などの標本の割り当てを計算できる",
+    "フィッシャーの3原則に基づいて実験計画を評価し、観察研究との違いを説明できる",
+    "加法定理・乗法定理・条件付き確率を使って確率を計算できる",
+    "ベイズの定理で事後確率を求め、検査の陽性的中率などを解釈できる",
+    "確率分布から期待値・分散を求め、変数の和や1次変換の期待値・分散を計算できる",
+    "場面に合った離散型・連続型の確率分布を選び、確率を手計算できる"
+  ],
+  "libraries": [],
+  "prerequisites": ["stats2-descriptive"],
+  "status": "draft",
+  "units": [
+    { "file": "01_sampling_survey.ipynb", "minutes": 30 },
+    { "file": "02_experiment.ipynb", "minutes": 30 },
+    { "file": "03_probability.ipynb", "minutes": 30 },
+    { "file": "04_bayes.ipynb", "minutes": 30 },
+    { "file": "05_random_variables.ipynb", "minutes": 35 },
+    { "file": "06_discrete_distributions.ipynb", "minutes": 35 },
+    { "file": "07_continuous_distributions.ipynb", "minutes": 30 }
+  ],
+  "quiz": "quiz.ipynb"
+}

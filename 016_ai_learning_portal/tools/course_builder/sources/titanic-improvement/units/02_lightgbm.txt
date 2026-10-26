@@ -1,0 +1,183 @@
+#%% md
+# 勾配ブースティング(LightGBM)
+データ分析のコンペティションでよく使われる「勾配ブースティング」のモデルを、LightGBM で使ってみます。ランダムフォレストとのしくみの違いと、学習率・木の数などの主なハイパーパラメータの調整方法を学びます。
+
+#%% md
+## 学習目標
+- 勾配ブースティングのしくみ(前の木の間違いを次の木が補う)を、ランダムフォレストと比べて説明できる
+- LightGBM の `LGBMClassifier` を scikit-learn と同じ手順で使える
+- 学習率・木の数・葉の数を調整して、交差検証で評価できる
+
+#%% md
+## 勾配ブースティングのしくみ
+
+| モデル | 木の作り方 | 予測のまとめ方 |
+|---|---|---|
+| ランダムフォレスト | 多数の木を **それぞれ独立に** 作る | 多数決 |
+| 勾配ブースティング | 木を **1本ずつ順番に** 作り、各木は **それまでの木の予測の間違いを小さくするように** 学習する | 各木の予測を少しずつ足し合わせる |
+
+勾配ブースティングの主なハイパーパラメータは次のとおりです。
+
+| ハイパーパラメータ | 意味 |
+|---|---|
+| `n_estimators` | 木の本数(何回、間違いを補うか) |
+| `learning_rate` | 学習率。各木の予測をどれだけ足すか(小さいほど慎重に少しずつ学習する) |
+| `num_leaves` | 1本の木の葉の数の上限(多いほど複雑な木) |
+
+学習率を小さくしたら、そのぶん木の本数を増やすのが基本です。
+
+#%% md
+## LightGBM を使う
+
+LightGBM のモデル `LGBMClassifier` も、scikit-learn のモデルと同じく `fit`・`predict`・`score` で使え、`cross_val_score` で評価できます。`verbose=-1` は学習中のメッセージを表示しない設定です。
+
+#%% code
+import lightgbm as lgb
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 既定の設定(木 100 本、学習率 0.1、葉 31 枚まで)の LightGBM
+default_model = lgb.LGBMClassifier(random_state=0, verbose=-1)
+scores = cross_val_score(default_model, X, y, cv=cv)
+print("既定の設定      :", round(scores.mean(), 3))
+
+# 葉の数を 7 までに減らし、学習率を 0.02 に下げて、木を 300 本にした LightGBM
+tuned_model = lgb.LGBMClassifier(n_estimators=300, learning_rate=0.02, num_leaves=7, random_state=0, verbose=-1)
+scores = cross_val_score(tuned_model, X, y, cv=cv)
+print("葉 7・学習率 0.02:", round(scores.mean(), 3), " 標準偏差", round(scores.std(), 3))
+
+#%% md
+既定の設定では交差検証の正解率は 79.9% で、ランダムフォレスト(81.7%)より低くなりました。既定の設定は、900 人程度の小さなデータには複雑すぎて過学習しているためです。木を単純にして(葉 7 枚)、学習率を下げて少しずつ学習させると 81.7% に上がり、標準偏差も小さく(1.3%)なりました。
+
+#%% md
+## 学習率と木の本数の関係
+
+学習率を変えながら、木の本数(100 本)と葉の数(7 枚)は同じにして比べます。
+
+#%% code
+# 学習率だけを変えて、交差検証の正解率を比べる
+for rate in [0.01, 0.05, 0.1, 0.3]:
+    model = lgb.LGBMClassifier(n_estimators=100, learning_rate=rate, num_leaves=7, random_state=0, verbose=-1)
+    scores = cross_val_score(model, X, y, cv=cv)
+    print(f"学習率 {rate}: {scores.mean():.3f}")
+
+#%% md
+- 学習率 0.01 では、100 本では学習が足りず(79.7%)、木の本数を増やす必要があります
+- 学習率 0.05 が最も良く(81.4%)、それより大きくすると下がります(大きすぎると、間違いを補いすぎて過学習しやすい)
+
+このように、学習率と木の本数は組み合わせて調整します。
+
+#%% md
+## 演習
+
+#%% md
+LightGBM(`num_leaves=7`、`learning_rate=0.05`、`random_state=0`、`verbose=-1`)の木の本数 `n_estimators` を **50・100・200** と変えて、それぞれ解説と同じ分け方で交差検証の正解率の平均を求めてください。木の本数と平均(小数第3位まで)を1行ずつ表示してください。
+
+#%% code
+# @starter
+import lightgbm as lgb
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 木の本数を変えて交差検証する(____ に、木の本数を指定してモデルを作る式を書く)
+for n in [50, 100, 200]:
+    model = ____
+    scores = cross_val_score(model, X, y, cv=cv)
+    print(n, round(scores.mean(), 3))
+
+#%% code
+# @solution
+# @title: 木の本数を変えた LightGBM
+# @hint: lgb.LGBMClassifier(n_estimators=n, learning_rate=0.05, num_leaves=7, random_state=0, verbose=-1) のように、ループの変数 n を n_estimators に渡します。
+# @explanation: 学習率 0.05 では、100 本(81.4%)が最も良く、50 本(80.7%)では学習が足りず、200 本(80.6%)では間違いを補いすぎて少し下がります。木の本数は多ければよいわけではなく、学習率と組み合わせて交差検証で選びます。
+import lightgbm as lgb
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 木の本数(n_estimators)だけを変えて交差検証する
+for n in [50, 100, 200]:
+    model = lgb.LGBMClassifier(n_estimators=n, learning_rate=0.05, num_leaves=7, random_state=0, verbose=-1)
+    scores = cross_val_score(model, X, y, cv=cv)
+    print(n, round(scores.mean(), 3))
+
+#%% md
+LightGBM(`n_estimators=300`、`learning_rate=0.02`、`num_leaves=7`、`random_state=0`、`verbose=-1`)を学習用のデータ全体で学習させ、特徴量の重要度(`feature_importances_`)の **大きい順に上位 5 つ** を表示してください。
+
+#%% code
+# @starter
+import lightgbm as lgb
+import pandas as pd
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+
+# LightGBM を学習用のデータ全体で学習させる(____ に、学習させるメソッドを書く)
+model = lgb.LGBMClassifier(n_estimators=300, learning_rate=0.02, num_leaves=7, random_state=0, verbose=-1)
+model.____(X, y)
+
+# 重要度を特徴量の名前を付けた Series にして、大きい順に上位 5 つを表示する
+importance = pd.Series(model.feature_importances_, index=X.columns)
+print(importance.sort_values(ascending=False).head(5))
+
+#%% code
+# @solution
+# @title: LightGBM の特徴量の重要度
+# @hint: fit(X, y) で学習させると、feature_importances_ に重要度が入ります。
+# @explanation: LightGBM の既定の重要度は「その特徴量が分岐に使われた回数」です。年齢・運賃のように値の種類が多い数値の特徴量は分岐に使われやすく、上位に来やすい点が、ランダムフォレストの重要度(性別・敬称が上位)と違います。重要度は計算方法によって変わるので、1つの見方だけで判断しないようにしましょう。
+import lightgbm as lgb
+import pandas as pd
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+
+# LightGBM を学習用のデータ全体で学習させる
+model = lgb.LGBMClassifier(n_estimators=300, learning_rate=0.02, num_leaves=7, random_state=0, verbose=-1)
+model.fit(X, y)
+
+# 重要度を特徴量の名前を付けた Series にして、大きい順に上位 5 つを表示する
+importance = pd.Series(model.feature_importances_, index=X.columns)
+print(importance.sort_values(ascending=False).head(5))
+
+#%% md
+<!-- @question
+type: choice
+answer: 木を1本ずつ順番に作り、それまでの木の予測の間違いを小さくするように次の木を学習する。
+title: 勾配ブースティングのしくみ
+hint: ランダムフォレストは木を独立に作って多数決をとります。勾配ブースティングとの違いは、木の作り方です。
+explanation: 勾配ブースティングは、木を1本ずつ順番に作り、それまでの木の予測の間違いを小さくするように次の木を学習させ、各木の予測を少しずつ足し合わせます。多数の木を独立に作って多数決をとるのはランダムフォレストです。
+-->
+勾配ブースティング(LightGBM など)のしくみの説明として、最も適切なものを選べ。
+
+- 多数の木をそれぞれ独立に作り、多数決で予測する。
+- 木を1本ずつ順番に作り、それまでの木の予測の間違いを小さくするように次の木を学習する。
+- 1本の深い木を作り、葉の数で予測する。
+- 特徴量を標準化して、係数の重み付きの和を確率に変換する。
+
+#%% md
+## まとめ
+
+- 勾配ブースティングは、木を順番に作って前の木の間違いを補い、予測を足し合わせる。LightGBM は scikit-learn と同じ手順で使える。
+- 小さなデータでは既定の設定は複雑すぎることがある。葉の数を減らし、学習率を下げて木の本数を増やすと安定する。
+- 学習率と木の本数は組み合わせて調整する。精度が頭打ちになったら、それ以上の調整は効果が小さい。

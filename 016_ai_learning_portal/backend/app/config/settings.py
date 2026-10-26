@@ -56,6 +56,11 @@ class Settings(BaseSettings):
         default="https://cdn.jsdelivr.net/pyodide/v314.0.7/full/", alias="PYODIDE_BASE_URL"
     )
 
+    # --- 講座の画像の保存先 ---
+    # local: ローカルのフォルダ(IMAGE_LOCAL_DIR)に保存する。Azure では Blob Storage を使う予定(docs/azure_deploy.md)
+    image_store: str = Field(default="local", alias="IMAGE_STORE")
+    image_local_dir: str = Field(default=str(BACKEND_DIR / "var" / "images"), alias="IMAGE_LOCAL_DIR")
+
     # --- AI(Azure OpenAI。010_ai_reviewer と同じ接続方式) ---
     azure_openai_endpoint: str = Field(default="", alias="AZURE_OPENAI_ENDPOINT")
     azure_openai_key: str = Field(default="", alias="AZURE_OPENAI_KEY")
@@ -64,6 +69,10 @@ class Settings(BaseSettings):
     # 単元・小テストの下書き生成に使うモデル(デプロイ名)
     ai_model_draft: str = Field(default="gpt-6-luna", alias="AI_MODEL_DRAFT")
     ai_timeout_seconds: int = Field(default=300, alias="AI_TIMEOUT_SECONDS")
+    # AI が作ったコードをサーバ側で実行して検証する(Node.js + Pyodide。backend/runner で npm install が必要)
+    ai_runner_enabled: bool = Field(default=True, alias="AI_RUNNER_ENABLED")
+    ai_runner_node: str = Field(default="node", alias="AI_RUNNER_NODE")  # node コマンドのパス
+    ai_runner_timeout_seconds: int = Field(default=600, alias="AI_RUNNER_TIMEOUT_SECONDS")  # 1回の実行の上限
 
     # --- DB の自動起動・停止(Azure Database for MySQL フレキシブルサーバー) ---
     # 有効にすると、DB が停止中のアクセスで DB を起動し、使われていなければ停止できる

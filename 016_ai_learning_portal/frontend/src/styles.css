@@ -684,6 +684,23 @@ a.toc-item:hover {
 .markdown p {
   margin: 0 0 12px;
 }
+/* 数式(KaTeX)。ディスプレイ数式は少し大きめにし、横に長い式は横スクロールにする */
+.markdown .katex {
+  font-size: 1.1em;
+}
+.markdown .katex-display {
+  margin: 16px 0;
+  padding: 4px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.markdown .katex-display > .katex {
+  font-size: 1.2em;
+}
+/* アプリの .accent(文字色)と、KaTeX の \bar などの部品のクラス名が同じため、数式の中では色を付けない */
+.katex .accent {
+  color: inherit;
+}
 .markdown code {
   padding: 1px 6px;
   border-radius: 4px;
@@ -814,6 +831,27 @@ a.toc-item:hover {
 .output-empty {
   color: var(--faint);
   font-size: 13px;
+}
+.output-files {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: var(--surface-sunk);
+}
+.output-files-title {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.output-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 3px 0;
+}
+.output-file .btn {
+  margin-left: auto;
 }
 
 /* 演習セル */
@@ -1015,7 +1053,12 @@ a.toc-item:hover {
   border-color: var(--faint);
   color: var(--ink);
 }
+/* 講座名が2行以上になっても、丸・チェックの印が縮んでつぶれないようにする */
+.roadmap-item > svg {
+  flex-shrink: 0;
+}
 .roadmap-dot {
+  flex-shrink: 0;
   width: 10px;
   height: 10px;
   margin: 0 2px;
@@ -1349,6 +1392,142 @@ a.unit-row-quiz:hover {
 .quiz-q {
   scroll-margin-top: 80px;
 }
+/* 選択式・数値入力・表形式の演習(実行ボタンが無いので左の字下げをしない) */
+.exercise-keyed .exercise-actions {
+  padding-left: 0;
+}
+.exercise-keyed .exercise-hint,
+.exercise-keyed .verdict {
+  margin-left: 0;
+}
+/* 表形式の選択 */
+.matrix-wrap {
+  overflow-x: auto;
+}
+.matrix {
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 15px;
+}
+.matrix th,
+.matrix td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.matrix tbody tr:last-child th,
+.matrix tbody tr:last-child td {
+  border-bottom: none;
+}
+.matrix thead th {
+  background: var(--surface-sunk);
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+.matrix tbody th {
+  font-weight: 500;
+  text-align: left;
+}
+.matrix td {
+  padding: 0;
+  text-align: center;
+}
+.matrix-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.matrix-cell input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.matrix td:hover {
+  background: var(--surface-sunk);
+}
+.matrix td.matrix-on {
+  background: var(--accent-soft);
+}
+.matrix-cell:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+}
+.markdown-inline code {
+  font-size: 0.92em;
+}
+/* 講座の画像(説明・問題文の中) */
+.markdown .md-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+.md-img-missing {
+  color: var(--warm-ink);
+  font-size: 13px;
+}
+/* 講座エディタの画像一覧 */
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+.image-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+}
+.image-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 140px;
+  border-radius: 6px;
+  background: var(--surface-sunk);
+  overflow: hidden;
+}
+.image-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.image-card figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.image-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.image-actions {
+  display: flex;
+  gap: 8px;
+}
+.pre-line {
+  white-space: pre-line;
+}
+.btn-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
 .quiz-q .verdict {
   margin-left: 0;
 }
@@ -1359,6 +1538,9 @@ a.unit-row-quiz:hover {
   margin: 0;
   padding: 0;
   border: none;
+}
+.choices-wide {
+  grid-template-columns: minmax(0, 1fr);
 }
 .choice {
   display: flex;
@@ -1807,6 +1989,23 @@ a.unit-row-quiz:hover {
   height: 18px;
   accent-color: var(--accent);
 }
+.choice-edit-row select {
+  min-width: 160px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  font: inherit;
+}
+/* 表形式の選択の編集(選択肢 → 行と正解の順に並べる) */
+.matrix-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.qe-answer-preview {
+  margin-top: 16px;
+}
 
 /* コード問題の編集 */
 .pe-tabs {
@@ -2241,6 +2440,11 @@ a.unit-row-quiz:hover {
   width: 100%;
   padding-right: 42px;
 }
+/* Edge が標準で出す表示切り替えボタンを隠す(共通の切り替えボタンだけを使う) */
+.password-field input::-ms-reveal,
+.password-field input::-ms-clear {
+  display: none;
+}
 .password-toggle {
   position: absolute;
   right: 4px;
@@ -2268,4 +2472,41 @@ a.unit-row-quiz:hover {
 }
 .admin-search {
   margin-left: 12px;
+}
+
+/* AI で作成:AI に渡すデータの要約 */
+.data-summary pre {
+  max-height: 260px;
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: var(--surface-sunk);
+  white-space: pre;
+}
+
+/* AI で作成:データファイルの選択(枠をクリックしてファイルを選ぶ) */
+.file-drop {
+  position: relative;
+  padding: 18px 14px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-sunk);
+  color: var(--ink-2);
+  font-weight: 400;
+  text-align: center;
+  cursor: pointer;
+}
+.file-drop:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.file-drop:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.field .list-card .list-row {
+  padding: 10px 16px;
+  font-weight: 400;
 }

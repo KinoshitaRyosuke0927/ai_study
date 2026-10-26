@@ -1,0 +1,165 @@
+#%% md
+# 特徴量の作成
+前の講座の分析で見つけたことをもとに、新しい特徴量を作ります。家族の人数・1人で乗船したか・敬称のまとめ・運賃の対数変換を作り、生存との関係を確かめます。
+
+#%% md
+## 学習目標
+- 既存の列から、家族の人数や 1人かどうかを表す特徴量を作れる
+- 人数の少ないカテゴリを「その他」にまとめられる
+- 右に裾の長い変数を対数変換した特徴量を作れる
+- 作った特徴量と生存の関係を確かめられる
+
+#%% md
+## 家族の人数と運賃の対数
+
+前の講座で、家族の人数(`SibSp + Parch + 1`)によって生存率が変わることを確かめました。また、運賃は右に裾の長い分布でした。これらを特徴量にします。
+
+#%% code
+import numpy as np
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# 家族の人数 = 兄弟姉妹・配偶者 + 親・子 + 本人
+train["FamilySize"] = train["SibSp"] + train["Parch"] + 1
+
+# 運賃の欠損値を学習用の中央値で埋めてから、log1p(1 を足して対数をとる)で変換する
+fare = train["Fare"].fillna(train["Fare"].median())
+train["LogFare"] = np.log1p(fare)
+
+# 元の運賃と、変換後の値の要約統計量を比べる
+train[["Fare", "LogFare"]].describe().round(2)
+
+#%% md
+運賃は 0〜512 の広い範囲に散らばっていましたが、対数をとると 0〜6.24 の範囲に収まり、平均(2.99)と中央値(2.72)も近くなりました。一部の非常に大きな値にモデルが引っ張られにくくなります。
+
+**なぜ対数変換するのか**:ロジスティック回帰のように値の大きさをそのまま使うモデルでは、極端に大きな値の影響を抑えると学習が安定します。決定木のように「値の大小の順番」で分けるモデルでは、変換してもしなくても結果はほとんど変わりません。
+
+#%% md
+## 作った特徴量と生存の関係
+
+家族の人数を区間に分け、生存率を確かめます。
+
+#%% code
+# 家族の人数を 3 つの区間に分けて、区間ごとの生存率と人数を求める
+family_group = pd.cut(train["FamilySize"], bins=[0, 1, 4, 11], labels=["1", "2-4", "5+"])
+train.groupby(family_group, observed=True)["Survived"].agg(["mean", "count"]).round(3)
+
+#%% md
+1 人の乗客(30%)と 5 人以上の家族(18%)は生存率が低く、2〜4 人の家族(55%)は高くなっています。
+
+## 人数の少ないカテゴリをまとめる
+
+前の単元の演習で、敬称をそのままワンホットエンコーディングすると 16 列にもなりました。Rev(牧師)や Col(大佐)のように数人しかいない敬称の列からは、モデルはほとんど何も学べず、予測用のデータに初めて出てくる敬称(Lady など)には対応できません。
+
+そこで、次のようにまとめます。
+
+| 元の敬称 | まとめた後 |
+|---|---|
+| Mr・Mrs・Miss・Master | そのまま |
+| Mlle・Ms(Miss のフランス語・別表記) | Miss |
+| Mme(Mrs のフランス語) | Mrs |
+| それ以外(Rev・Dr・Col など) | Rare |
+
+#%% md
+## 演習
+
+#%% md
+学習用のデータで、家族の人数 `FamilySize` から「1 人で乗船したら 1、そうでなければ 0」を表す `IsAlone` 列を作り、`IsAlone` ごとの生存率を小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込み、家族の人数の列を作る
+train = pd.read_csv("train.csv")
+train["FamilySize"] = train["SibSp"] + train["Parch"] + 1
+
+# 1 人で乗船したら 1、そうでなければ 0 の列を作る(____ に、1 人かどうかを判定する比較の式を書く)
+train["IsAlone"] = (____).astype(int)
+
+# IsAlone ごとの生存率を、小数第3位まで表示する
+print(train.groupby("IsAlone")["Survived"].mean().round(3))
+
+#%% code
+# @solution
+# @title: 1人で乗船したかを表す特徴量
+# @hint: train["FamilySize"] == 1 で、1 人なら True になります。astype(int) で 1 / 0 に変えます。
+# @explanation: 1 人で乗船した乗客の生存率は約 30%、家族と乗船した乗客は約 49% です。家族の人数そのもの(FamilySize)とあわせて、1 人かどうかも特徴量に加えます。
+import pandas as pd
+
+# 学習用のデータを読み込み、家族の人数の列を作る
+train = pd.read_csv("train.csv")
+train["FamilySize"] = train["SibSp"] + train["Parch"] + 1
+
+# 家族の人数が 1(本人だけ)なら True → astype(int) で 1 / 0 に変える
+train["IsAlone"] = (train["FamilySize"] == 1).astype(int)
+
+# IsAlone ごとの生存率を、小数第3位まで表示する
+print(train.groupby("IsAlone")["Survived"].mean().round(3))
+
+#%% md
+学習用のデータで、名前から取り出した敬称を、上の表のとおりにまとめてください(Mlle・Ms → Miss、Mme → Mrs、Mr・Mrs・Miss・Master 以外 → Rare)。まとめた敬称ごとの生存率(`mean`)と人数(`count`)を小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込み、名前から敬称を取り出す
+train = pd.read_csv("train.csv")
+title = train["Name"].str.extract(r",\s*([^.]+)\.")[0]
+
+# 別表記の敬称を置き換える(replace に「元の値 → 新しい値」の辞書を渡す)
+title = title.replace({"Mlle": "Miss", "Ms": "Miss", "Mme": "Mrs"})
+
+# 主な 4 つの敬称以外を "Rare" にする
+# (where(条件, 値) は、条件が True の行はそのまま、False の行を値に置き換える。____ に、主な敬称に含まれるかを判定するメソッドの名前を入れる)
+main = ["Mr", "Mrs", "Miss", "Master"]
+train["Title"] = title.where(title.____(main), "Rare")
+
+# まとめた敬称ごとの生存率と人数を、小数第3位まで表示する
+print(train.groupby("Title")["Survived"].agg(["mean", "count"]).round(3))
+
+#%% code
+# @solution
+# @title: 敬称をまとめる
+# @hint: isin(リスト) で、値がリストに含まれていれば True になります。
+# @explanation: まとめた結果、Rare は 23 人で生存率は約 30% です。主な 4 つの敬称と Rare の 5 つの値にまとまったので、ワンホットエンコーディングしても 5 列で済み、予測用のデータに初めて出てくる敬称も Rare として扱えます。
+import pandas as pd
+
+# 学習用のデータを読み込み、名前から敬称を取り出す
+train = pd.read_csv("train.csv")
+title = train["Name"].str.extract(r",\s*([^.]+)\.")[0]
+
+# 別表記の敬称を置き換える(replace に「元の値 → 新しい値」の辞書を渡す)
+title = title.replace({"Mlle": "Miss", "Ms": "Miss", "Mme": "Mrs"})
+
+# 主な 4 つの敬称(isin で判定)はそのまま、それ以外を "Rare" にする
+main = ["Mr", "Mrs", "Miss", "Master"]
+train["Title"] = title.where(title.isin(main), "Rare")
+
+# まとめた敬称ごとの生存率と人数を、小数第3位まで表示する
+print(train.groupby("Title")["Survived"].agg(["mean", "count"]).round(3))
+
+#%% md
+<!-- @question
+type: choice
+answer: 人数が少なくモデルが学べることが少ないうえ、予測用のデータに初めて出てくる敬称にも対応できるようになるため。
+title: 少ないカテゴリをまとめる理由
+hint: 数人しかいない敬称の列から、モデルはどれくらい学べるでしょうか。また、予測用のデータには学習用にない敬称(Lady など)が含まれていました。
+explanation: 数人しかいないカテゴリの列は、ほとんどが 0 で、モデルが傾向を学ぶには人数が足りません。また、予測用のデータに初めて出てくる値(Lady・Jonkheer など)は、学習用のデータに対応する列がありません。少ないカテゴリを Rare にまとめると、列の数が減り、初めての値も Rare として扱えます。
+-->
+敬称のうち、人数の少ないもの(Rev・Dr・Col など)を「Rare」にまとめる理由として最も適切なものを選べ。
+
+- 人数が少なくモデルが学べることが少ないうえ、予測用のデータに初めて出てくる敬称にも対応できるようになるため。
+- 人数の少ない敬称の乗客は、全員死亡しているため。
+- 敬称の種類が多いと、正規表現で取り出せなくなるため。
+- まとめると、生存率がすべて同じになるため。
+
+#%% md
+## まとめ
+
+- 家族の人数 `FamilySize`、1 人かどうか `IsAlone`、運賃の対数 `LogFare`、記録の有無 `HasCabin` などの特徴量を作る。
+- 人数の少ないカテゴリは「Rare」などにまとめてから、ワンホットエンコーディングする。予測用に初めて出てくる値にも対応できる。
+- 作った特徴量は、生存率との関係を集計して確かめる。

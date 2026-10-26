@@ -1,7 +1,8 @@
-// 演習セル(コードを書いて実行し、提出して採点する)
+// 演習セル(コード問題はコードを書いて実行し、選択式・数値入力・表形式は回答を選んで、提出して採点する)
 import { useCallback, useState } from 'react'
 import { api } from '../api/client'
 import type { Dataset, Exercise, SubmitResult } from '../api/types'
+import { AnswerInput, FORMAT_LABEL, hasAnswer } from './AnswerInput'
 import { RunButton } from './CodeCell'
 import { CodeEditor } from './CodeEditor'
 import { CheckIcon } from './Icons'
@@ -18,7 +19,106 @@ interface Props {
 
 type Verdict = { passed: boolean; message: string } | null
 
-export function ExerciseCell({ ctx, exercise, datasets, onSubmitted }: Props) {
+export function ExerciseCell(props: Props) {
+  return props.exercise.answer_format === 'code' ? <CodeExercise {...props} /> : <KeyedExercise {...props} />
+}
+
+/** 演習の見出し(タイトル・正解済みバッジ・採点方法) */
+function ExerciseHead({ exercise, passed, method }: { exercise: Exercise; passed: boolean; method: string }) {
+  return (
+    <div className="exercise-head">
+      <span className="exercise-label">演習</span>
+      <span className="exercise-title">{exercise.title}</span>
+      {passed && (
+        <span className="badge badge-pass">
+          <CheckIcon size={12} />
+          正解済み
+        </span>
+      )}
+      <span className="exercise-grading">{method}</span>
+    </div>
+  )
+}
+
+/** 採点結果の表示 */
+function VerdictView({ verdict }: { verdict: Verdict }) {
+  if (!verdict) return null
+  return (
+    <div className={`verdict ${verdict.passed ? 'verdict-pass' : 'verdict-fail'}`} role="status">
+      {verdict.passed && <CheckIcon size={18} />}
+      <div>
+        <b>{verdict.passed ? '正解です。' : 'まだ正解ではありません。'}</b>
+        <span className="verdict-message">{verdict.message.replace(/^正解です。/, '')}</span>
+      </div>
+    </div>
+  )
+}
+
+/** 選択式・数値入力・表形式の演習(コードを実行せず、回答をサーバで採点する) */
+function KeyedExercise({ exercise, onSubmitted }: Props) {
+  const format = exercise.answer_format as Exclude<Exercise['answer_format'], 'code'>
+  const [answer, setAnswer] = useState(exercise.last_answer ?? '')
+  const [passed, setPassed] = useState(exercise.passed)
+  const [showHint, setShowHint] = useState(false)
+  const [verdict, setVerdict] = useState<Verdict>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const ready = hasAnswer(format, answer, exercise.matrix_rows.length)
+
+  // 回答を送信して採点
+  const onSubmit = async () => {
+    setSubmitting(true)
+    setVerdict(null)
+    try {
+      const graded = await api.submitAnswer(exercise.problem_id, answer)
+      setVerdict({ passed: graded.passed, message: graded.message })
+      if (graded.passed) setPassed(true)
+      onSubmitted(graded)
+    } catch (err) {
+      setVerdict({ passed: false, message: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <section className="exercise exercise-keyed" aria-label={exercise.title}>
+      <ExerciseHead exercise={exercise} passed={passed} method={FORMAT_LABEL[format]} />
+      <div className="exercise-prompt">
+        <Markdown source={exercise.prompt} />
+      </div>
+      <div className="exercise-answer">
+        <AnswerInput
+          name={`ex-${exercise.problem_id}`}
+          label={exercise.title}
+          format={format}
+          choices={exercise.choices}
+          rows={exercise.matrix_rows}
+          value={answer}
+          onChange={(v) => {
+            setAnswer(v)
+            setVerdict(null)
+          }}
+          disabled={submitting}
+        />
+      </div>
+      <div className="exercise-actions">
+        <button type="button" className="btn btn-primary" onClick={() => void onSubmit()} disabled={submitting || !ready}>
+          {submitting ? '採点中…' : '回答して採点'}
+        </button>
+        {exercise.hint && (
+          <button type="button" className="btn" onClick={() => setShowHint((v) => !v)} aria-expanded={showHint}>
+            ヒント
+          </button>
+        )}
+      </div>
+      {showHint && <div className="exercise-hint">{exercise.hint}</div>}
+      <VerdictView verdict={verdict} />
+    </section>
+  )
+}
+
+/** コード問題の演習(ブラウザで実行した結果を送って採点する) */
+function CodeExercise({ ctx, exercise, datasets, onSubmitted }: Props) {
   const [code, setCode] = useState(exercise.last_answer ?? exercise.starter_code)
   const [passed, setPassed] = useState(exercise.passed)
   const [showHint, setShowHint] = useState(false)
@@ -65,17 +165,11 @@ export function ExerciseCell({ ctx, exercise, datasets, onSubmitted }: Props) {
 
   return (
     <section className="exercise" aria-label={exercise.title}>
-      <div className="exercise-head">
-        <span className="exercise-label">演習</span>
-        <span className="exercise-title">{exercise.title}</span>
-        {passed && (
-          <span className="badge badge-pass">
-            <CheckIcon size={12} />
-            正解済み
-          </span>
-        )}
-        <span className="exercise-grading">{exercise.grading === 'test' ? 'テストコードで採点' : '出力一致で採点'}</span>
-      </div>
+      <ExerciseHead
+        exercise={exercise}
+        passed={passed}
+        method={exercise.grading === 'test' ? 'テストコードで採点' : '出力一致で採点'}
+      />
       <div className="exercise-prompt">
         <Markdown source={exercise.prompt} />
       </div>
@@ -106,15 +200,7 @@ export function ExerciseCell({ ctx, exercise, datasets, onSubmitted }: Props) {
         </button>
       </div>
       {showHint && <div className="exercise-hint">{exercise.hint}</div>}
-      {verdict && (
-        <div className={`verdict ${verdict.passed ? 'verdict-pass' : 'verdict-fail'}`} role="status">
-          {verdict.passed && <CheckIcon size={18} />}
-          <div>
-            <b>{verdict.passed ? '正解です。' : 'まだ正解ではありません。'}</b>
-            <span className="verdict-message">{verdict.message.replace(/^正解です。/, '')}</span>
-          </div>
-        </div>
-      )}
+      <VerdictView verdict={verdict} />
     </section>
   )
 }

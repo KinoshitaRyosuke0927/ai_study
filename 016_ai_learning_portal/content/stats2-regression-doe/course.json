@@ -1,0 +1,33 @@
+{
+  "slug": "stats2-regression-doe",
+  "title": "統計検定2級対策 5:回帰と実験計画",
+  "summary": "統計検定2級の出題範囲のうち、回帰分析(単回帰モデルと回帰係数の推測、重回帰と偏回帰係数、決定係数と F 検定、多重共線性とダミー変数)と、実験計画の解析(一元配置・二元配置の分散分析と交互作用)を扱います。図表を使った解説と手計算の演習で、回帰分析・分散分析の結果を計算し、統計ソフトの出力を正しく解釈できるようになることを目指します。",
+  "level": "basic",
+  "tags": [
+    "統計検定2級",
+    "回帰分析",
+    "分散分析",
+    "実験計画"
+  ],
+  "outcomes": [
+    "単回帰モデルの仮定を説明し、回帰係数の標準誤差を求められる",
+    "回帰係数の t 検定と信頼区間を手計算し、係数表を読み取れる",
+    "偏回帰係数を「他の変数を一定にしたとき」の関係として解釈できる",
+    "決定係数・自由度調整済み決定係数・F 検定でモデルを評価し、比べられる",
+    "VIF で多重共線性を判断し、ダミー変数の係数を解釈できる",
+    "一元配置・二元配置の分散分析表を作り、交互作用を含めて結果を判断できる"
+  ],
+  "libraries": [],
+  "prerequisites": ["stats2-descriptive", "stats2-sampling-estimation", "stats2-hypothesis-testing"],
+  "status": "draft",
+  "units": [
+    { "file": "01_regression_model.ipynb", "minutes": 30 },
+    { "file": "02_coefficient_inference.ipynb", "minutes": 30 },
+    { "file": "03_multiple_regression.ipynb", "minutes": 35 },
+    { "file": "04_r2_f_test.ipynb", "minutes": 30 },
+    { "file": "05_collinearity_dummy.ipynb", "minutes": 30 },
+    { "file": "06_one_way_anova.ipynb", "minutes": 35 },
+    { "file": "07_two_way_anova.ipynb", "minutes": 35 }
+  ],
+  "quiz": "quiz.ipynb"
+}

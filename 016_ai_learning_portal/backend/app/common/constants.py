@@ -46,7 +46,10 @@ class AnswerFormat:
     CODE = "code"  # コードを書く
     CHOICE = "choice"  # 選択式
     NUMERIC = "numeric"  # 数値入力
-    ALL = (CODE, CHOICE, NUMERIC)
+    MATRIX = "matrix"  # 表形式の選択(行ごとに、共通の選択肢から1つ選ぶ)
+    ALL = (CODE, CHOICE, NUMERIC, MATRIX)
+    # 正解を作成者が直接設定する形式(コードの実行による検証が不要)
+    KEYED = (CHOICE, NUMERIC, MATRIX)
 
 
 class Grading:

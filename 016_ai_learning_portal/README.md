@@ -61,14 +61,15 @@ alembic upgrade head                   # テーブル作成
 
 # ユーザ作成と講座の取り込み
 python -m app.cli create-user --login admin --name "管理者" --admin
-python -m app.cli import-course ../content/statistics-basics --author admin
+python -m app.cli import-course ../content/stats2-descriptive --author admin   # 前提講座があるので講座 1→6 の順に取り込む
 ```
 
 ### 3. フロントエンドをビルドして起動
 
 ```bash
 cd ../frontend && npm install && npm run build   # frontend/dist ができる
-cd ../backend && uvicorn app.main:app --port 8000
+cd ../backend/runner && npm install                # AI が作ったコードをサーバで実行して確かめる環境(Node.js + Pyodide。任意)
+cd .. && uvicorn app.main:app --port 8000
 ```
 
 ブラウザで http://localhost:8000 を開いてログインします。

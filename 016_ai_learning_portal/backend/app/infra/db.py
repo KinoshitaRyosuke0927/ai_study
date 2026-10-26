@@ -81,6 +81,8 @@ def get_db() -> Iterator[Session]:
     FastAPI の依存性として使う、リクエスト単位のセッションを返す
 
     正常終了で commit、例外で rollback する。
+    必ず Depends(get_db, scope="function") で使うこと。scope を省略すると、commit がレスポンスの送信後になり、
+    続けて送られた次のリクエスト(演習の連続提出など)が、まだ確定していない前の結果を読めずに誤判定することがある。
 
     Returns
     -----------------

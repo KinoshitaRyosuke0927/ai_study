@@ -28,6 +28,8 @@ class AppConfigOut(BaseModel):
     """フロントエンドに渡す実行時設定。"""
 
     pyodide_base_url: str
+    # 受講者のコードで描くグラフにも適用する、講座の図の共通スタイル(matplotlibrc の内容)
+    matplotlibrc: str
 
 
 # ---------- 講座 ----------
@@ -97,9 +99,12 @@ class ExerciseOut(BaseModel):
     """演習セルの内容(想定出力や解答は含めない)。"""
 
     problem_id: int
+    answer_format: str  # code / choice / numeric / matrix
     title: str
     prompt: str
     hint: str
+    choices: list[str]  # 選択式の選択肢(表形式では列の選択肢)
+    matrix_rows: list[str]  # 表形式の行
     starter_code: str
     grading: str
     test_code: str
@@ -155,6 +160,12 @@ class CodeSubmitRequest(BaseModel):
     test_passed: bool | None = None  # 採点方式「テストコード」の結果
 
 
+class AnswerSubmitRequest(BaseModel):
+    """選択式・数値入力・表形式の選択の提出。"""
+
+    answer: str = Field(max_length=20_000)  # 選択肢の文言・数値・表形式は JSON 配列の文字列
+
+
 class SubmitResultOut(BaseModel):
     """提出の採点結果。"""
 
@@ -178,9 +189,10 @@ class QuizQuestionOut(BaseModel):
 
     problem_id: int
     position: int
-    answer_format: str  # choice / numeric / code
+    answer_format: str  # choice / numeric / matrix / code
     prompt: str
     choices: list[str]
+    matrix_rows: list[str]
     starter_code: str
     grading: str
     test_code: str
@@ -213,7 +225,7 @@ class QuizAnswerIn(BaseModel):
     """小テストの1問分の回答(コード問題はブラウザで実行済み)。"""
 
     problem_id: int
-    answer: str = Field(default="", max_length=200_000)  # 選択肢の文言・数値・コード
+    answer: str = Field(default="", max_length=200_000)  # 選択肢の文言・数値・表形式の JSON・コード
     output: str = Field(default="", max_length=200_000)
     error: str | None = Field(default=None, max_length=50_000)
     test_passed: bool | None = None

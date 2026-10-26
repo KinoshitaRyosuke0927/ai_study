@@ -1,0 +1,249 @@
+#%% md
+# ロジスティック回帰
+最初に使ったロジスティック回帰のしくみを理解します。生存の「確率」を予測していること、係数から特徴量の影響の向きと大きさが読み取れること、確率を 0 / 1 に変えるしきい値で予測が変わることを確かめます。
+
+#%% md
+## 学習目標
+- ロジスティック回帰が生存の確率を予測するしくみを説明できる
+- 特徴量の標準化(`StandardScaler`)を行い、係数を比べられる
+- `predict_proba` で確率を求め、しきい値を変えて予測できる
+- しきい値を変えると、予測の傾向がどう変わるかを説明できる
+
+#%% md
+## ロジスティック回帰のしくみ
+
+ロジスティック回帰は、特徴量に重み(係数)をかけて足し合わせた値 $z$ を、**シグモイド関数** で 0〜1 の確率に変換します。
+
+$$z = b_0 + b_1 x_1 + b_2 x_2 + \dots, \qquad p = \frac{1}{1 + e^{-z}}$$
+
+- 係数 $b$ が **正** の特徴量は、値が大きいほど生存の確率を **上げる**
+- 係数 $b$ が **負** の特徴量は、値が大きいほど生存の確率を **下げる**
+- 確率 $p$ が 0.5 以上なら「生存(1)」、0.5 未満なら「死亡(0)」と予測する(0.5 を **しきい値** という)
+
+#%% md
+## 標準化してから学習する
+
+特徴量によって値の大きさ(単位)が違うと、係数の大きさを比べられません(年齢は 0〜76、性別は 0 / 1)。そこで、各特徴量を「平均 0、標準偏差 1」にそろえる **標準化** をしてから学習します。
+
+`StandardScaler` は、学習用のデータから平均と標準偏差を求め(`fit`)、その値で変換します(`transform`)。前の講座のルールと同じく、**平均と標準偏差は学習用のデータから求め**、検証用のデータにも同じ値を使います。
+
+#%% code
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、学習用と検証用に分ける(前の単元と同じ分け方)
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 学習用のデータから平均と標準偏差を求め(fit)、学習用・検証用の両方を変換する(transform)
+scaler = StandardScaler()
+scaler.fit(X_train)
+X_train_s = scaler.transform(X_train)
+X_valid_s = scaler.transform(X_valid)
+
+# 標準化したデータで学習させ、検証用の正解率を求める
+model = LogisticRegression(max_iter=1000)
+model.fit(X_train_s, y_train)
+print("正解率:", round(model.score(X_valid_s, y_valid), 3))
+
+#%% md
+## 係数を読み取る
+
+学習した係数は `model.coef_` に入っています。特徴量の名前と並べ、小さい順に表示します。
+
+#%% code
+# coef_[0] が各特徴量の係数。特徴量の名前を付けた Series にして、小さい順に並べる
+coef = pd.Series(model.coef_[0], index=X.columns)
+coef.sort_values().round(3)
+
+#%% md
+- 最も大きい正の係数は `Sex`(1.02):女性(1)であることが、生存の確率を大きく上げている
+- `Pclass` は負(−0.56):等級の数字が大きい(3 等に近い)ほど、生存の確率が下がる
+- `Title_Master`(男の子)や `HasCabin`(客室番号の記録あり)も、生存の確率を上げる方向
+
+標準化しているので、係数の絶対値が大きいほど、その特徴量の影響が大きいと読めます(ただし、`FamilySize` と `SibSp` のように互いに関係の強い特徴量の係数は、片方に影響が分かれるので、1つずつの解釈には注意が必要です)。
+
+#%% md
+## 確率を予測する
+
+`predict_proba` は、各クラス(0 = 死亡、1 = 生存)の確率を返します。`[:, 1]` で生存の確率だけを取り出します。
+
+#%% code
+import numpy as np
+
+# 検証用のデータについて、生存の確率を求める([:, 1] で 2 列目 = 生存の確率を取り出す)
+proba = model.predict_proba(X_valid_s)[:, 1]
+
+# 先頭 5 人の確率と正解を並べる
+print("生存の確率:", np.round(proba[:5], 3).tolist())
+print("正解      :", y_valid.head(5).tolist())
+
+#%% md
+1 人目は 0.889 で生存と予測し、正解も生存です。5 人目は 0.38 で死亡と予測しましたが、実際は生存でした。確率が 0.5 に近い乗客ほど、予測が外れやすくなります。
+
+## しきい値を変える
+
+確率を 0 / 1 に変えるしきい値を変えると、予測が変わります。しきい値ごとに、「生存」と予測した人数と正解率を比べます。
+
+#%% code
+for threshold in [0.3, 0.5, 0.7]:
+    # 確率がしきい値以上なら 1(生存)、未満なら 0(死亡)と予測する
+    pred = (proba >= threshold).astype(int)
+    # 正解率 = 予測と正解が一致した割合
+    accuracy = (pred == y_valid).mean()
+    print(f"しきい値 {threshold}: 生存と予測した人数 {pred.sum()}、正解率 {accuracy:.3f}")
+
+#%% md
+しきい値を下げる(0.3)と生存と予測する人が増え、上げる(0.7)と減ります。この例ではしきい値 0.5 の正解率が最も高くなっていますが、目的によっては別のしきい値を選ぶこともあります(単元5の評価指標で詳しく扱います)。
+
+#%% md
+## 演習
+
+#%% md
+解説と同じ標準化したロジスティック回帰で、検証用のデータの生存の確率を求め、しきい値 **0.6** で 0 / 1 に変えてください。「生存」と予測した人数と、正解率(小数第3位まで)を、この順に表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 標準化(平均と標準偏差は学習用から求める)
+scaler = StandardScaler().fit(X_train)
+X_train_s = scaler.transform(X_train)
+X_valid_s = scaler.transform(X_valid)
+
+# ロジスティック回帰を学習させる
+model = LogisticRegression(max_iter=1000).fit(X_train_s, y_train)
+
+# 生存の確率を求める(____ に、確率を求めるメソッドの名前を入れる)
+proba = model.____(X_valid_s)[:, 1]
+
+# しきい値 0.6 以上なら 1、未満なら 0 にする(____ に、比べる式を書く)
+pred = (____).astype(int)
+
+# 生存と予測した人数と、正解率を表示する
+print(pred.sum())
+print(round((pred == y_valid).mean(), 3))
+
+#%% code
+# @solution
+# @title: しきい値 0.6 での予測
+# @hint: 確率は predict_proba(X_valid_s)[:, 1]、しきい値との比較は proba >= 0.6 です。
+# @explanation: しきい値 0.6 では生存と予測するのは 73 人で、0.5 のとき(80 人)より少なくなります。正解率は 81.2% で、0.5 のとき(80.7%)より少し高くなりました。しきい値 0.5 がいつも最もよいとは限りません。ただし、223 人の検証用データでの 0.5% の差(約 1 人分)は偶然の範囲とも考えられます。
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 標準化(平均と標準偏差は学習用から求める)
+scaler = StandardScaler().fit(X_train)
+X_train_s = scaler.transform(X_train)
+X_valid_s = scaler.transform(X_valid)
+
+# ロジスティック回帰を学習させる
+model = LogisticRegression(max_iter=1000).fit(X_train_s, y_train)
+
+# predict_proba で生存の確率を求める([:, 1] で生存の確率を取り出す)
+proba = model.predict_proba(X_valid_s)[:, 1]
+
+# しきい値 0.6 以上なら 1、未満なら 0 にする
+pred = (proba >= 0.6).astype(int)
+
+# 生存と予測した人数と、正解率を表示する
+print(pred.sum())
+print(round((pred == y_valid).mean(), 3))
+
+#%% md
+標準化したロジスティック回帰の係数のうち、**絶対値の大きい順に上位 3 つ** の特徴量の名前と係数を、小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 標準化してロジスティック回帰を学習させる
+scaler = StandardScaler().fit(X_train)
+model = LogisticRegression(max_iter=1000).fit(scaler.transform(X_train), y_train)
+
+# 係数を、特徴量の名前を付けた Series にする
+coef = pd.Series(model.coef_[0], index=X.columns)
+
+# 絶対値の大きい順に並べた順番で、上位 3 つの係数を取り出す
+# (____ に、絶対値を求めるメソッドの名前を入れる。sort_values(ascending=False) で大きい順に並ぶ)
+order = coef.____().sort_values(ascending=False).index
+print(coef[order[:3]].round(3))
+
+#%% code
+# @solution
+# @title: 影響の大きい特徴量
+# @hint: Series の abs() で絶対値が求まります。絶対値で並べた順番(index)を使って、元の係数(符号付き)を取り出します。
+# @explanation: 絶対値が大きいのは Sex(1.019)、Pclass(−0.557)、SibSp(−0.51)です。性別の影響が特に大きく、等級は負の方向に影響しています。符号を残したまま表示することで、影響の向きもわかります。
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 標準化してロジスティック回帰を学習させる
+scaler = StandardScaler().fit(X_train)
+model = LogisticRegression(max_iter=1000).fit(scaler.transform(X_train), y_train)
+
+# 係数を、特徴量の名前を付けた Series にする
+coef = pd.Series(model.coef_[0], index=X.columns)
+
+# abs() で絶対値にして大きい順に並べ、その順番(index)で元の係数の上位 3 つを取り出す
+order = coef.abs().sort_values(ascending=False).index
+print(coef[order[:3]].round(3))
+
+#%% md
+<!-- @question
+type: choice
+answer: 年齢が高いほど、生存の確率は下がる方向に予測される。
+title: 係数の読み取り
+hint: 係数が負の特徴量は、値が大きいほど生存の確率を下げます。
+explanation: 年齢の係数は負なので、年齢が高いほど生存の確率が下がる方向に予測されます。係数はあくまでモデルの中での関係を表すもので、年齢が生存の原因であることを示すものではありません。また、標準化しているので、係数の値そのものは「1 歳あたり」の変化ではありません。
+-->
+標準化したロジスティック回帰で、年齢 `Age` の係数は −0.344 だった。この係数の読み取りとして最も適切なものを選べ。
+
+- 年齢が高いほど、生存の確率は下がる方向に予測される。
+- 年齢が 1 歳上がるごとに、生存の確率がちょうど 0.344 下がる。
+- 係数が負なので、年齢はこのモデルでは使われていない。
+- 年齢が高いことが、死亡の原因であることが証明された。
+
+#%% md
+## まとめ
+
+- ロジスティック回帰は、特徴量の重み付きの和をシグモイド関数で確率にし、しきい値(通常 0.5)で 0 / 1 に変える。
+- `StandardScaler` で標準化すると係数の大きさを比べられる。平均と標準偏差は学習用のデータから求める。
+- 係数の符号は影響の向き(正なら生存の確率を上げる)を表す。`predict_proba` で確率を求め、しきい値を変えると予測の傾向が変わる。

@@ -1,0 +1,27 @@
+{
+  "slug": "stats2-practice-exam",
+  "title": "統計検定2級対策 6:本番形式の練習問題と模擬試験",
+  "summary": "統計検定2級の本番を想定した、5択形式の問題だけからなる講座です。講座1〜5に対応する分野別の練習問題(各8問、1問ずつ採点・解説)で力を確認し、最後に全範囲から出題する30問の模擬試験(すべて解答してから採点)に取り組みます。問題はすべてオリジナルで、必要な分布表の値は問題文に示します。",
+  "level": "basic",
+  "tags": [
+    "統計検定2級",
+    "練習問題",
+    "模擬試験"
+  ],
+  "outcomes": [
+    "統計検定2級の出題形式(5択)に慣れ、時間内に解き切る力をつける",
+    "分野ごとの理解度を確認し、復習が必要な分野を見つけられる",
+    "記述統計・確率・推定・検定・回帰・実験計画の全範囲の問題に対応できる"
+  ],
+  "libraries": [],
+  "prerequisites": ["stats2-descriptive", "stats2-probability", "stats2-sampling-estimation", "stats2-hypothesis-testing", "stats2-regression-doe"],
+  "status": "draft",
+  "units": [
+    { "file": "01_descriptive.ipynb", "minutes": 20 },
+    { "file": "02_probability.ipynb", "minutes": 20 },
+    { "file": "03_estimation.ipynb", "minutes": 20 },
+    { "file": "04_testing.ipynb", "minutes": 20 },
+    { "file": "05_regression_doe.ipynb", "minutes": 20 }
+  ],
+  "quiz": "quiz.ipynb"
+}

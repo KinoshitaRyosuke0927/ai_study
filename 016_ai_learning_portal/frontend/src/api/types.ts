@@ -9,6 +9,7 @@ export interface User {
 
 export interface AppConfig {
   pyodide_base_url: string
+  matplotlibrc: string // 受講者のコードで描くグラフにも適用する、講座の図の共通スタイル
 }
 
 export type CourseLevel = 'basic' | 'intermediate' | 'advanced'
@@ -66,15 +67,21 @@ export interface CourseDetail extends CourseSummary {
 
 export interface Exercise {
   problem_id: number
+  answer_format: AnswerFormat
   title: string
   prompt: string
   hint: string
+  choices: string[] // 選択式の選択肢(表形式では列の選択肢)
+  matrix_rows: string[] // 表形式の行
   starter_code: string
   grading: 'output' | 'test'
   test_code: string
   passed: boolean
   last_answer: string | null
 }
+
+/** 回答形式(表形式は、行ごとに共通の選択肢から1つ選ぶ) */
+export type AnswerFormat = 'code' | 'choice' | 'numeric' | 'matrix'
 
 export interface Cell {
   id: number
@@ -132,9 +139,10 @@ export interface RelatedUnit {
 export interface QuizQuestion {
   problem_id: number
   position: number
-  answer_format: 'choice' | 'numeric' | 'code'
+  answer_format: AnswerFormat
   prompt: string
   choices: string[]
+  matrix_rows: string[]
   starter_code: string
   grading: 'output' | 'test'
   test_code: string

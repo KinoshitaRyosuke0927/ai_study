@@ -7,6 +7,7 @@
       01_xxx.ipynb        単元(1ファイル = 1単元)
       quiz.ipynb          小テスト
       data/               演習で使うデータファイル(任意)
+      images/             説明・問題文で使う画像(任意。Markdown から ![説明](images/xxx.png) で参照)
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from app.common.constants import (
     VerifyStatus,
 )
 from app.models import Cell, Course, CoursePrerequisite, Dataset, Problem, Unit, User
+from app.services.image_service import ImageInputError, add_image, delete_course_images, validate_image
 
 # 演習用のマーカー行(セルの1行目)
 _STARTER = "# @starter"
@@ -46,6 +48,11 @@ _GOALS_HEADING = re.compile(r"^##\s*学習目標\s*$")
 _QUESTION_META = re.compile(r"^\s*<!--\s*@question\s*\n(.*?)-->\s*", re.DOTALL)
 # 箇条書きの行(選択肢)
 _BULLET = re.compile(r"^\s*[-*]\s+(.+?)\s*$")
+# 講座フォルダの images/ にある画像への参照 ![説明](images/xxx.png)(アプリでは image:xxx.png に読み替える)
+_IMAGE_LINK = re.compile(r"\]\(\s*(?:\./)?images/([^)\s]+)")
+# Markdown の表の行(表形式の選択)と、見出しの区切り行
+_TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$")
+_TABLE_SEPARATOR = re.compile(r"^\s*\|(\s*:?-+:?\s*\|)+\s*$")
 
 
 class NotebookFormatError(Exception):
@@ -69,19 +76,8 @@ class _ParsedCode:
 
 
 @dataclass
-class _ParsedUnit:
-    """解析途中の単元。"""
-
-    title: str
-    summary: str
-    goals: list[str] = field(default_factory=list)
-    # (セル種別, 本文, 演習) の並び
-    cells: list[tuple[str, str, _ParsedCode | None]] = field(default_factory=list)
-
-
-@dataclass
 class _ParsedQuestion:
-    """解析途中の小テストの問題。"""
+    """解析途中の問題(小テストの問題、または単元の選択式・数値入力・表形式の演習)。"""
 
     answer_format: str
     prompt: str
@@ -91,6 +87,20 @@ class _ParsedQuestion:
     explanation: str
     unit_position: int | None
     code: _ParsedCode | None
+    matrix_rows: list[str] = field(default_factory=list)
+    title: str = ""
+    hint: str = ""
+
+
+@dataclass
+class _ParsedUnit:
+    """解析途中の単元。"""
+
+    title: str
+    summary: str
+    goals: list[str] = field(default_factory=list)
+    # (セル種別, 本文, 演習) の並び。演習はコード問題か、選択式・数値入力・表形式の問題
+    cells: list[tuple[str, str, _ParsedCode | _ParsedQuestion | None]] = field(default_factory=list)
 
 
 def _first_line(source: str) -> str:
@@ -108,6 +118,31 @@ def _first_line(source: str) -> str:
     """
     # 先頭の空行を飛ばして1行目を返却
     return source.strip().split("\n", 1)[0].strip()
+
+
+def _read_cells(path: Path) -> list:
+    """
+    ノートブックを読み込み、空でないセルを返す(Markdown の images/ への画像参照は image: に読み替える)
+
+    Jupyter では講座フォルダの images/xxx.png をそのまま表示でき、アプリでは講座の画像 image:xxx.png として表示する。
+
+    Args
+    -----------------
+    - path: Path,                       .ipynb ファイルのパス
+
+    Returns
+    -----------------
+    - cells: list,                      空でないセル
+
+    """
+    # ノートブックを読み込み、空のセルを除く
+    nb = nbformat.read(str(path), as_version=4)
+    cells = [c for c in nb.cells if c.source.strip()]
+    # Markdown セルの画像参照を読み替える
+    for c in cells:
+        if c.cell_type == "markdown":
+            c.source = _IMAGE_LINK.sub(r"](image:\1", c.source)
+    return cells
 
 
 def _strip_first_line(source: str) -> str:
@@ -253,8 +288,7 @@ def parse_notebook(path: Path) -> _ParsedUnit:
 
     """
     # ノートブックを読み込む
-    nb = nbformat.read(str(path), as_version=4)
-    cells = [c for c in nb.cells if c.source.strip()]
+    cells = _read_cells(path)
     # 1つ目のセルは「# 単元タイトル」で始まる Markdown でなければならない
     if not cells or cells[0].cell_type != "markdown" or not _first_line(cells[0].source).startswith("# "):
         raise NotebookFormatError(f"{path.name}: 1つ目のセルは「# 単元タイトル」で始まる Markdown にしてください")
@@ -272,6 +306,20 @@ def parse_notebook(path: Path) -> _ParsedUnit:
                 for line in cell.source.split("\n")[1:]
                 if re.match(r"^\s*[-*]\s+", line)
             ]
+            i += 1
+            continue
+        # 設定ブロック(<!-- @question ... -->)付きの Markdown セル: 選択式・数値入力・表形式の演習
+        parsed = _parse_question_meta(cell.source) if cell.cell_type == "markdown" else None
+        if parsed is not None:
+            meta, body = parsed
+            no = sum(1 for t, _, _ in unit.cells if t == CellType.EXERCISE) + 1
+            label = f"{path.name}: 演習{no}"
+            if meta.get("type") == AnswerFormat.CODE:
+                raise NotebookFormatError(f"{label}: 単元のコード演習は「{_STARTER}」セルで書いてください")
+            question = _parse_keyed_question(meta, body, label)
+            question.title = meta.get("title", "")
+            question.hint = meta.get("hint", "")
+            unit.cells.append((CellType.EXERCISE, "", question))
             i += 1
             continue
         # Markdown セル: 説明セル
@@ -328,6 +376,107 @@ def _parse_question_meta(source: str) -> tuple[dict[str, str], str] | None:
     return meta, source[match.end() :].strip()
 
 
+def _split_table_row(line: str) -> list[str]:
+    """
+    Markdown の表の1行をセルに分ける
+
+    Args
+    -----------------
+    - line: str,                        表の行(| a | b |)
+
+    Returns
+    -----------------
+    - cells: list[str],                 セルの文字列(前後の空白を除く)
+
+    """
+    # 両端の | を除いて | で区切る
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def _parse_keyed_question(meta: dict[str, str], body: str, label: str) -> _ParsedQuestion:
+    """
+    選択式・数値入力・表形式の問題を、設定ブロックと本文から読み取る(小テスト・単元の演習で共通)
+
+    - choice: 本文の最後の箇条書きが選択肢。answer は正解の選択肢の文言
+    - numeric: answer は数値
+    - matrix: 本文の最後の Markdown の表が問題の表。見出し行の2列目以降が選択肢、
+      各行の1列目が分類する項目。answer は行の順に正解の選択肢をカンマ区切りで並べる
+
+    Args
+    -----------------
+    - meta: dict[str, str],             設定ブロックの内容
+    - body: str,                        設定ブロックを除いた本文
+    - label: str,                       エラーメッセージ用の問題の名前
+
+    Returns
+    -----------------
+    - question: _ParsedQuestion,        解析した問題
+
+    """
+    qtype = meta.get("type", "")
+    explanation = meta.get("explanation", "")
+    lines = body.split("\n")
+    # 本文の末尾の空行を除いた終端
+    end = len(lines)
+    while end > 0 and not lines[end - 1].strip():
+        end -= 1
+    # 選択式: 本文の最後の箇条書きを選択肢にする
+    if qtype == AnswerFormat.CHOICE:
+        start = end
+        while start > 0 and _BULLET.match(lines[start - 1]):
+            start -= 1
+        choices = [_BULLET.match(line).group(1) for line in lines[start:end]]  # type: ignore[union-attr]
+        answer = meta.get("answer", "")
+        if len(choices) < 2:
+            raise NotebookFormatError(f"{label} の選択肢(箇条書き)が2つ以上必要です")
+        if answer not in choices:
+            raise NotebookFormatError(f"{label} の answer が選択肢に含まれていません")
+        prompt = "\n".join(lines[:start]).strip()
+        return _ParsedQuestion(AnswerFormat.CHOICE, prompt, choices, answer, 0.0, explanation, None, None)
+    # 数値入力: answer を数値として保存する
+    if qtype == AnswerFormat.NUMERIC:
+        try:
+            value = float(meta.get("answer", ""))
+        except ValueError:
+            raise NotebookFormatError(f"{label} の answer は数値で指定してください")
+        if not math.isfinite(value):
+            raise NotebookFormatError(f"{label} の answer は有限の数値で指定してください")
+        tolerance = float(meta.get("tolerance", "1e-6"))
+        return _ParsedQuestion(AnswerFormat.NUMERIC, body, [], meta["answer"], tolerance, explanation, None, None)
+    # 表形式: 本文の最後の表から選択肢(見出し行)と行(1列目)を読む
+    if qtype == AnswerFormat.MATRIX:
+        start = end
+        while start > 0 and _TABLE_ROW.match(lines[start - 1]):
+            start -= 1
+        table = lines[start:end]
+        if len(table) < 3 or not _TABLE_SEPARATOR.match(table[1]):
+            raise NotebookFormatError(f"{label} の本文の最後に、見出し行と区切り行のある表が必要です")
+        choices = [c for c in _split_table_row(table[0])[1:] if c]
+        rows = [_split_table_row(line)[0] for line in table[2:]]
+        answers = [a.strip() for a in re.split(r"[,、]", meta.get("answer", ""))]
+        if len(choices) < 2 or not all(rows):
+            raise NotebookFormatError(f"{label} の表には、選択肢の列が2つ以上と、1列目に項目名のある行が必要です")
+        if len(answers) != len(rows):
+            raise NotebookFormatError(f"{label} の answer は、表の行の数({len(rows)})だけカンマ区切りで並べてください")
+        wrong = [a for a in answers if a not in choices]
+        if wrong:
+            raise NotebookFormatError(f"{label} の answer に選択肢にない値があります: {', '.join(wrong)}")
+        prompt = "\n".join(lines[:start]).strip()
+        return _ParsedQuestion(
+            AnswerFormat.MATRIX,
+            prompt,
+            choices,
+            json.dumps(answers, ensure_ascii=False),
+            0.0,
+            explanation,
+            None,
+            None,
+            matrix_rows=rows,
+        )
+    # それ以外の type は誤り
+    raise NotebookFormatError(f"{label} の type は choice / numeric / matrix のいずれかにしてください")
+
+
 def parse_quiz(path: Path) -> list[_ParsedQuestion]:
     """
     小テストのノートブックを解析する
@@ -342,8 +491,7 @@ def parse_quiz(path: Path) -> list[_ParsedQuestion]:
 
     """
     # ノートブックを読み込む
-    nb = nbformat.read(str(path), as_version=4)
-    cells = [c for c in nb.cells if c.source.strip()]
+    cells = _read_cells(path)
     questions: list[_ParsedQuestion] = []
     i = 0
     while i < len(cells):
@@ -361,40 +509,11 @@ def parse_quiz(path: Path) -> list[_ParsedQuestion]:
         no = len(questions) + 1
         unit_position = int(meta["unit"]) if meta.get("unit") else None
         explanation = meta.get("explanation", "")
-        # 選択式: 本文の最後の箇条書きを選択肢にする
-        if qtype == AnswerFormat.CHOICE:
-            lines = body.split("\n")
-            end = len(lines)
-            while end > 0 and not lines[end - 1].strip():
-                end -= 1
-            start = end
-            while start > 0 and _BULLET.match(lines[start - 1]):
-                start -= 1
-            choices = [_BULLET.match(line).group(1) for line in lines[start:end]]  # type: ignore[union-attr]
-            answer = meta.get("answer", "")
-            if len(choices) < 2:
-                raise NotebookFormatError(f"{path.name}: 問{no} の選択肢(箇条書き)が2つ以上必要です")
-            if answer not in choices:
-                raise NotebookFormatError(f"{path.name}: 問{no} の answer が選択肢に含まれていません")
-            prompt = "\n".join(lines[:start]).strip()
-            questions.append(
-                _ParsedQuestion(AnswerFormat.CHOICE, prompt, choices, answer, 0.0, explanation, unit_position, None)
-            )
-            i += 1
-        # 数値入力: answer を数値として保存する
-        elif qtype == AnswerFormat.NUMERIC:
-            try:
-                value = float(meta.get("answer", ""))
-            except ValueError:
-                raise NotebookFormatError(f"{path.name}: 問{no} の answer は数値で指定してください")
-            if not math.isfinite(value):
-                raise NotebookFormatError(f"{path.name}: 問{no} の answer は有限の数値で指定してください")
-            tolerance = float(meta.get("tolerance", "1e-6"))
-            questions.append(
-                _ParsedQuestion(
-                    AnswerFormat.NUMERIC, body, [], meta["answer"], tolerance, explanation, unit_position, None
-                )
-            )
+        # 選択式・数値入力・表形式: 単元の演習と共通の書き方で読む
+        if qtype in AnswerFormat.KEYED:
+            question = _parse_keyed_question(meta, body, f"{path.name}: 問{no}")
+            question.unit_position = unit_position
+            questions.append(question)
             i += 1
         # コード: 次のセルから初期コード・解答・(任意の)テストを読む
         elif qtype == AnswerFormat.CODE:
@@ -410,7 +529,9 @@ def parse_quiz(path: Path) -> list[_ParsedQuestion]:
             )
             i += 1 + consumed
         else:
-            raise NotebookFormatError(f"{path.name}: 問{no} の type は choice / numeric / code のいずれかにしてください")
+            raise NotebookFormatError(
+                f"{path.name}: 問{no} の type は choice / numeric / matrix / code のいずれかにしてください"
+            )
     # 問題が1問もない小テストはエラー
     if not questions:
         raise NotebookFormatError(f"{path.name}: 小テストの問題がありません")
@@ -459,6 +580,45 @@ def _code_problem(
     )
 
 
+def _keyed_problem(
+    course_id: int, unit_id: int | None, kind: str, position: int, title: str, q: _ParsedQuestion
+) -> Problem:
+    """
+    解析した選択式・数値入力・表形式の問題から Problem を生成する
+
+    Args
+    -----------------
+    - course_id: int,                   講座 ID
+    - unit_id: int | None,              単元 ID(小テストは None)
+    - kind: str,                        問題の種類(ProblemKind)
+    - position: int,                    並び順
+    - title: str,                       タイトル
+    - q: _ParsedQuestion,               解析した問題
+
+    Returns
+    -----------------
+    - problem: Problem,                 生成した問題(未登録)
+
+    """
+    # 項目を移して返却(作成者自身が正解を書いているため検証済みとして扱う)
+    return Problem(
+        course_id=course_id,
+        unit_id=unit_id,
+        kind=kind,
+        position=position,
+        answer_format=q.answer_format,
+        title=title,
+        prompt=q.prompt,
+        hint=q.hint,
+        choices=q.choices,
+        matrix_rows=q.matrix_rows,
+        correct_answer=q.correct_answer,
+        tolerance=q.tolerance,
+        explanation=q.explanation,
+        verify_status=VerifyStatus.VERIFIED,
+    )
+
+
 def add_parsed_unit(session: Session, course_id: int, parsed: _ParsedUnit, position: int, minutes: int) -> Unit:
     """
     解析した単元を、セル・演習とあわせて講座に登録する
@@ -494,9 +654,11 @@ def add_parsed_unit(session: Session, course_id: int, parsed: _ParsedUnit, posit
         # 演習セルの場合は問題を登録する
         if ex is not None:
             exercise_no += 1
-            problem = _code_problem(
-                course_id, unit.id, ProblemKind.EXERCISE, exercise_no, ex.title or f"演習 {position}-{exercise_no}", ex
-            )
+            title = ex.title or f"演習 {position}-{exercise_no}"
+            if isinstance(ex, _ParsedCode):
+                problem = _code_problem(course_id, unit.id, ProblemKind.EXERCISE, exercise_no, title, ex)
+            else:
+                problem = _keyed_problem(course_id, unit.id, ProblemKind.EXERCISE, exercise_no, title, ex)
             session.add(problem)
             session.flush()
             problem_id = problem.id
@@ -550,14 +712,28 @@ def import_course(
     for no, q in enumerate(questions, start=1):
         if q.unit_position is not None and not 1 <= q.unit_position <= len(parsed_units):
             raise NotebookFormatError(f"小テスト 問{no} の unit が単元の範囲外です")
+    # 画像(images/)の形式・サイズを確認
+    image_files: list[tuple[str, bytes]] = []
+    image_dir = course_dir / "images"
+    if image_dir.is_dir():
+        for file in sorted(image_dir.iterdir()):
+            if file.is_file():
+                data = file.read_bytes()
+                try:
+                    validate_image(file.name, data)
+                except ImageInputError as e:
+                    raise NotebookFormatError(f"images/{file.name}: {e}")
+                image_files.append((file.name, data))
     # 同じ識別名の講座がある場合
     existing = session.scalar(select(Course).where(Course.slug == slug))
     if existing is not None:
         if not replace:
             raise NotebookFormatError(f"講座 '{slug}' は既に登録されています(置き換える場合は --replace)")
-        # 置き換え指定なら既存講座を削除(受講記録も連動して削除される)
+        # 置き換え指定なら既存講座を削除(受講記録も連動して削除される。画像の中身も削除する)
+        existing_id = existing.id
         session.delete(existing)
         session.flush()
+        delete_course_images(existing_id)
     # 講座を登録
     status = force_status or meta.get("status", CourseStatus.DRAFT)
     course = Course(
@@ -590,20 +766,7 @@ def import_course(
         if q.code is not None:
             problem = _code_problem(course.id, None, ProblemKind.QUIZ, no, q.code.title or f"問{no}", q.code)
         else:
-            problem = Problem(
-                course_id=course.id,
-                unit_id=None,
-                kind=ProblemKind.QUIZ,
-                position=no,
-                answer_format=q.answer_format,
-                title=f"問{no}",
-                prompt=q.prompt,
-                choices=q.choices,
-                correct_answer=q.correct_answer,
-                tolerance=q.tolerance,
-                explanation=q.explanation,
-                verify_status=VerifyStatus.VERIFIED,
-            )
+            problem = _keyed_problem(course.id, None, ProblemKind.QUIZ, no, f"問{no}", q)
         problem.related_unit_id = related
         session.add(problem)
     # データファイルを登録
@@ -619,6 +782,9 @@ def import_course(
                         content=file.read_bytes(),
                     )
                 )
+    # 画像を登録
+    for name, data in image_files:
+        add_image(session, course.id, name, data)
     session.flush()
     # 登録した講座を返却
     return course

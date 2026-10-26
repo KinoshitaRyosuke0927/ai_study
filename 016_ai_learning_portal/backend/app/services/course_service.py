@@ -376,9 +376,12 @@ def get_unit(session: Session, user: User, unit_id: int) -> UnitDetailOut:
             p = cell.problem
             exercise = ExerciseOut(
                 problem_id=p.id,
+                answer_format=p.answer_format,
                 title=p.title,
                 prompt=p.prompt,
                 hint=p.hint,
+                choices=list(p.choices or []),
+                matrix_rows=list(p.matrix_rows or []),
                 starter_code=p.starter_code,
                 grading=p.grading,
                 # テストコードはブラウザで実行するため、テスト採点の問題のみ渡す

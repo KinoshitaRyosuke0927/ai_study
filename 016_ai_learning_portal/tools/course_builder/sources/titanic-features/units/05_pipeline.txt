@@ -1,0 +1,280 @@
+#%% md
+# 前処理を関数にまとめる
+これまでの前処理(補完・数値化・特徴量の作成)を1つの関数にまとめ、学習用と予測用のデータに同じ処理を確実に行えるようにします。できあがった特徴量の表を確認し、CSV ファイルに保存してダウンロードします。
+
+#%% md
+## 学習目標
+- 前処理を関数にまとめ、学習用と予測用に同じ処理を適用できる
+- 補完に使う値を学習用のデータから求め、関数に渡せる
+- できあがった特徴量の表(列・欠損値・型)を確認できる
+- 前処理の結果を CSV ファイルに保存して、ダウンロードできる
+
+#%% md
+## なぜ関数にまとめるのか
+
+前処理のコードを学習用・予測用それぞれに書くと、片方だけ直し忘れるなどの間違いが起きやすくなります。**1つの関数にまとめて、両方に同じ関数を使う** と、ルール1(学習用と予測用に同じ処理をする)を確実に守れます。
+
+補完に使う値(敬称ごとの年齢の中央値・運賃の中央値・港の最頻値)は、ルール2(学習用のデータから求める)のとおり、先に学習用のデータから求めておき、関数の中で使います。
+
+#%% md
+## 補完に使う値を求める
+
+#%% code
+import numpy as np
+import pandas as pd
+
+# 表を省略せずに表示する(列は 20 列まで、1 行の幅は 200 文字まで)
+pd.set_option("display.max_columns", 20)
+pd.set_option("display.width", 200)
+
+# 学習用・予測用のデータを読み込む
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
+
+
+def extract_title(name):
+    """名前から敬称を取り出し、主な 4 つ以外を Rare にまとめる"""
+    # 名前から敬称を取り出す
+    title = name.str.extract(r",\s*([^.]+)\.")[0]
+    # 別表記の敬称を置き換える
+    title = title.replace({"Mlle": "Miss", "Ms": "Miss", "Mme": "Mrs"})
+    # 主な 4 つの敬称以外を Rare にし、列の名前を "Title" にして返す
+    return title.where(title.isin(["Mr", "Mrs", "Miss", "Master"]), "Rare").rename("Title")
+
+
+# 補完に使う値を、学習用のデータだけから求める
+age_by_title = train.groupby(extract_title(train["Name"]))["Age"].median()  # 敬称ごとの年齢の中央値
+fare_median = train["Fare"].median()                                      # 運賃の中央値
+embarked_mode = train["Embarked"].mode()[0]                               # 港の最頻値
+
+print(age_by_title)
+print("運賃の中央値:", fare_median, " 港の最頻値:", embarked_mode)
+
+#%% md
+## 前処理の関数
+
+これまでの単元の処理を、1つの関数 `preprocess` にまとめます。元のデータ(表)を受け取り、特徴量だけの新しい表を返します。
+
+#%% code
+def preprocess(df):
+    """元のデータ df から、モデルに入れる特徴量の表を作って返す"""
+    # 結果を入れる表を作る(提出ファイルで使う PassengerId は残しておく)
+    out = pd.DataFrame({"PassengerId": df["PassengerId"]})
+
+    # 数値のまま使う列
+    out["Pclass"] = df["Pclass"]
+    out["SibSp"] = df["SibSp"]
+    out["Parch"] = df["Parch"]
+
+    # 性別:女性 = 1、男性 = 0
+    out["Sex"] = (df["Sex"] == "female").astype(int)
+
+    # 年齢:欠損値を、敬称ごとの中央値(学習用から求めた値)で埋める
+    title = extract_title(df["Name"])
+    out["Age"] = df["Age"].fillna(title.map(age_by_title))
+
+    # 運賃:欠損値を中央値で埋めてから、対数をとる
+    out["LogFare"] = np.log1p(df["Fare"].fillna(fare_median))
+
+    # 客室番号の記録の有無、家族の人数、1 人かどうか
+    out["HasCabin"] = df["Cabin"].notna().astype(int)
+    out["FamilySize"] = df["SibSp"] + df["Parch"] + 1
+    out["IsAlone"] = (out["FamilySize"] == 1).astype(int)
+
+    # 港と敬称のワンホットエンコーディング(港の欠損値は最頻値で埋める)
+    embarked = pd.get_dummies(df["Embarked"].fillna(embarked_mode), prefix="Embarked", dtype=int)
+    titles = pd.get_dummies(title, prefix="Title", dtype=int)
+
+    # 作った列を横につなげて返す
+    return pd.concat([out, embarked, titles], axis=1)
+
+#%% md
+## 学習用・予測用に適用して確認する
+
+同じ関数を学習用・予測用の両方に使い、できあがった表を確認します。
+
+#%% code
+# 同じ関数で、学習用・予測用の特徴量の表を作る
+train_prepared = preprocess(train)
+test_prepared = preprocess(test)
+
+# 予測用の列を、学習用と同じ列・同じ順番にそろえる(足りない列があれば 0 で追加される)
+test_prepared = test_prepared.reindex(columns=train_prepared.columns, fill_value=0)
+
+# 行数・列数と、欠損値の合計を確認する
+print(train_prepared.shape, test_prepared.shape)
+print("欠損値:", train_prepared.isna().sum().sum(), test_prepared.isna().sum().sum())
+
+# 先頭 3 行を表示する
+train_prepared.head(3)
+
+#%% md
+学習用は 891 行、予測用は 418 行で、どちらも 18 列(`PassengerId` と 17 個の特徴量)になり、欠損値はありません。すべての値が数値になり、モデルに入れられる形になりました。
+
+#%% md
+## CSV ファイルに保存する
+
+前処理の結果をファイルに保存しておくと、次の講座(モデルの学習と評価)で使えます。学習用の表には、正解の `Survived` も加えて保存します。
+
+`to_csv` でファイルに書き出すと、セルの出力の下に「作成したファイル」が表示され、**ダウンロード** ボタンで自分のパソコンに保存できます(次の講座では、同じ内容のファイルが講座のデータとして用意されています)。
+
+#%% code
+# 学習用の表に、正解の Survived を加える
+train_out = train_prepared.copy()
+train_out["Survived"] = train["Survived"]
+
+# CSV ファイルに書き出す(index=False で、行番号は書き出さない)
+train_out.to_csv("train_prepared.csv", index=False)
+test_prepared.to_csv("test_prepared.csv", index=False)
+print("保存しました")
+
+#%% md
+## 演習
+
+#%% md
+学習用・予測用の特徴量の表について、**列名が完全に一致しているか**(順番も含めて)を `True` / `False` で表示してください。続けて、学習用の表の **型ごとの列の数** を表示してください(すべて数値になっていることの確認)。
+
+#%% code
+# @starter
+import numpy as np
+import pandas as pd
+
+# (ここでは、前処理の関数を簡単にしたものを使う)
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
+embarked_mode = train["Embarked"].mode()[0]
+
+
+def simple_preprocess(df):
+    """性別・等級・港だけの、簡単な前処理"""
+    out = pd.DataFrame({"Pclass": df["Pclass"], "Sex": (df["Sex"] == "female").astype(int)})
+    embarked = pd.get_dummies(df["Embarked"].fillna(embarked_mode), prefix="Embarked", dtype=int)
+    return pd.concat([out, embarked], axis=1)
+
+
+train_x = simple_preprocess(train)
+test_x = simple_preprocess(test)
+
+# 列名のリストどうしを比べて、完全に一致しているかを表示する(____ に、比べる式を書く)
+print(____)
+
+# 型ごとの列の数を表示する(dtypes の値ごとの件数を数える)
+print(train_x.dtypes.value_counts())
+
+#%% code
+# @solution
+# @title: 学習用と予測用の列の確認
+# @hint: list(train_x.columns) == list(test_x.columns) で、列名のリストが順番も含めて同じなら True になります。
+# @explanation: 列名は順番も含めて一致しており(True)、学習用の表の 5 列はすべて整数(int32 または int64)です。ブラウザ内の Python では astype(int) が 32 ビットの整数(int32)になりますが、どちらも整数なのでモデルに入れられます。モデルに入れる前に、このように列と型を確認する習慣をつけましょう。
+import numpy as np
+import pandas as pd
+
+# (ここでは、前処理の関数を簡単にしたものを使う)
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
+embarked_mode = train["Embarked"].mode()[0]
+
+
+def simple_preprocess(df):
+    """性別・等級・港だけの、簡単な前処理"""
+    out = pd.DataFrame({"Pclass": df["Pclass"], "Sex": (df["Sex"] == "female").astype(int)})
+    embarked = pd.get_dummies(df["Embarked"].fillna(embarked_mode), prefix="Embarked", dtype=int)
+    return pd.concat([out, embarked], axis=1)
+
+
+train_x = simple_preprocess(train)
+test_x = simple_preprocess(test)
+
+# 列名のリストどうしを == で比べる(順番も含めて同じなら True)
+print(list(train_x.columns) == list(test_x.columns))
+
+# 型ごとの列の数を表示する(dtypes の値ごとの件数を数える)
+print(train_x.dtypes.value_counts())
+
+#%% md
+次のコードは、前処理の関数に **年齢の欠損値の補完** を加えたものです。空欄を埋めて、学習用・予測用の両方に適用し、年齢の欠損値の数(学習用、予測用の順)と、予測用の年齢の平均(小数第2位まで)を表示してください。補完に使う値は学習用のデータから求めてください。
+
+#%% code
+# @starter
+import pandas as pd
+
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
+
+# 敬称を取り出す(ここでは、まとめずにそのまま使う)
+train_title = train["Name"].str.extract(r",\s*([^.]+)\.")[0]
+test_title = test["Name"].str.extract(r",\s*([^.]+)\.")[0]
+
+# 補完に使う値を求める(____ に、どちらのデータの敬称と年齢を使うかを考えて書く)
+age_by_title = ____.groupby(____)["Age"].median()
+age_median = train["Age"].median()
+
+
+def fill_age(df, title):
+    """敬称ごとの中央値で年齢を埋め、それでも残る欠損値(学習用にない敬称)は全体の中央値で埋める"""
+    age = df["Age"].fillna(title.map(age_by_title))
+    return age.fillna(age_median)
+
+
+train_age = fill_age(train, train_title)
+test_age = fill_age(test, test_title)
+
+# 欠損値の数と、予測用の年齢の平均を表示する
+print(train_age.isna().sum())
+print(test_age.isna().sum())
+print(round(test_age.mean(), 2))
+
+#%% code
+# @solution
+# @title: 年齢の補完を関数にする
+# @hint: 補完に使う値は学習用のデータから求めます。train.groupby(train_title)["Age"].median() のように、学習用の敬称でグループに分けます。
+# @explanation: 予測用のデータには学習用にない敬称(Lady など)があり、敬称ごとの中央値では埋められない人が残ります。そのため、全体の中央値でもう一度埋めています。敬称をまとめずに使うと、このような対応が必要になります(講座の前処理では、少ない敬称を Rare にまとめてこの問題を避けています)。
+import pandas as pd
+
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
+
+# 敬称を取り出す(ここでは、まとめずにそのまま使う)
+train_title = train["Name"].str.extract(r",\s*([^.]+)\.")[0]
+test_title = test["Name"].str.extract(r",\s*([^.]+)\.")[0]
+
+# 補完に使う値を、学習用のデータから求める
+age_by_title = train.groupby(train_title)["Age"].median()
+age_median = train["Age"].median()
+
+
+def fill_age(df, title):
+    """敬称ごとの中央値で年齢を埋め、それでも残る欠損値(学習用にない敬称)は全体の中央値で埋める"""
+    age = df["Age"].fillna(title.map(age_by_title))
+    return age.fillna(age_median)
+
+
+train_age = fill_age(train, train_title)
+test_age = fill_age(test, test_title)
+
+# 欠損値の数と、予測用の年齢の平均を表示する
+print(train_age.isna().sum())
+print(test_age.isna().sum())
+print(round(test_age.mean(), 2))
+
+#%% md
+<!-- @question
+type: choice
+answer: 学習用と予測用に同じ処理を確実に適用でき、直し忘れなどの間違いを防げるため。
+title: 前処理を関数にまとめる理由
+hint: 前処理のルール1(学習用と予測用に同じ処理をする)を思い出しましょう。
+explanation: 前処理を関数にまとめ、学習用・予測用の両方に同じ関数を使うと、同じ処理が確実に適用されます。片方のコードだけ直し忘れるといった間違いを防げます。関数にしても処理の速さや精度が上がるわけではありません。
+-->
+前処理を1つの関数にまとめ、学習用と予測用の両方に使う主な理由として最も適切なものを選べ。
+
+- 学習用と予測用に同じ処理を確実に適用でき、直し忘れなどの間違いを防げるため。
+- 関数にすると、モデルの精度が必ず上がるため。
+- 関数にすると、欠損値が自動的に補完されるため。
+- 関数の中では、予測用のデータの値を使って補完できるため。
+
+#%% md
+## まとめ
+
+- 補完に使う値は学習用から求め、前処理を関数 `preprocess` にまとめて、学習用・予測用の両方に使う。
+- 最後に `reindex` で列をそろえ、行数・列数・欠損値・型を確認する。
+- `to_csv` で保存したファイルは、セルの下の「作成したファイル」からダウンロードできる。この講座の前処理の結果(17 個の特徴量)を、次の講座のモデルづくりに使う。

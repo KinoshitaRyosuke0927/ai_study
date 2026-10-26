@@ -9,6 +9,12 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
+# ---------- AI が作ったコードの実行環境(Node.js + Pyodide)の依存 ----------
+FROM node:22-slim AS runner
+WORKDIR /runner
+COPY backend/runner/package.json backend/runner/package-lock.json ./
+RUN npm ci --omit=dev
+
 # ---------- 実行イメージ ----------
 FROM python:3.12-slim
 
@@ -26,6 +32,12 @@ RUN pip install -r requirements.txt
 COPY backend/ ./
 COPY content/ /app/content/
 COPY --from=frontend /src/frontend/dist /app/frontend/dist
+
+# AI が作ったコードの実行環境: node 本体、Pyodide、受講画面と同じ実行補助関数(worker.ts)
+# (Pyodide のパッケージ(pandas など)は初回の実行時に CDN から取得する)
+COPY --from=runner /usr/local/bin/node /usr/local/bin/node
+COPY --from=runner /runner/node_modules /app/backend/runner/node_modules
+COPY frontend/src/python/worker.ts /app/backend/runner/worker.ts
 
 ENV APP_ENV=azure \
     APP_FRONTEND_DIST=/app/frontend/dist \

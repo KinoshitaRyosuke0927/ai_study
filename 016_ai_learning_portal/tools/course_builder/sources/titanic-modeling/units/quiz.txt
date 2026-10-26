@@ -1,0 +1,345 @@
+#%% md
+# 小テスト:タイタニックで学ぶデータ分析 3 モデルの学習と評価
+全10問です。コードを書く問題と、モデルの考え方を問う選択式の問題があります。データは前の講座で作った特徴量の表 `train_prepared.csv` を使います。コードの問題では、これまでの単元と同じ分け方(`test_size=0.25, random_state=0, stratify=y`)を使います。満点で講座修了になります。何度でも受け直せます。
+
+#%% md
+<!-- @question
+type: code
+unit: 1
+-->
+特徴量を **客室の等級 `Pclass` だけ** にしたロジスティック回帰を学習させ、検証用のデータでの正解率を小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+
+# 特徴量の表を読み込み、特徴量 X(等級だけ)と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = ____  # ____ に、Pclass だけの 1 列の表を取り出す式を書く
+y = df["Survived"]
+
+# 学習用と検証用に分ける
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 学習させて、検証用の正解率を表示する
+model = LogisticRegression(max_iter=1000).fit(X_train, y_train)
+print(round(model.score(X_valid, y_valid), 3))
+
+#%% code
+# @solution
+# @explanation: df[["Pclass"]] のように [[ ]] で囲むと、1 列だけの表になります。等級だけのモデルの正解率は約 65.9% で、ベースライン(62.8%)をわずかに上回る程度です。性別だけのモデル(77.1%)と比べると、性別の方が予測に役立つことがわかります。
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+
+# 特徴量の表を読み込み、特徴量 X(等級だけ)と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df[["Pclass"]]  # [[ ]] で囲むと、1 列だけの表(DataFrame)になる
+y = df["Survived"]
+
+# 学習用と検証用に分ける
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 学習させて、検証用の正解率を表示する
+model = LogisticRegression(max_iter=1000).fit(X_train, y_train)
+print(round(model.score(X_valid, y_valid), 3))
+
+#%% md
+<!-- @question
+type: choice
+answer: 学習用と検証用で、正解(生存・死亡)の割合がそろうように分けるため。
+unit: 1
+explanation: stratify=y を指定すると、y(生存・死亡)の割合が学習用と検証用でほぼ同じになるように分けられます。分け方の偶然で、検証用に生存者が多すぎたり少なすぎたりすることを防げます。
+-->
+`train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)` の `stratify=y` を指定する理由として、最も適切なものを選べ。
+
+- 学習用と検証用で、正解(生存・死亡)の割合がそろうように分けるため。
+- 毎回同じ分け方になるようにするため。
+- 検証用のデータの割合を 25% にするため。
+- 欠損値のある行を取り除くため。
+
+#%% md
+<!-- @question
+type: code
+unit: 2
+-->
+標準化したロジスティック回帰で、検証用のデータについて **生存の確率が 0.8 以上** と予測された乗客の人数を表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 標準化したロジスティック回帰を学習させる
+scaler = StandardScaler().fit(X_train)
+model = LogisticRegression(max_iter=1000).fit(scaler.transform(X_train), y_train)
+
+# 検証用のデータの生存の確率を求める
+proba = model.predict_proba(scaler.transform(X_valid))[:, 1]
+
+# 確率が 0.8 以上の人数を表示する(____ に、人数を求める式を書く)
+print(____)
+
+#%% code
+# @solution
+# @explanation: (proba >= 0.8) は True / False の配列で、sum() で True の数(=人数)が数えられます。生存の確率が 0.8 以上と強く予測された乗客は 29 人です。
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 標準化したロジスティック回帰を学習させる
+scaler = StandardScaler().fit(X_train)
+model = LogisticRegression(max_iter=1000).fit(scaler.transform(X_train), y_train)
+
+# 検証用のデータの生存の確率を求める
+proba = model.predict_proba(scaler.transform(X_valid))[:, 1]
+
+# 確率が 0.8 以上なら True。sum() で True の数を数える
+print((proba >= 0.8).sum())
+
+#%% md
+<!-- @question
+type: choice
+answer: 学習用のデータで求めた平均と標準偏差を使って、検証用のデータも変換する。
+unit: 2
+explanation: 標準化に使う平均と標準偏差は、前処理のルールと同じく学習用のデータから求め(fit)、その値で学習用・検証用(・予測用)の両方を変換(transform)します。検証用のデータで fit し直すと、学習用と違う基準で変換されてしまいます。
+-->
+`StandardScaler` で特徴量を標準化するときの、検証用のデータの扱いとして最も適切なものを選べ。
+
+- 検証用のデータで fit し直してから、検証用のデータを変換する。
+- 学習用のデータで求めた平均と標準偏差を使って、検証用のデータも変換する。
+- 検証用のデータは標準化せずに、そのままモデルに入れる。
+- 学習用と検証用をつなげたデータで fit してから、両方を変換する。
+
+#%% md
+<!-- @question
+type: code
+unit: 3
+-->
+深さ 3 の決定木(`random_state=0`)を学習させ、学習用と検証用の正解率を、この順に小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 深さ 3 の決定木を作って学習させる(____ に、モデルを作る式を書く)
+model = ____
+model.fit(X_train, y_train)
+
+# 学習用・検証用の正解率を表示する
+print(round(model.score(X_train, y_train), 3))
+print(round(model.score(X_valid, y_valid), 3))
+
+#%% code
+# @solution
+# @explanation: 深さ 3 の決定木は、学習用 82.2%、検証用 77.1% です。深さを制限しない木(学習用 97.8%、検証用 73.1%)と比べて、学習用と検証用の差が小さく、過学習が抑えられています。
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 深さ 3 の決定木を作って学習させる
+model = DecisionTreeClassifier(max_depth=3, random_state=0)
+model.fit(X_train, y_train)
+
+# 学習用・検証用の正解率を表示する
+print(round(model.score(X_train, y_train), 3))
+print(round(model.score(X_valid, y_valid), 3))
+
+#%% md
+<!-- @question
+type: code
+unit: 4
+-->
+木の本数を **50**、各木の深さを 5 までにしたランダムフォレスト(`random_state=0`)を学習させ、検証用の正解率を小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 木の本数 50、深さ 5 までのランダムフォレストを作って学習させる(____ に、引数を書く)
+forest = RandomForestClassifier(____, random_state=0)
+forest.fit(X_train, y_train)
+
+# 検証用の正解率を表示する
+print(round(forest.score(X_valid, y_valid), 3))
+
+#%% code
+# @solution
+# @explanation: 木の本数は n_estimators、深さの上限は max_depth で指定します。木の本数を 100 から 50 に減らしても、この例では正解率は大きく変わりません。木の本数は、精度が安定する程度にあれば十分です。
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 木の本数 50(n_estimators)、深さ 5 まで(max_depth)のランダムフォレスト
+forest = RandomForestClassifier(n_estimators=50, max_depth=5, random_state=0)
+forest.fit(X_train, y_train)
+
+# 検証用の正解率を表示する
+print(round(forest.score(X_valid, y_valid), 3))
+
+#%% md
+<!-- @question
+type: code
+unit: 5
+-->
+深さ 3 の決定木(`random_state=0`)について、検証用のデータでの **再現率** を小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.metrics import recall_score
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 深さ 3 の決定木を学習させ、検証用のデータを予測する
+model = DecisionTreeClassifier(max_depth=3, random_state=0).fit(X_train, y_train)
+pred = model.predict(X_valid)
+
+# 再現率を表示する(____ に、正解と予測を渡す)
+print(round(recall_score(____), 3))
+
+#%% code
+# @solution
+# @explanation: 再現率は recall_score(正解, 予測) で求めます。深さ 3 の決定木の再現率は約 65.1% で、生存した人の約 35% を見逃しています。ランダムフォレスト(71.1%)やロジスティック回帰(72.3%)より見逃しが多いモデルです。
+import pandas as pd
+from sklearn.metrics import recall_score
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+
+# 特徴量の表を読み込み、学習用と検証用に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
+
+# 深さ 3 の決定木を学習させ、検証用のデータを予測する
+model = DecisionTreeClassifier(max_depth=3, random_state=0).fit(X_train, y_train)
+pred = model.predict(X_valid)
+
+# 再現率を表示する(正解、予測の順に渡す)
+print(round(recall_score(y_valid, pred), 3))
+
+#%% md
+<!-- @question
+type: choice
+answer: 「生存」と予測した人のうち、実際に生存した人の割合
+unit: 5
+explanation: 適合率(precision)は TP ÷ (TP + FP) で、「生存」と予測した人のうち実際に生存した人の割合です。予測の確かさを表します。実際に生存した人のうち「生存」と予測できた割合は再現率です。
+-->
+評価指標の「適合率」の説明として、最も適切なものを選べ。
+
+- 実際に生存した人のうち、「生存」と予測できた人の割合
+- 「生存」と予測した人のうち、実際に生存した人の割合
+- 全員のうち、予測と正解が一致した人の割合
+- 実際に死亡した人のうち、誤って「生存」と予測した人の割合
+
+#%% md
+<!-- @question
+type: code
+unit: 6
+-->
+深さ 5 の決定木(`random_state=0`)について、`StratifiedKFold(n_splits=5, shuffle=True, random_state=0)` で 5 分割交差検証を行い、正解率の平均を小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.tree import DecisionTreeClassifier
+
+# 特徴量の表を読み込む
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+
+# 5 分割の分け方と、モデルを用意する
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+model = DecisionTreeClassifier(max_depth=5, random_state=0)
+
+# 交差検証を行い、平均を表示する(____ に、交差検証を行う式を書く)
+scores = ____
+print(round(scores.mean(), 3))
+
+#%% code
+# @solution
+# @explanation: cross_val_score(model, X, y, cv=cv) で 5 回分の正解率が求まり、mean() で平均になります。交差検証では学習用の 891 人すべてを使い、検証用のグループを入れ替えながら評価します。
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.tree import DecisionTreeClassifier
+
+# 特徴量の表を読み込む
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+
+# 5 分割の分け方と、モデルを用意する
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+model = DecisionTreeClassifier(max_depth=5, random_state=0)
+
+# 交差検証を行い(5 回分の正解率の配列が返る)、平均を表示する
+scores = cross_val_score(model, X, y, cv=cv)
+print(round(scores.mean(), 3))
+
+#%% md
+<!-- @question
+type: choice
+answer: データを 5 つのグループに分け、検証用のグループを入れ替えながら 5 回学習と評価をくり返す。
+unit: 6
+explanation: 5 分割交差検証では、データを 5 つのグループに分け、1 つを検証用、残り 4 つを学習用にして評価することを、検証用のグループを入れ替えながら 5 回くり返します。すべてのデータが 1 回ずつ検証に使われます。
+-->
+5 分割交差検証の説明として、最も適切なものを選べ。
+
+- データを 5 つのグループに分け、検証用のグループを入れ替えながら 5 回学習と評価をくり返す。
+- 同じ学習用・検証用の分け方で、モデルを 5 回学習させて平均をとる。
+- データの 5% を検証用にして評価する。
+- 5 種類のモデルを学習させ、最も正解率の高いモデルを選ぶ。

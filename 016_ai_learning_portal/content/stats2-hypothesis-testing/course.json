@@ -1,0 +1,32 @@
+{
+  "slug": "stats2-hypothesis-testing",
+  "title": "統計検定2級対策 4:仮説検定",
+  "summary": "統計検定2級の出題範囲のうち、仮説検定(母平均・母比率・母分散の検定、2つの母集団の比較、適合度検定と独立性の検定)を扱います。帰無仮説と p 値の考え方、2種類の過誤と検出力から始め、z 検定・t 検定・カイ二乗検定・F 検定を、図表を使った解説と手計算の演習で身につけ、試験で問われる計算と統計ソフトの出力の読み取りができるようになることを目指します。",
+  "level": "basic",
+  "tags": [
+    "統計検定2級",
+    "仮説検定"
+  ],
+  "outcomes": [
+    "帰無仮説・対立仮説を立て、棄却域や p 値から正しく結論を述べられる",
+    "第1種・第2種の過誤と検出力の関係を説明し、検出力を手計算できる",
+    "母平均・母比率・母分散の検定を、z・t・カイ二乗分布を使い分けて手計算できる",
+    "2つの母平均・母分散・母比率の比較に適した検定を選び、検定統計量を計算できる",
+    "適合度検定と独立性の検定で、期待度数・カイ二乗値・自由度を求めて判断できる",
+    "統計ソフトの検定結果の出力を読み取り、結論と解釈を述べられる"
+  ],
+  "libraries": [],
+  "prerequisites": ["stats2-descriptive", "stats2-sampling-estimation"],
+  "status": "draft",
+  "units": [
+    { "file": "01_concepts.ipynb", "minutes": 35 },
+    { "file": "02_errors_power.ipynb", "minutes": 30 },
+    { "file": "03_mean_test.ipynb", "minutes": 35 },
+    { "file": "04_proportion_variance.ipynb", "minutes": 30 },
+    { "file": "05_two_means.ipynb", "minutes": 40 },
+    { "file": "06_variance_ratio_proportions.ipynb", "minutes": 30 },
+    { "file": "07_goodness_of_fit.ipynb", "minutes": 30 },
+    { "file": "08_independence.ipynb", "minutes": 35 }
+  ],
+  "quiz": "quiz.ipynb"
+}

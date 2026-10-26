@@ -50,7 +50,7 @@ def _call(fn: Callable[[], T]) -> T:
 
 # ---------- メンバー ----------
 @router.get("/progress", response_model=ProgressMatrixOut)
-def progress(db: Session = Depends(get_db)) -> ProgressMatrixOut:
+def progress(db: Session = Depends(get_db, scope="function")) -> ProgressMatrixOut:
     """
     メンバー × 講座の受講状況を返す
 
@@ -68,7 +68,7 @@ def progress(db: Session = Depends(get_db)) -> ProgressMatrixOut:
 
 
 @router.get("/members/{user_id}", response_model=MyPageOut)
-def member_detail(user_id: int, db: Session = Depends(get_db)) -> MyPageOut:
+def member_detail(user_id: int, db: Session = Depends(get_db, scope="function")) -> MyPageOut:
     """
     メンバー1人の受講状況を返す
 
@@ -87,7 +87,7 @@ def member_detail(user_id: int, db: Session = Depends(get_db)) -> MyPageOut:
 
 
 @router.get("/users", response_model=list[UserAdminOut])
-def list_users(db: Session = Depends(get_db)) -> list[UserAdminOut]:
+def list_users(db: Session = Depends(get_db, scope="function")) -> list[UserAdminOut]:
     """
     メンバーの一覧を返す
 
@@ -105,7 +105,7 @@ def list_users(db: Session = Depends(get_db)) -> list[UserAdminOut]:
 
 
 @router.post("/users", response_model=UserAdminOut)
-def add_user(req: UserCreateIn, db: Session = Depends(get_db)) -> UserAdminOut:
+def add_user(req: UserCreateIn, db: Session = Depends(get_db, scope="function")) -> UserAdminOut:
     """
     メンバーを追加する
 
@@ -125,7 +125,7 @@ def add_user(req: UserCreateIn, db: Session = Depends(get_db)) -> UserAdminOut:
 
 @router.put("/users/{user_id}", response_model=UserAdminOut)
 def update_user(
-    user_id: int, req: UserUpdateIn, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+    user_id: int, req: UserUpdateIn, admin: User = Depends(require_admin), db: Session = Depends(get_db, scope="function")
 ) -> UserAdminOut:
     """
     メンバーを更新する
@@ -147,7 +147,7 @@ def update_user(
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> None:
+def delete_user(user_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db, scope="function")) -> None:
     """
     メンバーを削除する(受講記録も削除される)
 

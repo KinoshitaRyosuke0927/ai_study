@@ -97,6 +97,9 @@ export const api = {
   unit: (id: number) => request<UnitDetail>('GET', `/api/units/${id}`),
   submitCode: (problemId: number, body: CodeSubmit) =>
     request<SubmitResult>('POST', `/api/problems/${problemId}/submit-code`, body),
+  // 選択式・数値入力・表形式の演習(表形式の回答は行ごとの選択を並べた JSON 配列の文字列)
+  submitAnswer: (problemId: number, answer: string) =>
+    request<SubmitResult>('POST', `/api/problems/${problemId}/submit-answer`, { answer }),
   quiz: (slug: string) => request<Quiz>('GET', `/api/courses/${encodeURIComponent(slug)}/quiz`),
   submitQuiz: (slug: string, answers: QuizAnswer[]) =>
     request<QuizResult>('POST', `/api/courses/${encodeURIComponent(slug)}/quiz/attempts`, { answers }),
@@ -132,6 +135,12 @@ export const api = {
       return request<CourseEditor>('POST', `/api/authoring/courses/${courseId}/datasets`, form)
     },
     deleteDataset: (datasetId: number) => request<void>('DELETE', `/api/authoring/datasets/${datasetId}`),
+    uploadImage: (courseId: number, file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return request<CourseEditor>('POST', `/api/authoring/courses/${courseId}/images`, form)
+    },
+    deleteImage: (imageId: number) => request<void>('DELETE', `/api/authoring/images/${imageId}`),
     progress: () => request<ProgressMatrix>('GET', '/api/admin/progress'),
     member: (userId: number) => request<MemberDetail>('GET', `/api/admin/members/${userId}`),
     users: () => request<AdminUser[]>('GET', '/api/admin/users'),
@@ -148,8 +157,19 @@ export const api = {
     },
     aiStatus: () => request<AIStatus>('GET', '/api/authoring/ai/status'),
     aiOutline: (req: OutlineRequest) => request<CourseOutline>('POST', '/api/authoring/ai/outline', req),
-    aiCreateDraft: (slug: string, req: OutlineRequest, outline: CourseOutline) =>
-      request<AIJob>('POST', '/api/authoring/ai/drafts', { slug, request: req, outline }),
+    /** データファイルの要約(列・型・欠損・先頭の行)を作る(AI に渡す) */
+    aiDataSummary: (files: File[]) => {
+      const form = new FormData()
+      files.forEach((f) => form.append('files', f))
+      return request<{ summary: string }>('POST', '/api/authoring/ai/datasets/summary', form)
+    },
+    /** 構成案から下書きを作る(データファイルは講座のデータファイルとして登録される) */
+    aiCreateDraft: (slug: string, req: OutlineRequest, outline: CourseOutline, files: File[] = []) => {
+      const form = new FormData()
+      form.append('payload', JSON.stringify({ slug, request: req, outline }))
+      files.forEach((f) => form.append('files', f))
+      return request<AIJob>('POST', '/api/authoring/ai/drafts', form)
+    },
     aiJob: (jobId: number) => request<AIJob>('GET', `/api/authoring/ai/jobs/${jobId}`),
     aiResumeJob: (jobId: number) => request<AIJob>('POST', `/api/authoring/ai/jobs/${jobId}/resume`),
   },

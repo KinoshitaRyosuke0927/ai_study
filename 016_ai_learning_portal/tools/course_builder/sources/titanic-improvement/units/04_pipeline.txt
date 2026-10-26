@@ -1,0 +1,192 @@
+#%% md
+# パイプライン
+標準化などの前処理とモデルを1つにまとめる「パイプライン」を学びます。パイプラインを使うと、交差検証やハイパーパラメータの探索の中でも前処理が正しく行われ、学習から予測までを1つのオブジェクトで扱えます。
+
+#%% md
+## 学習目標
+- `make_pipeline` で前処理とモデルを1つにまとめられる
+- 交差検証で、前処理を各回の学習用データだけで行う必要がある理由を説明できる
+- パイプラインのハイパーパラメータを `GridSearchCV` で探索できる(`名前__パラメータ` の指定)
+
+#%% md
+## 交差検証と前処理の問題
+
+ロジスティック回帰では、特徴量を標準化してから学習させました。標準化の平均と標準偏差は、学習用のデータから求めるのがルールでした。
+
+ところが、交差検証の前にデータ全体で標準化してしまうと、各回の **検証用のフォールドの情報(平均・標準偏差)も使って変換した** ことになります。小さなリークですが、正しい評価ではありません。各回の学習用のフォールドだけで標準化の値を求めるには、標準化とモデルを **パイプライン** にまとめます。
+
+#%% md
+## パイプラインを作る
+
+`make_pipeline(前処理, モデル)` で、前処理とモデルをつなげたパイプラインが作れます。パイプラインもモデルと同じく `fit`・`predict`・`score` が使え、`fit` すると前処理の `fit` → 変換 → モデルの `fit` が順に行われます。
+
+#%% code
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 標準化とロジスティック回帰をつなげたパイプライン
+pipe = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+
+# パイプラインごと交差検証する(各回の学習用フォールドだけで標準化の値が求められる)
+scores = cross_val_score(pipe, X, y, cv=cv)
+print("正解率:", round(scores.mean(), 3))
+
+# パイプラインの中身(各手順の名前)を確認する
+print(list(pipe.named_steps.keys()))
+
+#%% md
+パイプラインの各手順には、クラス名を小文字にした名前(`standardscaler`・`logisticregression`)が自動で付きます。
+
+## パイプラインのハイパーパラメータを探索する
+
+ロジスティック回帰には、係数が大きくなりすぎないように抑える強さを表すハイパーパラメータ `C` があります(小さいほど強く抑えて、単純なモデルになります)。パイプラインの中のハイパーパラメータは、**`手順の名前__パラメータ名`**(アンダースコア 2 つ)で指定します。
+
+#%% code
+from sklearn.model_selection import GridSearchCV
+
+# logisticregression の C を探索する(手順の名前 + "__" + パラメータ名)
+param_grid = {"logisticregression__C": [0.01, 0.1, 1, 10]}
+search = GridSearchCV(pipe, param_grid, cv=cv)
+search.fit(X, y)
+
+print("最も良い組み合わせ:", search.best_params_)
+print("交差検証の正解率  :", round(search.best_score_, 3))
+
+#%% md
+`C=0.1` のときが最も良く、81.6% です。ロジスティック回帰も、ランダムフォレストや LightGBM とほぼ同じ精度になりました。
+
+`search.best_estimator_` は、標準化とモデルが入ったパイプラインです。予測用のデータを渡すだけで、学習用のデータで求めた値で標準化してから予測してくれるので、前処理のし忘れを防げます。
+
+#%% md
+## 演習
+
+#%% md
+標準化と `LogisticRegression(C=0.01, max_iter=1000)` をつなげたパイプラインを作り、解説と同じ分け方で交差検証の正解率の平均を小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 標準化とロジスティック回帰(C=0.01)をつなげたパイプラインを作る(____ に、パイプラインを作る式を書く)
+pipe = ____
+
+# パイプラインごと交差検証して、平均を表示する
+print(round(cross_val_score(pipe, X, y, cv=cv).mean(), 3))
+
+#%% code
+# @solution
+# @title: C を小さくしたパイプライン
+# @hint: make_pipeline(StandardScaler(), LogisticRegression(C=0.01, max_iter=1000)) のように、前処理・モデルの順に渡します。
+# @explanation: C=0.01 では係数を強く抑えすぎて、正解率は C=0.1 のとき(81.6%)より下がります。抑えすぎると単純すぎるモデルになり、特徴の違いをとらえきれなくなります。
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+# 標準化 → ロジスティック回帰(C=0.01)の順につなげたパイプライン
+pipe = make_pipeline(StandardScaler(), LogisticRegression(C=0.01, max_iter=1000))
+
+# パイプラインごと交差検証して、平均を表示する
+print(round(cross_val_score(pipe, X, y, cv=cv).mean(), 3))
+
+#%% md
+解説の `GridSearchCV` で選ばれたパイプライン(`best_estimator_`)を使って、予測用の特徴量の表 `test_prepared.csv` の **最初の 5 人の生存の予測(0 / 1)** をリストにして表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+# 学習用の特徴量の表で、パイプラインのハイパーパラメータを探索する
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+pipe = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+search = GridSearchCV(pipe, {"logisticregression__C": [0.01, 0.1, 1, 10]}, cv=cv).fit(X, y)
+
+# 予測用の特徴量の表を読み込み、PassengerId を除いた特徴量にする
+test = pd.read_csv("test_prepared.csv")
+X_test = test.drop(columns=["PassengerId"])
+
+# 選ばれたパイプラインで最初の 5 人を予測する(____ に、選ばれたパイプラインが入っている属性の名前を入れる)
+best = search.____
+print(best.predict(X_test.head(5)).tolist())
+
+#%% code
+# @solution
+# @title: 選ばれたパイプラインで予測する
+# @hint: GridSearchCV の best_estimator_ に、最も良い組み合わせですべての学習用データを使って学習し直したパイプラインが入っています。
+# @explanation: best_estimator_ は標準化とモデルが入ったパイプラインなので、予測用の特徴量をそのまま渡すだけで、学習用のデータで求めた値で標準化してから予測してくれます。
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+# 学習用の特徴量の表で、パイプラインのハイパーパラメータを探索する
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+pipe = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+search = GridSearchCV(pipe, {"logisticregression__C": [0.01, 0.1, 1, 10]}, cv=cv).fit(X, y)
+
+# 予測用の特徴量の表を読み込み、PassengerId を除いた特徴量にする
+test = pd.read_csv("test_prepared.csv")
+X_test = test.drop(columns=["PassengerId"])
+
+# best_estimator_(選ばれたパイプライン)で最初の 5 人を予測する
+best = search.best_estimator_
+print(best.predict(X_test.head(5)).tolist())
+
+#%% md
+<!-- @question
+type: choice
+answer: 各回の学習用フォールドだけで標準化の値が求められ、検証用フォールドの情報が学習に混ざらないから。
+title: パイプラインで交差検証する理由
+hint: 前処理のルール2(前処理に使う値は学習用のデータだけから求める)を、交差検証の各回に当てはめて考えます。
+explanation: 交差検証の前にデータ全体で標準化すると、各回の検証用フォールドの平均・標準偏差も変換に使われ、検証用の情報が学習側に混ざります(リーク)。パイプラインにまとめて交差検証すると、各回で学習用フォールドだけを使って標準化の値が求められるので、正しく評価できます。
+-->
+標準化とロジスティック回帰をパイプラインにまとめてから交差検証する理由として、最も適切なものを選べ。
+
+- パイプラインにすると、交差検証の回数が自動で増えるから。
+- 各回の学習用フォールドだけで標準化の値が求められ、検証用フォールドの情報が学習に混ざらないから。
+- パイプラインにすると、標準化をしなくてもよくなるから。
+- パイプラインにすると、必ず正解率が上がるから。
+
+#%% md
+## まとめ
+
+- `make_pipeline` で前処理とモデルを1つにまとめると、`fit` で前処理とモデルの学習が順に行われる。
+- パイプラインごと交差検証すると、各回の学習用フォールドだけで前処理の値が求められ、正しく評価できる。
+- パイプラインのハイパーパラメータは `手順の名前__パラメータ名` で探索する。`best_estimator_` で、前処理込みのまま予測できる。

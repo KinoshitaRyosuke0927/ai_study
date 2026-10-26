@@ -1,0 +1,9 @@
+{
+  "name": "ai-code-runner",
+  "private": true,
+  "description": "AI が作ったコード(例題・模範解答・正解の根拠・図)を、受講画面と同じ Pyodide でサーバ側で実行する",
+  "type": "module",
+  "dependencies": {
+    "pyodide": "314.0.7"
+  }
+}

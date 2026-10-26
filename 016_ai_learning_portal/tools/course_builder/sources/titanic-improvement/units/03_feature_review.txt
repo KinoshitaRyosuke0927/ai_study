@@ -1,0 +1,180 @@
+#%% md
+# 特徴量の見直し
+特徴量を取り除いたり、新しく加えたりしたときの精度の変化を交差検証で確かめ、特徴量が本当に役立っているかを評価します。精度を上げるには、モデルの調整よりも特徴量の工夫が効くことが多い一方で、加えれば良くなるとは限らないことを学びます。
+
+#%% md
+## 学習目標
+- 特徴量のグループを取り除いたときの交差検証の正解率から、その特徴量の役立ち方を評価できる
+- 新しい特徴量を加えて、精度が変わるかを交差検証で確かめられる
+- 精度の差が偶然の範囲かどうかを、標準偏差と比べて判断できる
+
+#%% md
+## 特徴量を取り除いて比べる
+
+講座2で作った特徴量のうち、関係のある列をグループにまとめ、グループごとに取り除いたときの交差検証の正解率を比べます。モデルは、単元1で選んだランダムフォレスト(`max_depth=5`、`min_samples_leaf=5`)です。
+
+#%% code
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=5, random_state=0)
+
+# すべての特徴量を使ったときの正解率(基準)
+base = cross_val_score(model, X, y, cv=cv).mean()
+print(f"すべての特徴量       : {base:.3f}")
+
+# 取り除く特徴量のグループ(グループ名 → 列名のリスト)
+groups = {
+    "敬称(Title_*)": ["Title_Master", "Title_Miss", "Title_Mr", "Title_Mrs", "Title_Rare"],
+    "港(Embarked_*)": ["Embarked_C", "Embarked_Q", "Embarked_S"],
+    "客室番号の有無(HasCabin)": ["HasCabin"],
+}
+
+# グループごとに取り除いて交差検証し、基準との差を表示する
+for name, cols in groups.items():
+    score = cross_val_score(model, X.drop(columns=cols), y, cv=cv).mean()
+    print(f"{name}を除く: {score:.3f}(差 {score - base:+.3f})")
+
+#%% md
+- 敬称を取り除くと、正解率が最も大きく(約 2%)下がります。講座2で名前から取り出した敬称は、精度に役立っています
+- 港を取り除いても、正解率はほとんど変わりません。港の情報は、等級など他の特徴量でほぼ説明できるためと考えられます
+- 客室番号の有無も、取り除いたときの変化は小さくなっています
+
+役立っていない特徴量は、取り除いてモデルを単純にする選択肢もあります。
+
+#%% md
+## 精度の差は偶然か
+
+交差検証の正解率の差が 0.3% のように小さいとき、それが本当の差なのか、たまたまの差なのかを考える必要があります。目安として、**交差検証の各回の正解率の標準偏差** と比べます。
+
+#%% code
+# 各回の正解率と、その標準偏差を確かめる
+scores = cross_val_score(model, X, y, cv=cv)
+print("各回の正解率:", scores.round(3).tolist())
+print("標準偏差    :", round(scores.std(), 3))
+
+#%% md
+各回の正解率は 79.8〜85.4% と数 % ばらついています。差がこの標準偏差(約 2%)より十分小さいときは、「ほぼ同じ」と考えるのが安全です。
+
+#%% md
+## 演習
+
+#%% md
+年齢から「16 歳未満なら 1、それ以外は 0」を表す `IsChild` 列を特徴量に加え、解説と同じモデル・同じ分け方で交差検証の正解率の平均を求めてください。加える前と後の正解率を、この順に小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=5, random_state=0)
+
+# 加える前の正解率
+print(round(cross_val_score(model, X, y, cv=cv).mean(), 3))
+
+# 特徴量の表をコピーして、IsChild 列を加える(____ に、16 歳未満かどうかを 1 / 0 にする式を書く)
+X_child = X.copy()
+X_child["IsChild"] = ____
+
+# 加えた後の正解率
+print(round(cross_val_score(model, X_child, y, cv=cv).mean(), 3))
+
+#%% code
+# @solution
+# @title: 子どもかどうかの特徴量を加える
+# @hint: (X_child["Age"] < 16).astype(int) で、16 歳未満なら 1、それ以外は 0 になります。
+# @explanation: IsChild を加えると、正解率はかえって少し下がりました。子どもかどうかの情報は、年齢(Age)や敬称(Title_Master など)にすでに含まれているため、新しい情報になっていないと考えられます。特徴量は加えれば良くなるとは限らないので、必ず交差検証で確かめます。
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=5, random_state=0)
+
+# 加える前の正解率
+print(round(cross_val_score(model, X, y, cv=cv).mean(), 3))
+
+# 特徴量の表をコピーして、16 歳未満なら 1、それ以外は 0 の IsChild 列を加える
+X_child = X.copy()
+X_child["IsChild"] = (X_child["Age"] < 16).astype(int)
+
+# 加えた後の正解率
+print(round(cross_val_score(model, X_child, y, cv=cv).mean(), 3))
+
+#%% md
+家族に関する特徴量のうち、`SibSp`・`Parch` の 2 列を取り除いたとき(`FamilySize`・`IsAlone` は残す)の交差検証の正解率を、解説と同じモデル・同じ分け方で求め、小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=5, random_state=0)
+
+# SibSp と Parch を取り除いた特徴量で交差検証する(____ に、2 列を取り除いた表を作る式を書く)
+X_reduced = ____
+print(round(cross_val_score(model, X_reduced, y, cv=cv).mean(), 3))
+
+#%% code
+# @solution
+# @title: 家族の人数の内訳を取り除く
+# @hint: X.drop(columns=["SibSp", "Parch"]) で 2 列を取り除いた表が作れます。
+# @explanation: SibSp・Parch を取り除くと、正解率は少し下がります。家族の人数の合計(FamilySize)だけでなく、兄弟姉妹・配偶者と親・子の内訳にも、わずかに役立つ情報があるようです。ただし差は標準偏差より小さいので、どちらを選んでも大きな違いはありません。
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+# 特徴量の表を読み込み、特徴量 X と正解 y に分ける
+df = pd.read_csv("train_prepared.csv")
+X = df.drop(columns=["PassengerId", "Survived"])
+y = df["Survived"]
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+model = RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=5, random_state=0)
+
+# drop(columns=...) で SibSp と Parch を取り除いた特徴量で交差検証する
+X_reduced = X.drop(columns=["SibSp", "Parch"])
+print(round(cross_val_score(model, X_reduced, y, cv=cv).mean(), 3))
+
+#%% md
+<!-- @question
+type: choice
+answer: 差が交差検証のばらつき(標準偏差)より十分小さいので、偶然の差かもしれず、良くなったとは言い切れない。
+title: 小さな精度の差の判断
+hint: 交差検証の各回の正解率は、数 % ばらついていました。0.2% の差は、そのばらつきと比べてどうでしょうか。
+explanation: 交差検証の各回の正解率の標準偏差は約 2% あり、0.2% の差はそれよりずっと小さいので、たまたまの差である可能性があります。良くなったと判断するには、差がばらつきより十分大きいことを確かめるか、分け方を変えても同じ傾向になるかを確かめます。
+-->
+ある特徴量を加えたところ、交差検証の正解率が 81.6% から 81.8% に上がった。交差検証の各回の正解率の標準偏差は約 2% である。この結果の判断として最も適切なものを選べ。
+
+- 正解率が上がったので、この特徴量は必ず役立っている。
+- 差が交差検証のばらつき(標準偏差)より十分小さいので、偶然の差かもしれず、良くなったとは言い切れない。
+- 正解率の差が 1% 未満なので、この特徴量は必ず取り除くべきである。
+- 標準偏差が大きいので、交差検証の結果は使えない。
+
+#%% md
+## まとめ
+
+- 特徴量のグループを取り除いて交差検証すると、どの特徴量が役立っているかがわかる。名前から作った敬称は大きく役立っている。
+- 新しい特徴量は、加えれば良くなるとは限らない(既存の特徴量と同じ情報なら効果がない)。必ず交差検証で確かめる。
+- 精度の差は、交差検証の標準偏差と比べて判断する。

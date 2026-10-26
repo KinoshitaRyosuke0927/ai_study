@@ -9,7 +9,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AIJob, Course, Dataset, Problem, Unit, User
+from app.models import AIJob, Course, CourseImage, Dataset, Problem, Unit, User
 from app.services.course_service import NotFoundError
 
 
@@ -55,12 +55,12 @@ def editable_course(session: Session, user: User, course_id: int | None) -> Cour
 
 def course_id_of(session: Session, kind: str, object_id: int) -> int | None:
     """
-    単元・問題・データファイル・生成ジョブから、属する講座の ID を返す
+    単元・問題・データファイル・画像・生成ジョブから、属する講座の ID を返す
 
     Args
     -----------------
     - session: Session,                 DB セッション
-    - kind: str,                        対象の種類(unit / problem / dataset / job)
+    - kind: str,                        対象の種類(unit / problem / dataset / image / job)
     - object_id: int,                   対象の ID
 
     Returns
@@ -73,6 +73,7 @@ def course_id_of(session: Session, kind: str, object_id: int) -> int | None:
         "unit": (Unit.id, Unit.course_id),
         "problem": (Problem.id, Problem.course_id),
         "dataset": (Dataset.id, Dataset.course_id),
+        "image": (CourseImage.id, CourseImage.course_id),
         "job": (AIJob.id, AIJob.course_id),
     }[kind]
     # 講座 ID を取得して返却

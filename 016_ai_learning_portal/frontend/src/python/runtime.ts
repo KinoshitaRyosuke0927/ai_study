@@ -65,7 +65,7 @@ class PythonRuntime {
     this.worker.onmessage = this.onMessage
     this.ready = (async () => {
       const config = await api.config()
-      await this.send({ type: 'init', baseUrl: config.pyodide_base_url })
+      await this.send({ type: 'init', baseUrl: config.pyodide_base_url, matplotlibrc: config.matplotlibrc })
       this.setStatus('ready')
     })().catch((err) => {
       this.shutdown('failed')
@@ -138,6 +138,20 @@ class PythonRuntime {
         clearTimeout(timer)
         if (this.worker) this.setStatus('ready')
       }
+    })
+  }
+
+  /**
+   * セルで作成したファイルの中身を読み出す(ダウンロード用)
+   * @param name 作業ディレクトリのファイル名
+   */
+  readFile(name: string): Promise<ArrayBuffer> {
+    return this.enqueue(async () => {
+      // 停止・タイムアウトで実行環境を作り直すと、作成したファイルは消える
+      if (!this.worker) throw new Error(`ファイル ${name} が見つかりません。セルを実行し直してください。`)
+      const res = await this.send({ type: 'read', name })
+      if (res.type !== 'file') throw new Error('予期しない応答です')
+      return res.data
     })
   }
 

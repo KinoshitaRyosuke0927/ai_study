@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.common.constants import AnswerFormat, CourseStatus, Grading, ProblemKind
 from app.models import Course, Problem, Submission, UnitProgress, User
-from app.schemas import CodeSubmitRequest, QuizAnswerIn, SubmitResultOut
+from app.schemas import AnswerSubmitRequest, CodeSubmitRequest, QuizAnswerIn, SubmitResultOut
+from app.services.answer_check import grade_answer
 from app.services.course_service import NotFoundError
 from app.services.grading import outputs_match
 
@@ -106,24 +107,103 @@ def submit_code(
     - result: SubmitResultOut,          採点結果
 
     """
-    # 問題を取得
-    problem = session.get(Problem, problem_id)
-    # 存在しない、またはコード問題でない場合はエラー
-    if problem is None or problem.answer_format != AnswerFormat.CODE:
-        raise NotFoundError(problem_id)
-    # 非公開講座の問題を管理者以外が提出した場合はエラー
-    course = session.get(Course, problem.course_id)
-    if not (user.is_admin or course.status == CourseStatus.PUBLISHED or course.author_id == user.id):
+    # 問題を取得(コード問題のみ対象)
+    problem = _submittable_problem(session, user, problem_id)
+    if problem.answer_format != AnswerFormat.CODE:
         raise NotFoundError(problem_id)
     # 採点
     passed, message = grade_code(problem, req)
+    # 提出を記録して結果を返却
+    return _record(session, user, problem, req.code, req.output, passed, message)
+
+
+def submit_answer(
+    session: Session, user: User, problem_id: int, req: AnswerSubmitRequest
+) -> SubmitResultOut:
+    """
+    演習(選択式・数値入力・表形式の選択)の回答を採点して記録する
+
+    小テストの問題は小テストとしてまとめて採点するため、ここでは単元の演習だけを受け付ける
+    (1問ずつ正誤を確かめられないようにする)。
+
+    Args
+    -----------------
+    - session: Session,                 DB セッション
+    - user: User,                       ログイン中ユーザ
+    - problem_id: int,                  問題 ID
+    - req: AnswerSubmitRequest,         回答
+
+    Returns
+    -----------------
+    - result: SubmitResultOut,          採点結果
+
+    """
+    # 問題を取得(単元の演習で、選択式・数値入力・表形式のみ対象)
+    problem = _submittable_problem(session, user, problem_id)
+    if problem.kind != ProblemKind.EXERCISE or problem.answer_format not in AnswerFormat.KEYED:
+        raise NotFoundError(problem_id)
+    # 採点(未回答は記録せずに返す)
+    passed, answered, message = grade_answer(problem, req.answer)
+    if not answered:
+        return SubmitResultOut(passed=False, message=message, unit_completed=False, unit_newly_completed=False)
+    # 提出を記録して結果を返却
+    return _record(session, user, problem, req.answer, "", passed, message)
+
+
+def _submittable_problem(session: Session, user: User, problem_id: int) -> Problem:
+    """
+    ユーザが提出できる問題を取得する
+
+    Args
+    -----------------
+    - session: Session,                 DB セッション
+    - user: User,                       ログイン中ユーザ
+    - problem_id: int,                  問題 ID
+
+    Returns
+    -----------------
+    - problem: Problem,                 問題
+
+    """
+    # 問題を取得(存在しなければエラー)
+    problem = session.get(Problem, problem_id)
+    if problem is None:
+        raise NotFoundError(problem_id)
+    # 非公開講座の問題を、管理者・作成者以外が提出した場合はエラー
+    course = session.get(Course, problem.course_id)
+    if not (user.is_admin or course.status == CourseStatus.PUBLISHED or course.author_id == user.id):
+        raise NotFoundError(problem_id)
+    return problem
+
+
+def _record(
+    session: Session, user: User, problem: Problem, answer: str, output: str, passed: bool, message: str
+) -> SubmitResultOut:
+    """
+    提出を記録し、単元の完了状況を更新して採点結果を返す
+
+    Args
+    -----------------
+    - session: Session,                 DB セッション
+    - user: User,                       ログイン中ユーザ
+    - problem: Problem,                 問題
+    - answer: str,                      回答(コード・選択肢・数値など)
+    - output: str,                      実行結果の出力(コード問題のみ)
+    - passed: bool,                     正解なら True
+    - message: str,                     採点のメッセージ
+
+    Returns
+    -----------------
+    - result: SubmitResultOut,          採点結果
+
+    """
     # 提出を記録
     session.add(
         Submission(
             user_id=user.id,
             problem_id=problem.id,
-            answer=req.code,
-            output=req.output,
+            answer=answer,
+            output=output,
             passed=passed,
             content_version=problem.content_version,
         )

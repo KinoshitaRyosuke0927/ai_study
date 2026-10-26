@@ -12,7 +12,7 @@ from app.models import User
 SESSION_USER_KEY = "uid"
 
 
-def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+def get_current_user(request: Request, db: Session = Depends(get_db, scope="function")) -> User:
     """
     ログイン中のユーザを返す(未ログインなら 401)
 

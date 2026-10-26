@@ -5,9 +5,6 @@
 
 from __future__ import annotations
 
-import math
-import unicodedata
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -23,6 +20,7 @@ from app.schemas import (
     QuizSubmitRequest,
     RelatedUnitOut,
 )
+from app.services.answer_check import grade_answer
 from app.services.course_service import NotFoundError, dataset_out, visible_course_query
 from app.services.submission_service import grade_code
 
@@ -179,6 +177,7 @@ def get_quiz(session: Session, user: User, slug: str) -> QuizOut:
                     answer_format=p.answer_format,
                     prompt=p.prompt,
                     choices=list(p.choices or []),
+                    matrix_rows=list(p.matrix_rows or []),
                     starter_code=p.starter_code,
                     grading=p.grading,
                     test_code=p.test_code if p.grading == Grading.TEST else "",
@@ -200,23 +199,6 @@ def get_quiz(session: Session, user: User, slug: str) -> QuizOut:
     )
 
 
-def _normalize(text: str) -> str:
-    """
-    回答文字列を比較用に正規化する(全角英数字を半角に、前後の空白を除去)
-
-    Args
-    -----------------
-    - text: str,                        回答
-
-    Returns
-    -----------------
-    - normalized: str,                  正規化した回答
-
-    """
-    # NFKC で全角・半角を揃えて前後の空白を除いて返却
-    return unicodedata.normalize("NFKC", text).strip()
-
-
 def _grade(problem: Problem, answer: QuizAnswerIn | None) -> tuple[bool, bool, str]:
     """
     小テストの1問を採点する
@@ -234,23 +216,11 @@ def _grade(problem: Problem, answer: QuizAnswerIn | None) -> tuple[bool, bool, s
 
     """
     # 未回答は不正解
-    if answer is None or (problem.answer_format != AnswerFormat.CODE and not answer.answer.strip()):
+    if answer is None:
         return False, False, "未回答です。"
-    # 選択式: 選択肢の文言が正解と一致するか
-    if problem.answer_format == AnswerFormat.CHOICE:
-        ok = answer.answer == problem.correct_answer
-        return ok, True, "正解です。" if ok else "不正解です。"
-    # 数値入力: 許容誤差内で一致するか
-    if problem.answer_format == AnswerFormat.NUMERIC:
-        try:
-            value = float(_normalize(answer.answer).replace(",", ""))
-        except ValueError:
-            return False, True, "数値として読み取れませんでした。"
-        expected = float(problem.correct_answer)
-        ok = math.isfinite(value) and math.isclose(
-            value, expected, rel_tol=problem.tolerance, abs_tol=problem.tolerance
-        )
-        return ok, True, "正解です。" if ok else "不正解です。"
+    # 選択式・数値入力・表形式: 演習と共通の方法で採点
+    if problem.answer_format in AnswerFormat.KEYED:
+        return grade_answer(problem, answer.answer)
     # コード: 演習と同じ方法で採点
     ok, message = grade_code(problem, answer)
     return ok, True, message

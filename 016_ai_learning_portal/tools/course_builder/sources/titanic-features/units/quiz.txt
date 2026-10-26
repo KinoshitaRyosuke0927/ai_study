@@ -1,0 +1,274 @@
+#%% md
+# 小テスト:タイタニックで学ぶデータ分析 2 前処理と特徴量の作成
+全10問です。コードを書く問題と、前処理の考え方を問う選択式の問題があります。データは学習用の `train.csv` と予測用の `test.csv` を使います。満点で講座修了になります。何度でも受け直せます。
+
+#%% md
+<!-- @question
+type: choice
+answer: すべての値が数値で、欠損値がないこと。
+unit: 1
+explanation: scikit-learn の多くのモデルは、入力がすべて数値で、欠損値がないことを前提にしています。そのため、文字列の列は数値に変え、欠損値は補完してからモデルに入れます。
+-->
+scikit-learn の多くのモデルに入れるデータが満たすべき条件として、最も適切なものを選べ。
+
+- すべての値が数値で、欠損値がないこと。
+- すべての値が 0 から 1 の範囲に収まっていること。
+- 列の数が行の数より多いこと。
+- 文字列の列が少なくとも1つ含まれていること。
+
+#%% md
+<!-- @question
+type: code
+unit: 1
+-->
+学習用のデータで、運賃 `Fare` が欠損している乗客の `PassengerId` をリストにして表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# Fare が欠損している行の PassengerId をリストにして表示する(____ に、欠損している行を取り出す条件の式を書く)
+print(list(train[____]["PassengerId"]))
+
+#%% code
+# @solution
+# @explanation: train["Fare"].isna() を条件にして行を取り出します。運賃が欠損しているのは 1 人だけです。
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# isna() で欠損している行を True にして取り出し、PassengerId をリストにして表示する
+print(list(train[train["Fare"].isna()]["PassengerId"]))
+
+#%% md
+<!-- @question
+type: code
+unit: 2
+-->
+学習用のデータで、**性別 `Sex` ごとの年齢の中央値** を求め、その値で年齢の欠損値を埋めてください。性別ごとの中央値と、埋めた後の年齢の平均(小数第2位まで)を表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# 性別ごとの年齢の中央値を求めて表示する
+age_by_sex = train.groupby("Sex")["Age"].median()
+print(age_by_sex)
+
+# 各乗客の性別を中央値に置き換え、年齢の欠損値を埋める(____ に、埋める値の式を書く)
+age_filled = train["Age"].fillna(____)
+
+# 埋めた後の年齢の平均を、小数第2位まで表示する
+print(round(age_filled.mean(), 2))
+
+#%% code
+# @solution
+# @explanation: train["Sex"].map(age_by_sex) で、各乗客の性別を性別ごとの中央値に置き換えた列ができ、fillna でそれを使って埋めます。中央値は女性 28 歳、男性 29 歳です。
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# 性別ごとの年齢の中央値を求めて表示する
+age_by_sex = train.groupby("Sex")["Age"].median()
+print(age_by_sex)
+
+# 各乗客の性別を中央値に置き換え(map)、年齢の欠損値を埋める
+age_filled = train["Age"].fillna(train["Sex"].map(age_by_sex))
+
+# 埋めた後の年齢の平均を、小数第2位まで表示する
+print(round(age_filled.mean(), 2))
+
+#%% md
+<!-- @question
+type: choice
+answer: 最も多い値(最頻値)で埋める。
+unit: 2
+explanation: 乗船した港のようなカテゴリの変数は平均や中央値が計算できないので、最も多い値(最頻値)で埋めるのが基本です。欠損がごくわずかなら、全体への影響も小さく抑えられます。
+-->
+乗船した港 `Embarked` のようなカテゴリの変数に、少しだけ欠損値がある。補完の方法として最も適切なものを選べ。
+
+- 平均で埋める。
+- 最も多い値(最頻値)で埋める。
+- 0 で埋める。
+- 欠損している行を予測用のデータからも削除する。
+
+#%% md
+<!-- @question
+type: code
+unit: 3
+-->
+学習用のデータで、乗船した港 `Embarked`(欠損値は "S" で埋める)をワンホットエンコーディングし(列名の先頭は `Embarked`)、**各列の 1 の数** を表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# 欠損値を "S" で埋めてから、港ごとに 0 / 1 の列を作る(____ に、埋める処理の式を書く)
+dummies = pd.get_dummies(____, prefix="Embarked", dtype=int)
+
+# 各列の 1 の数を表示する
+print(dummies.sum())
+
+#%% code
+# @solution
+# @explanation: 欠損値を S で埋めたので、Embarked_S の 1 の数は 614 + 2 = 616 になります。各行でどれか1つの列だけが 1 なので、3 列の合計は 891(全員の人数)になります。
+import pandas as pd
+
+# 学習用のデータを読み込む
+train = pd.read_csv("train.csv")
+
+# 欠損値を "S" で埋めてから、港ごとに 0 / 1 の列を作る
+dummies = pd.get_dummies(train["Embarked"].fillna("S"), prefix="Embarked", dtype=int)
+
+# 各列の 1 の数を表示する
+print(dummies.sum())
+
+#%% md
+<!-- @question
+type: choice
+answer: 予測用のデータにない値の列が作られず、学習用と列が合わなくなることがあるため。
+unit: 3
+explanation: get_dummies はデータに含まれている値の列しか作りません。予測用のデータに学習用にある値が含まれていないと、その列が作られず、列の数や順番が学習用と合わなくなります。reindex(columns=学習用の列名, fill_value=0) でそろえます。
+-->
+学習用・予測用それぞれに `pd.get_dummies` を使った後、`reindex(columns=学習用の列名, fill_value=0)` で予測用の列をそろえる理由として最も適切なものを選べ。
+
+- get_dummies は欠損値を作るので、0 で埋める必要があるため。
+- 予測用のデータにない値の列が作られず、学習用と列が合わなくなることがあるため。
+- 予測用のデータの行の順番を、学習用と同じにするため。
+- reindex をしないと、get_dummies が文字列の列を返すため。
+
+#%% md
+<!-- @question
+type: code
+unit: 4
+-->
+学習用のデータで、家族の人数 `FamilySize`(`SibSp + Parch + 1`)が **5 人以上** かどうかを表す `LargeFamily` 列(5 人以上なら 1、それ以外は 0)を作り、`LargeFamily` ごとの生存率を小数第3位まで表示してください。
+
+#%% code
+# @starter
+import pandas as pd
+
+# 学習用のデータを読み込み、家族の人数の列を作る
+train = pd.read_csv("train.csv")
+train["FamilySize"] = train["SibSp"] + train["Parch"] + 1
+
+# 5 人以上なら 1、それ以外は 0 の列を作る(____ に、5 人以上かどうかを判定する比較の式を書く)
+train["LargeFamily"] = (____).astype(int)
+
+# LargeFamily ごとの生存率を、小数第3位まで表示する
+print(train.groupby("LargeFamily")["Survived"].mean().round(3))
+
+#%% code
+# @solution
+# @explanation: >= は「以上」の比較です。5 人以上の家族の生存率は約 18% で、それ以外(約 39%)より大きく下がります。
+import pandas as pd
+
+# 学習用のデータを読み込み、家族の人数の列を作る
+train = pd.read_csv("train.csv")
+train["FamilySize"] = train["SibSp"] + train["Parch"] + 1
+
+# 家族の人数が 5 以上なら True → astype(int) で 1 / 0 に変える
+train["LargeFamily"] = (train["FamilySize"] >= 5).astype(int)
+
+# LargeFamily ごとの生存率を、小数第3位まで表示する
+print(train.groupby("LargeFamily")["Survived"].mean().round(3))
+
+#%% md
+<!-- @question
+type: choice
+answer: 決定木のように値の大小の順番で分けるモデルでは、対数変換してもしなくても結果はほとんど変わらない。
+unit: 4
+explanation: 決定木は「値がある境目より大きいか小さいか」でデータを分けるため、対数変換のように大小の順番を変えない変換をしても、分け方はほとんど変わりません。対数変換は、ロジスティック回帰のように値の大きさをそのまま使うモデルで、極端に大きな値の影響を抑えるのに役立ちます。
+-->
+運賃の対数変換(`np.log1p`)について述べた次の記述のうち、最も適切なものを選べ。
+
+- 対数変換すると、運賃の大小の順番が逆になる。
+- 決定木のように値の大小の順番で分けるモデルでは、対数変換してもしなくても結果はほとんど変わらない。
+- 対数変換すると、欠損値も自動的に埋まる。
+- 運賃 0 の乗客がいるので、対数変換はできない。
+
+#%% md
+<!-- @question
+type: code
+unit: 5
+-->
+次の前処理の関数 `prep` を学習用・予測用の両方に使い、できた2つの表の **行数・列数** を表示してください(学習用、予測用の順に1行ずつ)。
+
+#%% code
+# @starter
+import pandas as pd
+
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
+
+
+def prep(df):
+    """性別と家族の人数だけの、簡単な前処理"""
+    out = pd.DataFrame({"Sex": (df["Sex"] == "female").astype(int)})
+    out["FamilySize"] = df["SibSp"] + df["Parch"] + 1
+    return out
+
+
+# 同じ関数を学習用・予測用の両方に使う(____ に、関数を呼び出す式を書く)
+train_x = ____
+test_x = ____
+
+# 行数・列数を表示する
+print(train_x.shape)
+print(test_x.shape)
+
+#%% code
+# @solution
+# @explanation: 同じ関数 prep を学習用(train)と予測用(test)の両方に使うことで、同じ処理が確実に行われます。行数はそれぞれ 891 行・418 行、列数はどちらも 2 列です。
+import pandas as pd
+
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
+
+
+def prep(df):
+    """性別と家族の人数だけの、簡単な前処理"""
+    out = pd.DataFrame({"Sex": (df["Sex"] == "female").astype(int)})
+    out["FamilySize"] = df["SibSp"] + df["Parch"] + 1
+    return out
+
+
+# 同じ関数を学習用・予測用の両方に使う
+train_x = prep(train)
+test_x = prep(test)
+
+# 行数・列数を表示する
+print(train_x.shape)
+print(test_x.shape)
+
+#%% md
+<!-- @question
+type: choice
+answer: I と II のみ
+unit: 5
+explanation: I. 補完に使う値は学習用のデータから求めるので正しい。II. 前処理の後は、学習用と予測用で列名と順番が一致しているかを確認するので正しい。III. 予測用のデータに正解(Survived)はなく、正解は特徴量に入れてはいけないので誤り。
+-->
+前処理の進め方について述べた次の記述 I〜III のうち、正しいものの組み合わせを選べ。
+
+I. 年齢の補完に使う中央値は、学習用のデータから求める。
+
+II. 前処理の後に、学習用と予測用の特徴量の表で、列名と順番が一致しているかを確認する。
+
+III. 予測の精度を上げるため、正解の `Survived` も特徴量の表に含めてモデルに入れる。
+
+- I のみ
+- II のみ
+- I と II のみ
+- I と III のみ
+- I と II と III
