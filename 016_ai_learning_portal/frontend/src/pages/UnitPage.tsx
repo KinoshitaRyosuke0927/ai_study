@@ -50,18 +50,19 @@ export function UnitPage() {
   const { unitId = '' } = useParams()
   const id = Number(unitId)
   const { data: unit, error, reload } = useLoad(() => api.unit(id), [id])
-  const [justCompleted, setJustCompleted] = useState(false)
+  // この画面で完了した単元の ID(単元を移動しても画面は作り直されないため、どの単元の完了かを覚えておく)
+  const [justCompletedId, setJustCompletedId] = useState<number | null>(null)
   const ctx = `unit-${id}`
 
   const onSubmitted = useCallback(
     (res: SubmitResult) => {
       // 単元の演習をすべて正解したら、完了の表示と目次を更新する
       if (res.unit_newly_completed) {
-        setJustCompleted(true)
+        setJustCompletedId(id)
         reload()
       }
     },
-    [reload],
+    [id, reload],
   )
 
   if (error) {
@@ -190,7 +191,7 @@ export function UnitPage() {
               )
             })}
 
-            {justCompleted && (
+            {justCompletedId === unit.id && (
               <div className="verdict verdict-pass unit-complete" role="status">
                 <CheckIcon size={20} />
                 <div>

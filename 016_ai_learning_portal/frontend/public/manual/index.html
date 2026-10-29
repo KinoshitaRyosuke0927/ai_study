@@ -1,0 +1,1229 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI学習ポータル 操作マニュアル</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+JP:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* 配色・書体はアプリ本体(frontend/src/styles.css)に合わせる */
+      :root {
+        --ground: #f6f5f1;
+        --surface: #ffffff;
+        --surface-sunk: #fafaf7;
+        --code-bg: #f0eee8;
+        --ink: #1b1e23;
+        --ink-2: #3d424a;
+        --muted: #5a5f66;
+        --line: #dad7cf;
+        --line-soft: #eceae4;
+        --accent: #0f6b72;
+        --accent-ink: #0a4f55;
+        --accent-soft: #e6f0f0;
+        --warm: #b4540f;
+        --warm-ink: #8f420b;
+        --warm-soft: #fbf1e8;
+        --font-sans: 'IBM Plex Sans JP', system-ui, sans-serif;
+        --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+        --radius: 8px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 76px;
+      }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--font-sans);
+        font-size: 15px;
+        line-height: 1.8;
+      }
+      a {
+        color: var(--accent);
+      }
+
+      /* ヘッダー */
+      .m-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: 60px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+      }
+      .brand-mark {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        font-family: var(--font-mono);
+        font-size: 13px;
+      }
+      .m-header b {
+        font-size: 17px;
+      }
+      .m-header .sub {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .toc-toggle {
+        display: none;
+        margin-left: auto;
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--surface);
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      /* 全体のレイアウト:左に目次、右に本文 */
+      .m-layout {
+        display: grid;
+        grid-template-columns: 240px minmax(0, 1fr);
+        max-width: 1600px;
+        margin: 0 auto;
+      }
+      .m-toc {
+        position: sticky;
+        top: 60px;
+        align-self: start;
+        max-height: calc(100vh - 60px);
+        overflow-y: auto;
+        padding: 24px 8px 40px 24px;
+        font-size: 13px;
+      }
+      .m-toc .toc-group {
+        margin: 16px 0 4px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+      .m-toc a {
+        display: block;
+        padding: 3px 10px;
+        border-left: 2px solid transparent;
+        color: var(--ink-2);
+        text-decoration: none;
+      }
+      .m-toc a:hover {
+        color: var(--accent);
+      }
+      .m-toc a.active {
+        border-left-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 700;
+      }
+      .m-toc a.sub {
+        padding-left: 22px;
+        font-size: 12.5px;
+      }
+      .m-main {
+        min-width: 0;
+        padding: 32px 24px 80px;
+      }
+
+      /* 本文 */
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+      h2 {
+        margin: 56px 0 16px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid var(--ink);
+        font-size: 22px;
+      }
+      h3 {
+        margin: 36px 0 10px;
+        font-size: 18px;
+      }
+      h4 {
+        margin: 24px 0 6px;
+        font-size: 15px;
+      }
+      p {
+        margin: 0 0 12px;
+      }
+      ul,
+      ol {
+        margin: 0 0 14px;
+        padding-left: 1.4em;
+      }
+      li {
+        margin: 2px 0;
+      }
+      .lead {
+        color: var(--ink-2);
+      }
+      .part {
+        display: inline-block;
+        margin-right: 8px;
+        padding: 1px 8px;
+        border-radius: 4px;
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+        font-size: 13px;
+        vertical-align: 3px;
+      }
+      /* 画面上のボタン・メニュー名 */
+      .ui {
+        padding: 0 5px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--surface);
+        font-size: 0.92em;
+        white-space: nowrap;
+      }
+      kbd {
+        padding: 0 5px;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        background: var(--surface);
+        font-family: var(--font-mono);
+        font-size: 0.88em;
+      }
+      code {
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: var(--code-bg);
+        font-family: var(--font-mono);
+        font-size: 0.88em;
+      }
+      .card {
+        margin: 16px 0;
+        padding: 16px 20px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+      .note,
+      .warn {
+        margin: 16px 0;
+        padding: 12px 16px;
+        border-left: 4px solid var(--accent);
+        border-radius: 0 var(--radius) var(--radius) 0;
+        background: var(--accent-soft);
+        font-size: 14px;
+      }
+      .warn {
+        border-left-color: var(--warm);
+        background: var(--warm-soft);
+      }
+      .note b:first-child,
+      .warn b:first-child {
+        margin-right: 6px;
+      }
+      table {
+        width: 100%;
+        margin: 12px 0 18px;
+        border-collapse: collapse;
+        background: var(--surface);
+        font-size: 14px;
+      }
+      th,
+      td {
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--code-bg);
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+      /* 手順(番号付きの流れ) */
+      .steps {
+        counter-reset: step;
+        list-style: none;
+        padding-left: 0;
+      }
+      .steps > li {
+        position: relative;
+        margin: 10px 0;
+        padding-left: 40px;
+      }
+      .steps > li::before {
+        counter-increment: step;
+        content: counter(step);
+        position: absolute;
+        top: 2px;
+        left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-family: var(--font-mono);
+        font-size: 13px;
+      }
+      /* 流れ図(横並びの箱) */
+      .flow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 16px 0;
+        font-size: 14px;
+      }
+      .flow span {
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--surface);
+      }
+      .flow span.end {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+        font-weight: 700;
+      }
+      .flow i {
+        color: var(--muted);
+        font-style: normal;
+      }
+      /* 画面の画像 */
+      figure {
+        margin: 18px 0 22px;
+      }
+      figure img {
+        display: block;
+        max-width: 100%;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        cursor: zoom-in;
+      }
+      figure img:hover {
+        border-color: var(--accent);
+      }
+      figure img:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      /* 画像の拡大表示(画面全体に重ねて表示する) */
+      .zoom {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: none;
+        flex-direction: column;
+        background: rgba(27, 30, 35, 0.88);
+      }
+      .zoom.open {
+        display: flex;
+      }
+      .zoom-bar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-shrink: 0;
+        padding: 10px 16px;
+        color: #fff;
+        font-size: 13px;
+      }
+      .zoom-caption {
+        flex-grow: 1;
+        min-width: 0;
+      }
+      .zoom-hint {
+        color: #c9ccd1;
+        white-space: nowrap;
+      }
+      .zoom-close {
+        width: 36px;
+        height: 36px;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 6px;
+        background: transparent;
+        color: #fff;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .zoom-close:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      /* 画像の表示エリア(原寸表示のときは、はみ出した分をスクロールする) */
+      .zoom-body {
+        flex-grow: 1;
+        display: flex;
+        overflow: auto;
+        padding: 0 16px 16px;
+      }
+      .zoom-body img {
+        margin: auto;
+        border-radius: 4px;
+        background: var(--surface);
+      }
+      .zoom.fit .zoom-body img {
+        max-width: 100%;
+        /* 上部のバー(約 56px)と下の余白を除いた高さに収める */
+        max-height: calc(100vh - 76px);
+        cursor: zoom-in;
+      }
+      .zoom:not(.fit) .zoom-body img {
+        max-width: none;
+        cursor: zoom-out;
+      }
+      figcaption {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      /* 画像がまだ無いときの仮の枠 */
+      .shot-missing {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        min-height: 160px;
+        padding: 20px;
+        border: 2px dashed var(--line);
+        border-radius: var(--radius);
+        background: var(--surface-sunk);
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+      .shot-missing code {
+        font-size: 13px;
+      }
+      .back-top {
+        margin-top: 64px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      /* 狭い画面では目次を折りたたむ */
+      @media (max-width: 860px) {
+        .m-layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .toc-toggle {
+          display: block;
+        }
+        .m-header .sub {
+          display: none;
+        }
+        .m-toc {
+          position: fixed;
+          top: 60px;
+          left: 0;
+          z-index: 9;
+          display: none;
+          width: 280px;
+          height: calc(100vh - 60px);
+          max-height: none;
+          border-right: 1px solid var(--line);
+          background: var(--surface);
+        }
+        .m-toc.open {
+          display: block;
+        }
+        .m-main {
+          padding: 24px 16px 60px;
+        }
+      }
+      /* 印刷するときは目次とヘッダーを出さない */
+      @media print {
+        .m-header,
+        .m-toc,
+        .zoom {
+          display: none;
+        }
+        .m-layout {
+          display: block;
+        }
+        h2 {
+          break-before: page;
+        }
+        figure,
+        table {
+          break-inside: avoid;
+        }
+      }
+    </style>
+    <script>
+      // 画像がまだ用意されていないときは、撮影する内容を書いた仮の枠に置き換える
+      function shotMissing(img) {
+        var box = document.createElement('div')
+        box.className = 'shot-missing'
+        box.innerHTML = '<b>画像(準備中)</b><code></code><span></span>'
+        box.querySelector('code').textContent = img.getAttribute('src')
+        box.querySelector('span').textContent = img.getAttribute('alt')
+        img.replaceWith(box)
+      }
+    </script>
+  </head>
+  <body>
+    <header class="m-header">
+      <span class="brand-mark">AI</span>
+      <b>AI学習ポータル</b>
+      <span class="sub">操作マニュアル</span>
+      <button type="button" class="toc-toggle" aria-expanded="false" aria-controls="toc">目次</button>
+    </header>
+
+    <div class="m-layout">
+      <nav class="m-toc" id="toc" aria-label="目次">
+        <div class="toc-group">はじめに</div>
+        <a href="#about">このサービスについて</a>
+        <a href="#roles">利用者の区分とできること</a>
+        <a href="#login">ログイン・ログアウト</a>
+        <a href="#screen">画面の構成</a>
+
+        <div class="toc-group">講座を受講する</div>
+        <a href="#flow-learn">受講の流れ</a>
+        <a href="#home">ホーム</a>
+        <a href="#catalog">講座カタログ</a>
+        <a href="#course">講座詳細</a>
+        <a href="#unit">単元で学ぶ</a>
+        <a href="#unit-code" class="sub">コードを実行する</a>
+        <a href="#unit-exercise" class="sub">演習に回答する</a>
+        <a href="#quiz">小テストを受ける</a>
+        <a href="#mypage">マイ学習</a>
+
+        <div class="toc-group">講座を作成する</div>
+        <a href="#flow-author">作成から公開までの流れ</a>
+        <a href="#admin-courses">講座管理</a>
+        <a href="#create-ai">AI で作成する</a>
+        <a href="#create-blank">白紙から作成する</a>
+        <a href="#editor">講座エディタ</a>
+        <a href="#editor-info" class="sub">講座情報</a>
+        <a href="#editor-unit" class="sub">単元の編集</a>
+        <a href="#editor-verify" class="sub">演習の検証</a>
+        <a href="#editor-quiz" class="sub">小テストの編集</a>
+        <a href="#editor-files" class="sub">データファイル・画像</a>
+        <a href="#publish">公開前チェックと公開</a>
+        <a href="#after-publish">公開後の変更</a>
+
+        <div class="toc-group">その他</div>
+        <a href="#faq">困ったときは</a>
+        <a href="#glossary">用語集</a>
+      </nav>
+
+      <main class="m-main">
+        <h1>AI学習ポータル 操作マニュアル</h1>
+        <p class="lead">
+          講座の受講、講座の作成・公開、管理者向けの機能について、画面ごとの使い方を説明します。
+          左の目次から読みたい項目を選んでください。
+        </p>
+
+        <!-- ============================================================ はじめに -->
+        <h2 id="about">このサービスについて</h2>
+        <p>
+          AI学習ポータルは、AIやデータ分析、統計に関する知識・技術を基礎から実践レベルまで学び、その学びを共有するためのサービスです。
+          講座は複数の<b>単元</b>でできていて、単元の中で概念の説明を読み、例題のコードを動かし、演習を解きながら学びます。
+        </p>
+        <ul>
+          <li><b>環境構築は不要です。</b>Python のコードはブラウザの中で実行されます(Google Colab に近い操作感です)。</li>
+          <li>単元の演習をすべて正解すると単元が<b>完了</b>になり、全単元を完了すると<b>小テスト</b>を受けられます。小テストで満点を取ると講座の<b>修了</b>です。</li>
+          <li>講座は、管理者だけでなく<b>メンバーの誰でも作成・公開</b>できます。AI に下書きを作らせることもできます。</li>
+        </ul>
+        <div class="note">
+          <b>補足</b>受講状況は、本人と管理者だけが確認できます。
+        </div>
+
+        <h2 id="roles">利用者の区分とできること</h2>
+        <p>利用者は「メンバー」と「管理者」の2つに分かれます。講座の受講・作成は、どちらも同じ操作で行えます。</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>機能</th>
+                <th>メンバー</th>
+                <th>管理者</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>講座の受講・小テスト・マイ学習</td>
+                <td>○</td>
+                <td>○</td>
+              </tr>
+              <tr>
+                <td>講座の作成・編集・公開・削除</td>
+                <td>○(自分が作成した講座のみ)</td>
+                <td>○(すべての講座)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="login">ログイン・ログアウト</h2>
+        <ol class="steps">
+          <li>ポータルの URL をブラウザで開くと、ログイン画面が表示されます。</li>
+          <li>管理者から伝えられた<b>ログイン名</b>と<b>パスワード</b>を入力し、<span class="ui">ログイン</span>を押します。</li>
+          <li>ログインするとホームが表示されます。</li>
+        </ol>
+        <figure>
+          <img src="images/01_login.png" alt="ログイン画面(ログイン名・パスワードの入力欄)" onerror="shotMissing(this)" />
+          <figcaption>ログイン画面</figcaption>
+        </figure>
+        <p>ログアウトするときは、画面右上の <span class="ui">ログアウト</span> を押します。</p>
+
+        <h2 id="screen">画面の構成</h2>
+        <p>すべての画面の上部にヘッダーがあり、次のメニューから各画面に移動できます。</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>メニュー</th>
+                <th>内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="ui">ホーム</span></td>
+                <td>続きから学習・受講中の講座・学習ロードマップ・新着講座</td>
+              </tr>
+              <tr>
+                <td><span class="ui">講座カタログ</span></td>
+                <td>公開中の講座の一覧。絞り込み・検索ができます</td>
+              </tr>
+              <tr>
+                <td><span class="ui">マイ学習</span></td>
+                <td>自分の受講状況・修了した講座・小テストの受験履歴</td>
+              </tr>
+              <tr>
+                <td><span class="ui">講座管理</span>(管理者は <span class="ui">管理</span>)</td>
+                <td>講座の作成・編集・公開</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          右上には、<span class="ui">マニュアル</span>(この操作マニュアルを別タブで開きます)、ログイン中の表示名、
+          <span class="ui">ログアウト</span> が表示されます。
+        </p>
+
+        <!-- ============================================================ 受講 -->
+        <h2 id="flow-learn"><span class="part">受講</span>受講の流れ</h2>
+        <div class="flow">
+          <span>講座を選ぶ</span><i>→</i><span>単元で説明・例題を学ぶ</span><i>→</i><span>演習をすべて正解(単元の完了)</span><i>→</i
+          ><span>全単元を完了</span><i>→</i><span>小テストで満点</span><i>→</i><span class="end">講座の修了</span>
+        </div>
+        <ul>
+          <li>単元はどの順番で開いても構いませんが、基本は 1 から順に進めることをおすすめします。</li>
+          <li>小テストは何度でも受け直せます。満点を取った時点で修了になります。</li>
+        </ul>
+
+        <h3 id="home">ホーム</h3>
+        <p>ログイン後に最初に表示される画面です。</p>
+        <figure>
+          <img src="images/02_home.png" alt="ホーム画面(続きから学習・受講中の講座・学習ロードマップ・自分の学習状況)" onerror="shotMissing(this)" />
+          <figcaption>ホーム</figcaption>
+        </figure>
+        <ul>
+          <li><b>続きから学習</b>:最後に学習していた講座と次の単元が表示されます。<span class="ui">続きから始める</span>で、その単元を開きます。</li>
+          <li><b>受講中の講座</b>:受講を始めた講座の進捗です。</li>
+          <li><b>学習ロードマップ</b>:講座を「基礎 → 応用 → 実践」のレベル順に並べています。基礎から順に受講すると無理なく進めます。</li>
+          <li><b>自分の学習状況</b>:修了講座・受講中・解いた演習の数です。</li>
+          <li><b>新着講座</b>:最近公開された講座です。</li>
+        </ul>
+
+        <h3 id="catalog">講座カタログ</h3>
+        <p>公開中の講座の一覧です。講座のカードを押すと講座詳細が開きます。</p>
+        <figure>
+          <img src="images/03_catalog.png" alt="講座カタログ(レベル・状態・タグの絞り込みと講座カード)" onerror="shotMissing(this)" />
+          <figcaption>講座カタログ</figcaption>
+        </figure>
+        <ul>
+          <li><b>レベル</b>(基礎・応用・実践)、<b>状態</b>(受講中・未受講・修了)、<b>タグ</b>で絞り込めます。</li>
+          <li><b>検索</b>欄に入力すると、講座名・概要・タグで絞り込めます。</li>
+        </ul>
+
+        <h3 id="course">講座詳細</h3>
+        <p>講座の概要と単元の一覧、自分の進捗を確認する画面です。</p>
+        <figure>
+          <img src="images/04_course_detail.png" alt="講座詳細(講座の概要・あなたの進捗・単元の一覧・小テスト)" onerror="shotMissing(this)" />
+          <figcaption>講座詳細</figcaption>
+        </figure>
+        <ul>
+          <li>右上の<b>あなたの進捗</b>のボタン(<span class="ui">受講を始める</span> / <span class="ui">続きから</span>)で、次に学ぶ単元を開きます。</li>
+          <li><b>単元</b>の一覧では、完了した単元にチェックが付き、次に学ぶ単元は「次に学習」と表示されます。どの単元も押して開けます。</li>
+          <li>一覧の最後が<b>小テスト</b>です。全単元を完了するまでは「あと ○ 単元」と表示され、受験できません。</li>
+          <li><b>先に受講をおすすめする講座</b>は目安です。修了していなくても受講できます。</li>
+          <li><b>学習環境</b>に、講座で使うライブラリとデータファイルが表示されます。</li>
+        </ul>
+
+        <h3 id="unit">単元で学ぶ</h3>
+        <p>単元の画面は、説明・例題コード・演習のセルを上から順に並べたノートブック形式です。上から読み進めてください。</p>
+        <figure>
+          <img src="images/05_unit.png" alt="単元画面の全体(左の目次、上部の Python の状態表示、説明セルと例題セル)" onerror="shotMissing(this)" />
+          <figcaption>単元画面</figcaption>
+        </figure>
+        <ul>
+          <li><b>左の目次</b>:講座のすべての単元と、開いている単元の見出し・演習へのリンクです。完了した単元にはチェックが付きます。</li>
+          <li><b>学習目標</b>:この単元で身につけることです。</li>
+          <li><b>Python の状態</b>(右上):「未起動」「準備中」「準備完了」「実行中」などを表示します。初めてコードを実行するときに実行環境を準備するため、数十秒かかることがあります。</li>
+          <li>画面の下の <span class="ui">前の単元</span> / <span class="ui">次の単元</span> で単元を移動できます。</li>
+        </ul>
+
+        <h4 id="unit-code">コードを実行する</h4>
+        <ol class="steps">
+          <li>コードセルの左にある<b>実行ボタン(▶)</b>を押すか、セルの中で <kbd>Shift</kbd> + <kbd>Enter</kbd> を押します。</li>
+          <li>セルの下に実行結果(print の内容・セル最後の式の値・グラフ・エラー)が表示されます。</li>
+        </ol>
+        <figure>
+          <img src="images/06_code_cell.png" alt="例題セルを実行したところ(実行ボタンと、表やグラフの出力)" onerror="shotMissing(this)" />
+          <figcaption>例題セルの実行結果</figcaption>
+        </figure>
+        <ul>
+          <li>例題のコードは自由に書き換えて試せます(書き換えた内容は保存されません。再読み込みすると元に戻ります)。</li>
+          <li>同じ単元のセルは変数を共有します。<b>例題は上から順に実行</b>してください。前のセルを実行していないと、変数が見つからないエラーになります。</li>
+          <li>実行中は実行ボタンが<b>停止ボタン</b>に変わります。終わらない処理は停止ボタンで止められます(120 秒で自動的に止まります)。</li>
+          <li>右上の <span class="ui">変数をリセット</span> で、この単元で作った変数をすべて消せます。動きがおかしくなったときにお試しください。</li>
+          <li>コードでファイルを作成すると(例:<code>df.to_csv("submission.csv")</code>)、出力の下に「作成したファイル」が表示され、<span class="ui">ダウンロード</span>で保存できます。</li>
+        </ul>
+
+        <h4 id="unit-exercise">演習に回答する</h4>
+        <p>演習には次の形式があります。演習の見出しに形式と採点方法が表示されます。</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>形式</th>
+                <th>回答のしかた</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>コード</td>
+                <td>
+                  初期コードの空欄(<code>____</code>)などを埋めて、<span class="ui">提出して採点</span>を押します。コードを実行し、その結果で採点します。
+                  採点方法は「出力一致」(出力が想定どおりか)と「テストコード」(テストに合格するか)の2つです。
+                </td>
+              </tr>
+              <tr>
+                <td>選択式</td>
+                <td>選択肢から1つ選び、<span class="ui">回答して採点</span>を押します。</td>
+              </tr>
+              <tr>
+                <td>数値入力</td>
+                <td>数値を入力し、<span class="ui">回答して採点</span>を押します。全角数字やカンマ区切りでも構いません。許容誤差の範囲内なら正解です。</td>
+              </tr>
+              <tr>
+                <td>表形式の選択</td>
+                <td>表の行ごとに、列の選択肢から1つずつ選び、<span class="ui">回答して採点</span>を押します。すべての行が正しければ正解です。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <figure>
+          <img src="images/07_exercise_code.png" alt="コードの演習(演習セル、提出して採点・ヒント・初期コードに戻すのボタン、正解の表示)" onerror="shotMissing(this)" />
+          <figcaption>コードの演習と採点結果</figcaption>
+        </figure>
+        <figure>
+          <img src="images/08_exercise_choice.png" alt="選択式または表形式の選択の演習と採点結果" onerror="shotMissing(this)" />
+          <figcaption>選択式・表形式の選択の演習</figcaption>
+        </figure>
+        <ul>
+          <li>分からないときは <span class="ui">ヒント</span> を押すと、ヒントが表示されます。</li>
+          <li>コードの演習で書き換えすぎたときは、<span class="ui">初期コードに戻す</span>で最初の状態に戻せます。</li>
+          <li>正解すると解説が表示され、演習に「正解済み」の印が付きます。不正解でも何度でも回答し直せます。</li>
+          <li><b>単元のすべての演習に正解すると、その単元は完了</b>になります。</li>
+        </ul>
+
+        <h3 id="quiz">小テストを受ける</h3>
+        <p>
+          講座の全単元を完了すると、講座詳細や単元の目次から小テストを開けます。小テストは 10 問程度で、<b>満点で講座の修了</b>です。
+          制限時間はなく、何度でも受け直せます。
+        </p>
+        <ol class="steps">
+          <li>すべての問題に回答します(コードの問題は、実行して結果を確かめておきます)。</li>
+          <li>画面下の <span class="ui">採点する</span> を押します。コードの問題は採点時に自動で実行されます。</li>
+          <li>
+            問題ごとに正解・不正解が表示されます。正解の問題には解説が、不正解の問題には復習する単元へのリンク(「復習:単元○ ○○ ↗」)が表示されます。
+            リンクを押すと単元が<b>別タブ</b>で開くので、採点結果を残したまま単元を見直せます。
+          </li>
+          <li>満点でなければ、小テストのタブに戻って回答を直し、<span class="ui">もう一度採点する</span> を押します。<span class="ui">最初から受け直す</span> で回答を消してやり直すこともできます。</li>
+        </ol>
+        <figure>
+          <img src="images/09_quiz.png" alt="小テストの画面(左の問題一覧と、問題・回答欄)" onerror="shotMissing(this)" />
+          <figcaption>小テスト</figcaption>
+        </figure>
+        <figure>
+          <img src="images/10_quiz_result.png" alt="小テストで満点を取り、講座を修了した表示" onerror="shotMissing(this)" />
+          <figcaption>満点で修了したときの表示</figcaption>
+        </figure>
+        <div class="note"><b>補足</b>未回答の問題があっても採点できます(未回答は不正解になります)。修了した後も、復習のために何度でも受験できます。</div>
+
+        <h3 id="mypage">マイ学習</h3>
+        <p>自分の学習の記録をまとめて確認する画面です。</p>
+        <figure>
+          <img src="images/11_mypage.png" alt="マイ学習(受講中の講座・修了した講座・小テストの受験履歴・最近の学習)" onerror="shotMissing(this)" />
+          <figcaption>マイ学習</figcaption>
+        </figure>
+        <ul>
+          <li><b>受講中の講座</b>:進捗と小テストの最高得点。ボタンから続きを始められます。</li>
+          <li><b>修了した講座</b>:修了日と小テストの受験回数。</li>
+          <li><b>小テストの受験履歴</b>・<b>最近の学習</b>:これまでの受験結果と学習の記録です。</li>
+        </ul>
+
+        <!-- ============================================================ 講座作成 -->
+        <h2 id="flow-author"><span class="part">講座作成</span>作成から公開までの流れ</h2>
+        <p>講座はメンバーの誰でも作成できます。作成した講座は「下書き」になり、公開前チェックを満たすと、承認なしで公開できます。</p>
+        <div class="flow">
+          <span>講座を作成(AI / 白紙)</span><i>→</i><span>講座エディタで内容を確認・編集</span><i>→</i><span>演習・小テストを検証</span><i>→</i
+          ><span>公開前チェック</span><i>→</i><span class="end">公開</span>
+        </div>
+        <div class="note">
+          <b>「検証」とは</b>
+          作成者が演習・小テストを自分で解いて、正解を確定させる作業です。AI が作った問題も含め、すべての問題が「検証済み」になるまで公開できません。
+          採点の誤りを防ぐための仕組みです。
+        </div>
+
+        <h3 id="admin-courses">講座管理</h3>
+        <p>
+          ヘッダーの <span class="ui">講座管理</span>で開きます。自分が作成した講座が表示されます。
+        </p>
+        <figure>
+          <img src="images/12_admin_courses.png" alt="講座管理(公開中・下書きの絞り込み、検索、新しい講座を作成ボタン。講座はまだ作成していない状態)" onerror="shotMissing(this)" />
+          <figcaption>講座管理(まだ講座を作成していない状態)</figcaption>
+        </figure>
+        <ul>
+          <li><b>状態</b>:「公開中」か「下書き」です。上のボタンで絞り込めます。</li>
+          <li><b>検証</b>:検証済みの問題数 / 全問題数です。すべて検証済みになると緑色で表示されます。</li>
+          <li><b>受講者</b>は1単元以上完了した人数、<b>修了者</b>は小テストで満点を取った人数です。</li>
+          <li><b>操作</b>:<span class="ui">編集</span>で講座エディタ、<span class="ui">公開前チェック</span>で公開前チェックの画面を開きます。</li>
+        </ul>
+
+        <h3 id="create-ai">AI で作成する</h3>
+        <p>題材を入力すると、AI が講座の構成案を作り、その構成から説明・例題・演習・小テストの下書きを作ります。</p>
+        <ol class="steps">
+          <li><span class="ui">＋ 新しい講座を作成</span>(または管理メニューの <span class="ui">講座を作成</span>)を押し、作成方法で <b>題材から AI で作成</b> を選びます。</li>
+          <li>
+            <b>講座のタイプ</b>を選びます。
+            <ul>
+              <li><b>概念理解型(コードなし)</b>:図表と文章で説明し、演習は選択式・数値入力・表形式で出題します(例:統計検定対策)。</li>
+              <li><b>実践型(コーディング中心)</b>:例題コードを実行して結果を読み取り、コードを書く演習で学びます(例:データ分析の実践)。</li>
+            </ul>
+          </li>
+          <li>講座タイトル(仮)・講座の目的・題材・単元数の目安・レベル・識別名などを入力します。データを使う講座は、<b>データファイル(CSV)</b>も選びます。AI がデータの列・型を読み取ってコードを書きます。</li>
+          <li><span class="ui">AI で構成案を作成</span> を押します(10 秒ほどかかります)。</li>
+          <li>表示された<b>構成案</b>(講座タイトル・概要・単元ごとのタイトル・概要・学習目標・演習数・小テストの問題数)を確認し、必要に応じて編集します。単元の追加・削除・並べ替えもできます。</li>
+          <li><span class="ui">この構成で下書きを作成</span> を押すと、下書きの作成が始まり、進捗の画面に移ります。</li>
+        </ol>
+        <figure>
+          <img src="images/13_create_ai_input.png" alt="講座を作成画面:AI で作成を選び、講座のタイプ・目的・題材などを入力したところ" onerror="shotMissing(this)" />
+          <figcaption>題材の入力</figcaption>
+        </figure>
+        <figure>
+          <img src="images/14_create_ai_outline.png" alt="AI が作った構成案を編集する画面(単元ごとのタイトル・概要・学習目標)" onerror="shotMissing(this)" />
+          <figcaption>構成案の確認・編集</figcaption>
+        </figure>
+        <h4>下書きの作成の進捗</h4>
+        <p>
+          AI は単元ごとに説明・例題・演習を作り、コードを実際に実行して数値や正解を確かめながら直します。
+          <b>1単元に 2〜4 分ほど、講座全体で 10〜20 分ほど</b>かかります。このページを閉じても作成は続きます。
+        </p>
+        <figure>
+          <img src="images/15_ai_job.png" alt="AI で下書きを作成中の進捗画面(単元ごとの状態)" onerror="shotMissing(this)" />
+          <figcaption>下書きの作成の進捗</figcaption>
+        </figure>
+        <ul>
+          <li>完了したら <span class="ui">講座エディタで確認する</span> を押して、内容を確認・検証します。</li>
+          <li>「要確認」と表示された項目は、AI が直しきれなかった点です。講座エディタで内容を確認してください。</li>
+          <li>途中で失敗・中断したときは <span class="ui">続きから再開</span> を押すと、まだできていない単元と小テストだけを作ります。</li>
+        </ul>
+        <div class="warn">
+          <b>注意</b>AI が作った内容には誤りが含まれることがあります。演習・小テストはすべて「未検証」の状態で作られます。
+          公開する前に、説明の内容も含めて必ず作成者が確認してください。
+        </div>
+
+        <h3 id="create-blank">白紙から作成する</h3>
+        <ol class="steps">
+          <li>作成方法で <b>白紙から作成</b> を選びます。</li>
+          <li>講座タイトル・識別名(URL に使う英小文字・数字・ハイフン)・レベル・概要を入力します。</li>
+          <li><span class="ui">下書きを作成してエディタへ</span> を押すと、講座エディタが開きます。説明・例題・演習を一から書いていきます。</li>
+        </ol>
+
+        <h3 id="editor">講座エディタ</h3>
+        <p>
+          講座の内容を編集する画面です。左の<b>講座の構成</b>から編集する項目(講座情報・各単元・小テスト・データファイル・画像)を選びます。
+          単元と小テストには、検証済みの問題数が表示されます。
+        </p>
+        <figure>
+          <img src="images/16_editor.png" alt="講座エディタ(左の講座の構成と、講座情報の編集エリア)" onerror="shotMissing(this)" />
+          <figcaption>講座エディタ(講座情報を開いた状態)</figcaption>
+        </figure>
+        <div class="warn"><b>注意</b>編集した内容は自動では保存されません。各画面の保存ボタンを押してください。保存せずに移動しようとすると確認が表示されます。</div>
+
+        <h4 id="editor-info">講座情報</h4>
+        <p>
+          講座タイトル・識別名・レベル・概要・タグ・使用ライブラリ・この講座で身につくこと・先に受講をおすすめする講座を編集し、
+          <span class="ui">講座情報を保存</span> を押します。<span class="ui">講座を削除</span> で講座を削除できます(受講記録もすべて削除され、元に戻せません)。
+        </p>
+
+        <h4 id="editor-unit">単元の編集</h4>
+        <p>単元のタイトル・概要・学習目標・目安時間と、単元の中身(セル)を編集します。</p>
+        <figure>
+          <img src="images/17_editor_unit.png" alt="単元の編集(演習・テキストのセルと、セルを追加するボタン・単元を保存ボタン)" onerror="shotMissing(this)" />
+          <figcaption>単元の編集(下部にセルを追加するボタンと単元を保存ボタン)</figcaption>
+        </figure>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>追加するセル</th>
+                <th>内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="ui">＋ テキスト</span></td>
+                <td>説明の文章。Markdown で書きます(数式は <code>$...$</code>)。<b>編集</b> / <b>プレビュー</b> で表示を確認できます。</td>
+              </tr>
+              <tr>
+                <td><span class="ui">＋ コード(例題)</span></td>
+                <td>受講者が実行して試す例題のコード。<span class="ui">例題を試しに実行</span> で動作を確認できます。</td>
+              </tr>
+              <tr>
+                <td><span class="ui">＋ 演習(コード)</span></td>
+                <td>コードを書く演習。問題文・初期コード・採点方式・作成者の解答などを設定します。</td>
+              </tr>
+              <tr>
+                <td>
+                  <span class="ui">＋ 演習(選択式)</span><br /><span class="ui">＋ 演習(数値入力)</span><br /><span class="ui">＋ 演習(表形式の選択)</span>
+                </td>
+                <td>選択肢・正解の数値と許容誤差・表の行と正解などを設定します。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li>セルは ↑ ↓ で並べ替え、× で削除できます。</li>
+          <li>編集が終わったら <span class="ui">単元を保存</span> を押します。</li>
+          <li><span class="ui">受講者表示でプレビュー</span> で、受講者に見える画面を確認できます(下書きの講座も、作成者と管理者はプレビューできます)。</li>
+          <li>単元の追加は左の <span class="ui">＋ 単元を追加</span>、並べ替えは <span class="ui">前へ</span> / <span class="ui">後へ</span>、削除は <span class="ui">単元を削除</span> です。</li>
+          <li><b>すべての単元に演習が1問以上必要</b>です(演習の正解で単元の完了を判定するため)。</li>
+        </ul>
+
+        <h4 id="editor-verify">演習の検証</h4>
+        <p>問題の形式によって、検証のしかたが異なります。検証の状態は「未検証」「検証済み」「不一致」のいずれかで表示されます。</p>
+        <h4>コードの演習</h4>
+        <ol class="steps">
+          <li><b>作成者の解答</b>欄に、受講者と同じ立場で問題を解いたコードを書きます(AI の模範解答は、先入観なく解けるよう最初は隠れています)。</li>
+          <li><span class="ui">解答を実行して検証</span> を押します(先に保存されます)。</li>
+          <li>
+            結果が表示されます。
+            <ul>
+              <li>AI の模範解答がある場合:その出力とあなたの解答の出力が一致すれば<b>検証済み</b>、違えば<b>不一致</b>です。</li>
+              <li>AI の模範解答が無い場合:あなたの解答の出力が想定出力になり、<b>検証済み</b>になります。</li>
+              <li>テストコードで採点する問題は、解答がテストに合格すれば検証済みです。</li>
+            </ul>
+          </li>
+          <li>不一致のときは <span class="ui">AI の模範解答を表示</span> で見比べます。自分の解答が正しければ <span class="ui">自分の解答を正とする</span> で検証済みにします。問題文の条件があいまいな場合は、問題文を直して検証し直してください。</li>
+        </ol>
+        <figure>
+          <img src="images/18_verify_code.png" alt="コードの演習の検証結果(AI の想定出力とあなたの解答の出力の比較、自分の解答を正とするボタン)" onerror="shotMissing(this)" />
+          <figcaption>コードの演習の検証</figcaption>
+        </figure>
+        <h4>選択式・数値入力・表形式の選択</h4>
+        <p>
+          問題文・選択肢・正解が正しいことを確認し、<span class="ui">内容を確認して検証済みにする</span> を押します。
+          作成者が自分で正解を設定して保存した問題は、保存時に検証済みになります。
+        </p>
+        <figure>
+          <img src="images/19_verify_keyed.png" alt="確認して検証済みになった選択式の演習(見出しに検証済みの印、選択肢と正解の設定)" onerror="shotMissing(this)" />
+          <figcaption>検証済みになった選択式の演習(確認前のボタンは「単元の編集」の画像の右下を参照)</figcaption>
+        </figure>
+        <div class="note">
+          <b>補足</b>採点に関わる項目(問題文・初期コード・採点方式・テストコード・選択肢・正解・許容誤差・解答)を変えると、その問題は「未検証」に戻ります。
+          ヒント・解説・タイトルだけの変更なら検証し直す必要はありません。
+        </div>
+
+        <h4 id="editor-quiz">小テストの編集</h4>
+        <p>
+          講座の構成から <b>小テスト</b> を選びます。<span class="ui">＋ 選択式</span>・<span class="ui">＋ 数値入力</span>・<span class="ui">＋ 表形式の選択</span>・<span class="ui">＋ コード</span>
+          で問題を追加し、<span class="ui">小テストを保存</span> を押します。問題ごとに<b>関連単元</b>を設定すると、受講者が不正解だったときに復習する単元として案内されます。
+          検証のしかたは演習と同じです。10 問程度を目安に、単元の内容に合った形式を選んでください。
+        </p>
+        <figure>
+          <img src="images/20_quiz_editor.png" alt="小テストの編集(問題の一覧、関連単元の選択、問題を追加するボタン)" onerror="shotMissing(this)" />
+          <figcaption>小テストの編集</figcaption>
+        </figure>
+
+        <h4 id="editor-files">データファイル・画像</h4>
+        <ul>
+          <li>
+            <b>データファイル</b>:<span class="ui">ファイルをアップロード</span> で講座で使うデータ(CSV など、1ファイル 20MB まで)を登録します。
+            受講者のブラウザの Python 実行環境に置かれ、コードから <code>pd.read_csv("ファイル名")</code> のようにファイル名で読み込めます。
+          </li>
+          <li>
+            <b>画像</b>:<span class="ui">画像をアップロード</span> で図を登録します(PNG / JPEG / GIF / WebP、1枚 2MB まで。ファイル名は半角英数字と <code>.</code> <code>_</code> <code>-</code> だけ)。
+            説明・問題文・解説の Markdown に <code>![説明](image:ファイル名)</code> と書くと、その位置に表示されます。<span class="ui">参照をコピー</span> でこの書き方をコピーできます。
+          </li>
+        </ul>
+        <figure>
+          <img src="images/21_editor_files.png" alt="講座エディタのデータファイルの画面(アップロードしたファイルの一覧と、ファイルをアップロードボタン)" onerror="shotMissing(this)" />
+          <figcaption>データファイルの管理(画像も同じ操作で管理します)</figcaption>
+        </figure>
+
+        <h3 id="publish">公開前チェックと公開</h3>
+        <p>講座エディタの <span class="ui">公開前チェックへ</span>、または講座管理の <span class="ui">公開前チェック</span> で開きます。</p>
+        <figure>
+          <img src="images/22_publish_check.png" alt="公開前チェック(チェック項目の一覧と、例題を実行してチェック・講座を公開するボタン)" onerror="shotMissing(this)" />
+          <figcaption>公開前チェック</figcaption>
+        </figure>
+        <p>次の項目をすべて満たすと公開できます。満たしていない項目は <span class="ui">エディタで開く</span> から直せます。</p>
+        <ul>
+          <li>講座情報(タイトル・概要・レベル)が入力されている</li>
+          <li>単元が1つ以上あり、すべての単元に演習が1問以上ある</li>
+          <li>演習の作成者解答がすべて検証済み</li>
+          <li>小テストが1問以上あり、すべて検証済み</li>
+          <li>例題コードがすべてブラウザ上でエラーなく実行できる(<span class="ui">例題を実行してチェック</span> を押して確認します)</li>
+        </ul>
+        <ol class="steps">
+          <li><span class="ui">例題を実行してチェック</span> を押し、すべての例題がエラーなく実行できることを確認します。</li>
+          <li><span class="ui">受講者表示で確認</span> で、受講者に見える画面を最終確認します。</li>
+          <li><span class="ui">講座を公開する</span> を押します。部署のメンバー全員の講座カタログに表示されます。</li>
+        </ol>
+        <p>公開をやめるときは <span class="ui">下書きに戻す</span> を押します。受講者からは見えなくなりますが、受講記録は残ります。</p>
+
+        <h3 id="after-publish">公開後の変更</h3>
+        <ul>
+          <li>公開した後も講座エディタで編集できます。保存した内容はすぐに受講者に反映されます。</li>
+          <li>演習・小テストの採点に関わる項目を変えた場合は、<b>その問題だけ検証し直して</b>ください。</li>
+          <li>すでに修了した受講者は、問題を変更しても修了のままです。</li>
+        </ul>
+
+        <!-- ============================================================ その他 -->
+        <h2 id="faq">困ったときは</h2>
+        <div class="card">
+          <h4>「データベースを起動しています」と表示された</h4>
+          <p>
+            しばらく使われていなかったため、データベースを停止していました。起動まで数分かかります。
+            そのままお待ちください(つながると自動で再読み込みします)。
+          </p>
+        </div>
+        <div class="card">
+          <h4>コードの実行が始まらない・Python の状態が「読み込みに失敗しました」になる</h4>
+          <p>
+            初回は実行環境の準備に数十秒かかります。失敗と表示された場合は、ネットワークの状態を確認してからページを再読み込みしてください。
+          </p>
+        </div>
+        <div class="card">
+          <h4>「name '...' is not defined」というエラーが出る</h4>
+          <p>前のセルを実行していないため、変数がまだありません。単元の例題を上から順に実行してから、もう一度実行してください。</p>
+        </div>
+        <div class="card">
+          <h4>コードの実行が終わらない</h4>
+          <p>実行ボタンの位置に表示される停止ボタンで止めてください。120 秒たつと自動で止まります。</p>
+        </div>
+        <div class="card">
+          <h4>演習の答えが合っているはずなのに正解にならない</h4>
+          <p>
+            「出力一致」の演習は、出力の内容(print の内容とセル最後の式の値)を比べます。余分な print を消す、問題文で指定された形式で表示する、などを確認してください。
+            <span class="ui">ヒント</span> も参考にしてください。
+          </p>
+        </div>
+        <div class="card">
+          <h4>小テストを受けられない</h4>
+          <p>講座のすべての単元を完了する必要があります。講座詳細で、まだ完了していない単元(チェックが付いていない単元)の演習に正解してください。</p>
+        </div>
+        <div class="card">
+          <h4>講座を公開できない</h4>
+          <p>公開前チェックで「満たしていない」項目を確認し、<span class="ui">エディタで開く</span> から直してください。多くの場合、未検証の問題が残っています。</p>
+        </div>
+        <div class="card">
+          <h4>パスワードを忘れた、不具合を見つけた など各種相談事</h4>
+          <p>木下(@r-kinoshita)に連絡お願いいたします。</p>
+        </div>
+
+        <h2 id="glossary">用語集</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>用語</th>
+                <th>意味</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>講座</td>
+                <td>1つのテーマを学ぶ単位。複数の単元と小テストでできています。</td>
+              </tr>
+              <tr>
+                <td>単元</td>
+                <td>講座の中の1回分の学習。説明・例題・演習のセルが並んでいます。</td>
+              </tr>
+              <tr>
+                <td>セル</td>
+                <td>単元の中の1つのまとまり(説明のテキスト、例題のコード、演習)。</td>
+              </tr>
+              <tr>
+                <td>単元の完了</td>
+                <td>単元のすべての演習に正解した状態。</td>
+              </tr>
+              <tr>
+                <td>小テスト</td>
+                <td>講座の最後のテスト。全単元を完了すると受験でき、満点で修了です。</td>
+              </tr>
+              <tr>
+                <td>修了</td>
+                <td>小テストで満点を取った状態。</td>
+              </tr>
+              <tr>
+                <td>レベル</td>
+                <td>講座の難易度。基礎・応用・実践の3段階です。</td>
+              </tr>
+              <tr>
+                <td>識別名</td>
+                <td>講座の URL に使う名前(英小文字・数字・ハイフン)。例:<code>stats2-descriptive</code></td>
+              </tr>
+              <tr>
+                <td>下書き / 公開中</td>
+                <td>講座の状態。下書きは作成者と管理者だけが見られ、公開中はメンバー全員の講座カタログに表示されます。</td>
+              </tr>
+              <tr>
+                <td>検証</td>
+                <td>作成者が問題を自分で解き、正解を確定させること。すべての問題が検証済みになると公開できます。</td>
+              </tr>
+              <tr>
+                <td>出力一致 / テストコード</td>
+                <td>コード問題の採点方法。出力が想定どおりか、またはテストコードに合格するかで採点します。</td>
+              </tr>
+              <tr>
+                <td>想定出力</td>
+                <td>出力一致で採点する問題の正しい出力。検証によって決まります。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="back-top"><a href="#">ページの先頭へ戻る</a></p>
+      </main>
+    </div>
+
+    <!-- 画像の拡大表示(本文の画像をクリックすると開く) -->
+    <div class="zoom fit" id="zoom" role="dialog" aria-modal="true" aria-labelledby="zoom-caption">
+      <div class="zoom-bar">
+        <span class="zoom-caption" id="zoom-caption"></span>
+        <span class="zoom-hint">画像をクリックで原寸 / 画面に合わせる ・ Esc で閉じる</span>
+        <button type="button" class="zoom-close" aria-label="拡大表示を閉じる">×</button>
+      </div>
+      <div class="zoom-body">
+        <img alt="" />
+      </div>
+    </div>
+
+    <script>
+      // 狭い画面での目次の開閉(項目を選んだら閉じる)
+      var toc = document.getElementById('toc')
+      var toggle = document.querySelector('.toc-toggle')
+      toggle.addEventListener('click', function () {
+        var open = toc.classList.toggle('open')
+        toggle.setAttribute('aria-expanded', String(open))
+      })
+      toc.addEventListener('click', function (e) {
+        if (e.target.tagName === 'A') {
+          toc.classList.remove('open')
+          toggle.setAttribute('aria-expanded', 'false')
+        }
+      })
+
+      // 表示中の見出しに対応する目次の項目を強調する
+      var links = Array.prototype.slice.call(toc.querySelectorAll('a'))
+      var targets = links
+        .map(function (a) {
+          return document.querySelector(a.getAttribute('href'))
+        })
+        .filter(Boolean)
+      function markActive() {
+        var current = targets[0]
+        for (var i = 0; i < targets.length; i++) {
+          if (targets[i].getBoundingClientRect().top <= 100) current = targets[i]
+        }
+        links.forEach(function (a) {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + current.id)
+        })
+      }
+      window.addEventListener('scroll', markActive, { passive: true })
+      markActive()
+
+      // 画像の拡大表示
+      var zoom = document.getElementById('zoom')
+      var zoomImg = zoom.querySelector('.zoom-body img')
+      var zoomCaption = document.getElementById('zoom-caption')
+      var zoomClose = zoom.querySelector('.zoom-close')
+      var lastFocus = null
+      function openZoom(img) {
+        // 開いた画像と説明を表示し、まずは画面に収まる大きさで表示する
+        lastFocus = img
+        zoomImg.src = img.src
+        zoomImg.alt = img.alt
+        var caption = img.parentNode.querySelector('figcaption')
+        zoomCaption.textContent = caption ? caption.textContent : img.alt
+        zoom.classList.add('fit')
+        zoom.classList.add('open')
+        document.body.style.overflow = 'hidden'
+        zoomClose.focus()
+      }
+      function closeZoom() {
+        zoom.classList.remove('open')
+        document.body.style.overflow = ''
+        if (lastFocus) lastFocus.focus()
+      }
+      // 本文の画像:クリック・Enter・スペースで拡大する(読み込めなかった画像は仮の枠に置き換わるため対象外)
+      document.querySelectorAll('figure img').forEach(function (img) {
+        img.tabIndex = 0
+        img.setAttribute('role', 'button')
+        img.setAttribute('title', 'クリックで拡大表示')
+        img.addEventListener('click', function () {
+          openZoom(img)
+        })
+        img.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            openZoom(img)
+          }
+        })
+      })
+      // 拡大した画像のクリックで、原寸表示と画面に合わせた表示を切り替える
+      zoomImg.addEventListener('click', function (e) {
+        e.stopPropagation()
+        zoom.classList.toggle('fit')
+      })
+      // 背景・×ボタン・Esc キーで閉じる
+      zoom.addEventListener('click', function (e) {
+        if (e.target === zoom || e.target.classList.contains('zoom-body')) closeZoom()
+      })
+      zoomClose.addEventListener('click', closeZoom)
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && zoom.classList.contains('open')) closeZoom()
+      })
+    </script>
+  </body>
+</html>

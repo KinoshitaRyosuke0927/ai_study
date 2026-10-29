@@ -117,16 +117,16 @@ GRANT ALL PRIVILEGES ON ai_learning_portal.* TO 'ai_learning_portal'@'%';
 FLUSH PRIVILEGES;
 ```
 
-現在のデータ(テーブル定義・サンプル講座・サンプルユーザ)を登録します(`db/README.md` のダンプを使います)。
+スナップショット(講座・ユーザ・受講記録を含む全データ。`db/README.md` 参照)を登録します。
 
 ```bash
 mysql -h $MYSQL.mysql.database.azure.com -u alpadmin -p --ssl-mode=REQUIRED \
-  --default-character-set=utf8mb4 ai_learning_portal < db/02_schema_and_data.sql
+  --default-character-set=utf8mb4 ai_learning_portal < db/snapshot_20261030/schema_and_data.sql
 ```
 
-> ダンプには Alembic の版数も含まれるため、コンテナ起動時の `alembic upgrade head` は必要な分だけを適用します。
-> サンプルユーザ(`admin` / `learner01`)のパスワードは `db/README.md` に記載しています。**公開前に必ず変更**してください
-> (デプロイ後に管理者でログインし、「管理 › メンバー管理」から変更できます)。
+> スナップショットには Alembic の版数も含まれるため、コンテナ起動時の `alembic upgrade head` は必要な分だけを適用します。
+> ユーザのパスワードは作成元の環境と同じです。必要に応じて、デプロイ後に管理者でログインし、「管理 › メンバー管理」から変更してください。
+> 講座の画像(`db/snapshot_20261030/images/`)は DB に含まれません。下の「講座の画像の保存先」の対応後に Blob Storage へアップロードします。
 
 ### 5. パラメータファイルの作成
 
@@ -263,7 +263,7 @@ az containerapp logs show -g $RG -n ca-ai-learning-portal --follow
 2. `backend/app/infra/image_store.py` に Blob Storage 版の保存先を追加し、`IMAGE_STORE=azure_blob` で切り替える
    (キーは「講座 ID/ファイル名」のまま。`delete_prefix` は講座の削除時に使う)。
 3. 接続はアプリのマネージド ID(ロール「ストレージ BLOB データ共同作成者」)で行う。ロールの割り当て権限が無い場合は接続文字列をシークレットで渡す。
-4. 既存の画像があれば、ローカルの `backend/var/images` の中身を同じキーでコンテナにアップロードする。
+4. スナップショットの画像(`db/snapshot_20261030/images/`。ローカルの `backend/var/images` と同じ構成)を、同じキーでコンテナにアップロードする。
 
 ## AI が作ったコードの実行環境(次回のデプロイまでに確認)
 

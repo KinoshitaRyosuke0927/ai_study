@@ -30,6 +30,10 @@ export function Header({ breadcrumb }: { breadcrumb?: ReactNode }) {
       )}
       {user && (
         <div className="user-menu">
+          {/* 操作マニュアル(静的な HTML。別タブで開く) */}
+          <a href="/manual/index.html" target="_blank" rel="noopener noreferrer" className="manual-link">
+            マニュアル
+          </a>
           <span>{user.display_name}</span>
           {user.is_admin && <span className="badge badge-admin">管理者</span>}
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => void logout()}>

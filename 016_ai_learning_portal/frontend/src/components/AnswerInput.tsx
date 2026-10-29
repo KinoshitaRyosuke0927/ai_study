@@ -52,7 +52,8 @@ export function AnswerInput({ name, label, format, choices, rows, value, onChang
         {choices.map((c) => (
           <label key={c} className={`choice${value === c ? ' choice-on' : ''}`}>
             <input type="radio" name={name} value={c} checked={value === c} onChange={() => onChange(c)} />
-            {c}
+            {/* 選択肢の文も Markdown として表示する($x$ などの数式・`コード` を整形する) */}
+            <Markdown source={c} inline />
           </label>
         ))}
       </fieldset>
@@ -91,7 +92,7 @@ export function AnswerInput({ name, label, format, choices, rows, value, onChang
             </th>
             {choices.map((c) => (
               <th key={c} scope="col">
-                {c}
+                <Markdown source={c} inline />
               </th>
             ))}
           </tr>

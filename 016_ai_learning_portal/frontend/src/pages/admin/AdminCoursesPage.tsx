@@ -50,8 +50,8 @@ export function AdminCoursesPage() {
           </label>
         </div>
         {error && <div className="form-error">{error}</div>}
-        <div className="card list-card">
-          <table className="table">
+        <div className="card list-card table-scroll">
+          <table className="table admin-courses-table">
             <thead>
               <tr>
                 <th>講座名</th>
@@ -69,7 +69,7 @@ export function AdminCoursesPage() {
             <tbody>
               {visible.map((r) => (
                 <tr key={r.id}>
-                  <td>
+                  <td className="course-title-cell">
                     <Link to={`/admin/courses/${r.id}`} className="strong-link">
                       {r.title}
                     </Link>

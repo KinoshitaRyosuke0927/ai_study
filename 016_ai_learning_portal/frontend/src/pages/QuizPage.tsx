@@ -38,8 +38,17 @@ function Feedback({ result }: { result: QuizQuestionResult }) {
           <span className="verdict-message">　{result.message}</span>
         )}
         {result.related_unit && (
-          <Link className="review-link" to={`/units/${result.related_unit.id}`}>
+          // 別タブで開く(同じタブで移動すると、採点結果が消えてしまうため)
+          <Link
+            className="review-link"
+            to={`/units/${result.related_unit.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="単元を別タブで開きます"
+          >
             復習:単元{result.related_unit.position} {result.related_unit.title}
+            <span aria-hidden="true"> ↗</span>
+            <span className="sr-only">(別タブで開きます)</span>
           </Link>
         )}
       </div>

@@ -44,7 +44,7 @@ from app.schemas_admin import (
 from app.services import admin_course_service as courses
 from app.services import ai_course_service as ai_courses
 from app.services import image_service as images
-from app.services.admin_course_service import MAX_DATASET_BYTES, MAX_IMPORT_BYTES, AdminInputError
+from app.services.admin_course_service import MAX_DATASET_BYTES, AdminInputError
 from app.services.image_service import MAX_IMAGE_BYTES
 from app.services.course_access import course_id_of, editable_course
 from app.services.course_service import NotFoundError
@@ -570,34 +570,6 @@ def delete_image(image_id: int, user: User = Depends(get_current_user), db: Sess
     # 画像の講座を編集できることを確認して、削除
     _guard_of(db, user, "image", image_id)
     _call(lambda: images.delete_image(db, image_id))
-
-
-# ---------- .ipynb の取り込み ----------
-@router.post("/courses/{course_id}/import-unit", response_model=UnitAdminOut)
-async def import_unit(
-    course_id: int, file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")
-) -> UnitAdminOut:
-    """
-    .ipynb を1つ取り込み、講座の末尾に単元として追加する
-
-    Args
-    -----------------
-    - course_id: int,                   講座 ID
-    - file: UploadFile,                 単元の .ipynb
-    - user: User,                       ログイン中ユーザ
-    - db: Session,                      DB セッション
-
-    Returns
-    -----------------
-    - unit: UnitAdminOut,               追加した単元
-
-    """
-    # 編集できることを確認する
-    _guard(db, user, course_id)
-    # 上限を少し超えるところまで読み、サイズ超過を検出する
-    data = await file.read(MAX_IMPORT_BYTES + 1)
-    # 取り込んで単元を返却
-    return _call(lambda: courses.import_unit_notebook(db, course_id, file.filename or "", data))
 
 
 # ---------- AI による講座作成 ----------

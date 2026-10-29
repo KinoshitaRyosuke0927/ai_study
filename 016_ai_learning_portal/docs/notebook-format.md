@@ -2,7 +2,7 @@
 
 Jupyter / VS Code / Google Colab で書いた `.ipynb` を、そのまま講座として取り込めます。
 講座の取り込みは `python -m app.cli import-course <講座フォルダ>`(`backend/` で実行)で行います。
-画面からは、講座エディタの「.ipynb から単元を追加」で、既存の講座に単元を1つずつ追加できます。
+取り込みは CLI(`python -m app.cli import-course`)で行います。
 見本は、コードを書かない講座が [`content/stats2-descriptive/`](../content/stats2-descriptive/)、コード演習を含む講座がテスト用の [`backend/tests/fixtures/sample-course/`](../backend/tests/fixtures/sample-course/) です。
 
 ## 講座フォルダの構成

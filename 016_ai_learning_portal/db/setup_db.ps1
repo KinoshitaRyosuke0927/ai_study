@@ -1,18 +1,36 @@
 ﻿# ============================================================
 # AI学習ポータル DB セットアップ(Windows PowerShell)
 #   1. データベースと接続ユーザを作成
-#   2. テーブル定義とデータ(02_schema_and_data.sql)を登録
+#   2. スナップショットのテーブル定義とデータ(snapshot_*/schema_and_data.sql)を登録
+#      (既存のテーブルは作り直すため、取り込み先の DB にあったデータは消える)
+#   3. スナップショットの講座の画像(snapshot_*/images)を画像の保存先にコピー
 # 実行例(このフォルダで):
 #   powershell -ExecutionPolicy Bypass -File .\setup_db.ps1
 #   powershell -ExecutionPolicy Bypass -File .\setup_db.ps1 -MysqlHost localhost -RootUser root
+#   powershell -ExecutionPolicy Bypass -File .\setup_db.ps1 -ImageDir D:\portal\images   # IMAGE_LOCAL_DIR を変えている場合
 # ============================================================
 param(
     [string]$MysqlHost = "localhost",
     [int]$Port = 3306,
-    [string]$RootUser = "root"
+    [string]$RootUser = "root",
+    [string]$ImageDir = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+# 使うスナップショット(新しいスナップショットを作ったら、ここのフォルダ名を変える)
+$snapshotName = "snapshot_20261030"
+$here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$snapshot = Join-Path $here $snapshotName
+if (-not (Test-Path (Join-Path $snapshot "schema_and_data.sql"))) { throw "スナップショットが見つかりません: $snapshot" }
+# 画像の保存先(既定は backend/var/images。backend/.env の IMAGE_LOCAL_DIR と合わせる)
+if (-not $ImageDir) { $ImageDir = Join-Path $here "..\backend\var\images" }
+
+# 既存のデータが消えることを確認する
+Write-Host "スナップショット $snapshotName の内容で DB ai_learning_portal を作り直します。"
+Write-Host "DB にある既存のテーブルとデータはすべて削除されます(画像の保存先: $ImageDir)。"
+$answer = Read-Host "続けますか? (y/N)"
+if ($answer -ne "y") { Write-Host "中止しました。"; exit 1 }
 
 # mysql コマンドを探す(PATH に無ければ既定のインストール先を見る)
 $mysql = (Get-Command mysql -ErrorAction SilentlyContinue).Source
@@ -37,7 +55,6 @@ if (-not $appPw) { throw "接続ユーザのパスワードを入力してくだ
 # 管理者パスワードは環境変数で渡す(コマンド履歴に残さない)
 $env:MYSQL_PWD = $rootPw
 $common = @("-h", $MysqlHost, "-P", $Port, "-u", $RootUser, "--default-character-set=utf8mb4")
-$here = Split-Path -Parent $MyInvocation.MyCommand.Path
 try {
     # 1. データベースと接続ユーザを作成(01_create_database.sql と同じ内容)
     $escaped = $appPw.Replace("\", "\\").Replace("'", "''")
@@ -53,7 +70,7 @@ FLUSH PRIVILEGES;
     Write-Host "データベースと接続ユーザを作成しました。"
 
     # 2. テーブル定義とデータを登録(文字化けを防ぐため mysql の source で直接読み込む)
-    $dump = (Join-Path $here "02_schema_and_data.sql").Replace("\", "/")
+    $dump = (Join-Path $snapshot "schema_and_data.sql").Replace("\", "/")
     & $mysql @common ai_learning_portal -e "source $dump"
     if ($LASTEXITCODE -ne 0) { throw "データの登録に失敗しました。" }
     Write-Host "テーブル定義とデータを登録しました。"
@@ -61,6 +78,11 @@ FLUSH PRIVILEGES;
 finally {
     Remove-Item Env:MYSQL_PWD -ErrorAction SilentlyContinue
 }
+
+# 3. 講座の画像をコピー(講座 ID ごとのフォルダ。同じ名前のファイルは上書き)
+New-Item -ItemType Directory -Force $ImageDir | Out-Null
+Copy-Item -Recurse -Force (Join-Path $snapshot "images\*") $ImageDir
+Write-Host "講座の画像をコピーしました: $ImageDir"
 
 Write-Host ""
 Write-Host "次に backend/.env を作成し、MYSQL_PASSWORD に今入力した接続ユーザのパスワードを設定してください。"

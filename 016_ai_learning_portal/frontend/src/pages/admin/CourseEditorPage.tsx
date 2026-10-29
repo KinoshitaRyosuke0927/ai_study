@@ -335,19 +335,6 @@ export function CourseEditorPage() {
     setParams({ s: `unit-${created.id}` })
   }
 
-  const importUnit = async (file: File | undefined) => {
-    if (!file) return
-    if (dirty && !window.confirm('保存していない変更があります。取り込むと変更は失われます。続けますか?')) return
-    try {
-      const unit = await api.admin.importUnit(editor.id, file)
-      await refresh()
-      setDirty(false)
-      setParams({ s: `unit-${unit.id}` })
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : String(err))
-    }
-  }
-
   const moveUnit = async (u: AdminUnit, delta: -1 | 1) => {
     const ids = editor.units.map((x) => x.id)
     const i = ids.indexOf(u.id)
@@ -405,18 +392,6 @@ export function CourseEditorPage() {
           <button type="button" className="toc-item toc-btn toc-add" onClick={() => void addUnit()}>
             ＋ 単元を追加
           </button>
-          <label className="toc-item toc-btn toc-add">
-            ＋ .ipynb から単元を追加
-            <input
-              type="file"
-              accept=".ipynb"
-              className="sr-only"
-              onChange={(e) => {
-                void importUnit(e.target.files?.[0])
-                e.target.value = ''
-              }}
-            />
-          </label>
           <button
             type="button"
             className={`toc-item toc-btn toc-quiz-open${section === 'quiz' ? ' toc-current' : ''}`}

@@ -1,37 +1,13 @@
-""".ipynb からの単元の追加と、DB の自動起動・停止のテスト。"""
+"""DB の自動起動・停止のテスト。"""
 
 from argparse import Namespace
 from datetime import datetime, timedelta, timezone
 
-import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
 from app.infra import db
 from app.infra.db_power import set_db_power
 from app.models import AppState
-from tests.conftest import SAMPLE_COURSE
-
-
-@pytest.fixture()
-def admin(seeded):
-    from app.main import app
-
-    c = TestClient(app)
-    assert c.post("/api/auth/login", json={"login_name": "admin", "password": "pw-admin"}).status_code == 200
-    return c
-
-
-def test_import_unit_notebook(admin):
-    course = admin.get("/api/authoring/courses").json()[0]
-    nb = (SAMPLE_COURSE / "03_central_tendency.ipynb").read_bytes()
-    res = admin.post(f"/api/authoring/courses/{course['id']}/import-unit", files={"file": ("03.ipynb", nb, "application/json")})
-    assert res.status_code == 200
-    unit = res.json()
-    assert unit["position"] == 6 and unit["title"].startswith("代表値")
-    # 書き方の誤りは理由つきでエラー
-    res = admin.post(f"/api/authoring/courses/{course['id']}/import-unit", files={"file": ("bad.ipynb", b"{}", "application/json")})
-    assert res.status_code == 400
 
 
 class FakePower:

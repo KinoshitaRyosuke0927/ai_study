@@ -10,9 +10,7 @@
 
 from __future__ import annotations
 
-import tempfile
 from datetime import datetime
-from pathlib import Path
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -59,7 +57,6 @@ from app.services.answer_check import answer_key_error
 from app.services.course_service import NotFoundError, dataset_out
 from app.services.grading import outputs_match
 from app.services.image_service import delete_course_images
-from app.services.notebook_import import NotebookFormatError, add_parsed_unit, parse_notebook
 
 # 採点に関わる項目(変更したら再検証が必要)
 _GRADED_FIELDS = (
@@ -76,8 +73,6 @@ _GRADED_FIELDS = (
 )
 # データファイルの上限サイズ
 MAX_DATASET_BYTES = 20 * 1024 * 1024
-# 取り込む .ipynb の上限サイズ
-MAX_IMPORT_BYTES = 50 * 1024 * 1024
 
 
 class AdminInputError(Exception):
@@ -842,45 +837,6 @@ def confirm_problem(session: Session, problem_id: int) -> VerifyOut:
         author_output="",
         ai_output=None,
     )
-
-
-# ---------- .ipynb からの単元の追加 ----------
-def import_unit_notebook(session: Session, course_id: int, filename: str, data: bytes) -> UnitAdminOut:
-    """
-    .ipynb を1つ読み込み、講座の末尾に単元として追加する
-
-    Args
-    -----------------
-    - session: Session,                 DB セッション
-    - course_id: int,                   講座 ID
-    - filename: str,                    ファイル名
-    - data: bytes,                      .ipynb の内容
-
-    Returns
-    -----------------
-    - unit: UnitAdminOut,               追加した単元
-
-    """
-    # サイズと拡張子の確認
-    if len(data) > MAX_IMPORT_BYTES:
-        raise AdminInputError("ファイルが大きすぎます(上限 50MB)")
-    if not filename.lower().endswith(".ipynb"):
-        raise AdminInputError(".ipynb ファイルを選んでください")
-    course = _get_course(session, course_id)
-    # 一時ファイルに書き出して解析する
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "unit.ipynb"
-        path.write_bytes(data)
-        try:
-            parsed = parse_notebook(path)
-        except NotebookFormatError as e:
-            raise AdminInputError(f"取り込みに失敗しました: {str(e).replace('unit.ipynb', filename)}")
-        except Exception:
-            raise AdminInputError("ノートブックとして読み込めませんでした")
-    # 講座の末尾に単元として登録
-    position = max((u.position for u in course.units), default=0) + 1
-    unit = add_parsed_unit(session, course.id, parsed, position, 20)
-    return _unit_out(_get_unit(session, unit.id))
 
 
 # ---------- 公開 ----------

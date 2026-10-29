@@ -14,7 +14,7 @@ Azure へのデプロイ手順は [docs/azure_deploy.md](docs/azure_deploy.md) �
 |---|---|
 | ホーム / 講座カタログ / マイ学習 | 続きから学習・学習ロードマップ・新着講座 / レベル・状態・タグで絞り込み / 自分の進捗・受験履歴 |
 | 講座詳細 / 単元 / 小テスト | 単元一覧と進捗 / ノートブック型の単元(Colab 風のセルで実行・採点)/ 全単元の完了後に受験、満点で修了 |
-| 講座管理(全ユーザ) | 講座の作成(AI で作成 / 白紙から)・.ipynb からの単元の追加・単元エディタ・小テストの編集・作成者による検証・公開前チェック。一般ユーザは自分が作成した講座だけ、管理者はすべての講座を扱える |
+| 講座管理(全ユーザ) | 講座の作成(AI で作成 / 白紙から)・単元エディタ・小テストの編集・作成者による検証・公開前チェック。一般ユーザは自分が作成した講座だけ、管理者はすべての講座を扱える |
 | 管理(管理者のみ) | メンバーの受講状況・メンバー管理 |
 
 ## 構成
@@ -39,16 +39,17 @@ Azure へのデプロイ手順は [docs/azure_deploy.md](docs/azure_deploy.md) �
 
 必要なもの:Python 3.12、Node.js 22、MySQL 8。
 
-> 別の環境で、現在のデータ入りの DB を用意してデモする場合は [db/README.md](db/README.md) を参照してください
-> (以下の手順 1 と、手順 2 の `alembic upgrade head`・ユーザ作成・講座取り込みが不要になります)。
+### 1. データベース(初回、または DB を復元するとき)
 
-### 1. データベース(初回のみ)
+`db/` フォルダのスクリプトで、DB と接続ユーザを作成し、スナップショット(講座・ユーザ・受講記録を含む全データ)を登録します。
+講座の画像も `backend/var/images/` にコピーされます。詳細・注意点は [db/README.md](db/README.md) を参照してください。
 
-```sql
-CREATE DATABASE ai_learning_portal CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-CREATE USER 'ai_learning_portal'@'localhost' IDENTIFIED BY '<パスワード>';
-GRANT ALL PRIVILEGES ON ai_learning_portal.* TO 'ai_learning_portal'@'localhost';
+```bash
+cd db
+powershell -ExecutionPolicy Bypass -File .\setup_db.ps1   # Windows。macOS / Linux / Git Bash は bash setup_db.sh
 ```
+
+> スナップショットの登録は **既存のテーブルを削除して作り直します**。データの入っている DB に対して実行するときは注意してください。
 
 ### 2. バックエンド(`backend/` で実行)
 
@@ -56,13 +57,11 @@ GRANT ALL PRIVILEGES ON ai_learning_portal.* TO 'ai_learning_portal'@'localhost'
 python -m venv .venv
 .venv\Scripts\activate                 # Git Bash なら source .venv/Scripts/activate
 pip install -r requirements.txt
-cp .env.example .env                   # MYSQL_PASSWORD と APP_SECRET_KEY を設定する
-alembic upgrade head                   # テーブル作成
-
-# ユーザ作成と講座の取り込み
-python -m app.cli create-user --login admin --name "管理者" --admin
-python -m app.cli import-course ../content/stats2-descriptive --author admin   # 前提講座があるので講座 1→6 の順に取り込む
+cp .env.example .env                   # MYSQL_PASSWORD(手順1の接続ユーザのパスワード)と APP_SECRET_KEY を設定する
+alembic upgrade head                   # スナップショット以降のマイグレーションがあれば適用(無ければ何もしない)
 ```
+
+講座とユーザはスナップショットに含まれるため、講座の取り込みやユーザの作成は不要です。
 
 ### 3. フロントエンドをビルドして起動
 

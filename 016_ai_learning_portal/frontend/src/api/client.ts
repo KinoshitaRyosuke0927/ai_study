@@ -150,11 +150,6 @@ export const api = {
       request<AdminUser>('PUT', `/api/admin/users/${id}`, body),
     deleteUser: (id: number) => request<void>('DELETE', `/api/admin/users/${id}`),
     confirm: (problemId: number) => request<VerifyResult>('POST', `/api/authoring/problems/${problemId}/confirm`),
-    importUnit: (courseId: number, file: File) => {
-      const form = new FormData()
-      form.append('file', file)
-      return request<AdminUnit>('POST', `/api/authoring/courses/${courseId}/import-unit`, form)
-    },
     aiStatus: () => request<AIStatus>('GET', '/api/authoring/ai/status'),
     aiOutline: (req: OutlineRequest) => request<CourseOutline>('POST', '/api/authoring/ai/outline', req),
     /** データファイルの要約(列・型・欠損・先頭の行)を作る(AI に渡す) */
