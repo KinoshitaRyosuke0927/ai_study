@@ -4,9 +4,9 @@ AI学習ポータル(`016_ai_learning_portal`)を Azure Container Apps(従量課
 Azure Database for MySQL(フレキシブルサーバー)にデプロイする手順です。構成・命名・IP 制限は
 `010_ai_reviewer`(`010_ai_reviewer/docs/azure_deploy.md`)に合わせています。
 
-> 2026-10-20 にこの手順でデプロイしました。実施時の状況は末尾の「デプロイの記録」を参照してください。
-> デプロイしたアカウントには**ロールの割り当て権限が無かった**ため、DB の自動起動・停止は無効のまま運用しています
-> (DB は手動で起動・停止。「自動起動・停止を有効にする」の手順で後から有効にできます)。
+> 2026-10-20 にプレリリース、2026-10-30 に本リリースとしてこの手順でデプロイしました。実施時の状況は末尾の「デプロイの記録」を参照してください。
+> 本リリースから DB の自動起動・停止(アクセス時に起動、60 分使われなければ停止)と、講座の画像の Blob Storage 保存を有効にしています。
+> ロールの割り当ては、権限を持つ人に Azure portal で行ってもらいます(手順 7)。
 
 ## 構成
 
@@ -20,6 +20,7 @@ Azure Database for MySQL(フレキシブルサーバー)にデプロイする手
 | Container App | `ca-ai-learning-portal` | `minReplicas=0` / `maxReplicas=1`。Ingress に IP 制限 |
 | Container Apps ジョブ | `caj-ai-learning-portal-db-stop` | 15 分ごとに「一定時間使われていなければ DB を停止」 |
 | Azure Database for MySQL | `mysql-ai-learning-portal` | フレキシブルサーバー / Burstable B1ms / MySQL 8.0 |
+| ストレージアカウント | `stailearningportal` | 講座の画像(Blob コンテナ `course-images`、非公開)。アプリはマネージド ID で接続 |
 | Azure OpenAI | 既存(010 と同じリソース) | `gpt-6-luna`(構成案・下書きとも) |
 
 IP 制限(010 と同じ社内ネットワーク):オフィス `221.117.124.90` / VPN `122.220.62.58`
@@ -165,16 +166,47 @@ az deployment group create \
 ```
 
 出力の `fqdn` がアプリの URL、`appPrincipalId` が手順 7 で使うアプリのマネージド ID です。
-ジョブのマネージド ID は次で取得します(`deployIdleStopJob` が `true` の場合のみ)。
+`jobPrincipalId` がジョブのマネージド ID(`deployIdleStopJob` が `true` の場合のみ)です。
+あとから確認する場合は次で取得します。
 
 ```bash
 az resource show -g $RG -n caj-ai-learning-portal-db-stop --resource-type Microsoft.App/jobs --query identity.principalId -o tsv
 ```
 
-### 7. マネージド ID に DB を操作する権限を付ける
+テンプレートはストレージアカウント `stailearningportal` と Blob コンテナ `course-images` も作成し、
+アプリの画像の保存先を Blob Storage(`IMAGE_STORE=azure_blob`)にします。講座の画像があれば、次のようにアップロードします
+(キーは「講座 ID/ファイル名」。ローカルの `backend/var/images` やスナップショットの `images/` と同じ構成)。
 
-アプリ(停止中の DB を起動する)とジョブ(使われていない DB を停止する)が、MySQL サーバーを操作できるようにします。
-**ロールの割り当てができる権限が必要**です(無い場合は、権限を持つ人に依頼してください)。
+```bash
+az storage blob upload-batch --account-name stailearningportal --destination course-images \
+  --source db/snapshot_20261030/images --overwrite --auth-mode key
+```
+
+### 7. マネージド ID に権限を付ける(DB の起動・停止と講座の画像)
+
+アプリとジョブのマネージド ID に、次の 3 つのロールを割り当てます。
+**ロールの割り当てができる権限(所有者 または ユーザー アクセス管理者)が必要**です(無い場合は、権限を持つ人に依頼してください)。
+
+| # | 割り当て先(マネージド ID) | 対象リソース | ロール | 用途 |
+|---|---|---|---|---|
+| 1 | Container App `ca-ai-learning-portal` | MySQL `mysql-ai-learning-portal` | 共同作成者(Contributor) | 停止中の DB を起動する |
+| 2 | Container Apps ジョブ `caj-ai-learning-portal-db-stop` | MySQL `mysql-ai-learning-portal` | 共同作成者(Contributor) | 使われていない DB を停止する |
+| 3 | Container App `ca-ai-learning-portal` | ストレージアカウント `stailearningportal` | ストレージ BLOB データ共同作成者(Storage Blob Data Contributor) | 講座の画像を読み書きする |
+
+**Azure portal での操作**(1〜3 それぞれ、対象リソースの画面で行う)
+
+1. 対象リソース(MySQL サーバー または ストレージアカウント)を開き、左のメニューの **アクセス制御 (IAM)** を選ぶ。
+2. **+ 追加 › ロールの割り当ての追加** を選ぶ。
+3. **ロール** タブでロールを選ぶ。共同作成者は **特権管理者ロール** タブにある。
+   ストレージ BLOB データ共同作成者は **職務ロール** タブで検索する。**次へ**。
+4. **メンバー** タブで、アクセスの割り当て先に **マネージド ID** を選び、**+ メンバーを選択** を押す。
+5. 右側の画面で、サブスクリプションを選び、マネージド ID の種類に **Container App**(1・3)または **Container Apps ジョブ**(2)を選ぶ。
+   一覧から対象(`ca-ai-learning-portal` / `caj-ai-learning-portal-db-stop`)を選んで **選択**。
+6. **レビューと割り当て** を押して完了する。反映まで数分かかることがある。
+
+割り当て後、各リソースの **アクセス制御 (IAM) › ロールの割り当て** タブで、割り当て先とロールを確認できます。
+
+Azure CLI で行う場合:
 
 ```bash
 MYSQL_ID=$(az mysql flexible-server show -g $RG -n $MYSQL --query id -o tsv)
@@ -182,7 +214,12 @@ az role assignment create --assignee-object-id <appPrincipalId> --assignee-princ
   --role "Contributor" --scope $MYSQL_ID
 az role assignment create --assignee-object-id <jobPrincipalId> --assignee-principal-type ServicePrincipal \
   --role "Contributor" --scope $MYSQL_ID
+STORAGE_ID=$(az storage account show -g $RG -n stailearningportal --query id -o tsv)
+az role assignment create --assignee-object-id <appPrincipalId> --assignee-principal-type ServicePrincipal \
+  --role "Storage Blob Data Contributor" --scope $STORAGE_ID
 ```
+
+手順 6 の出力の `appPrincipalId` / `jobPrincipalId` が、それぞれアプリとジョブのマネージド ID(オブジェクト ID)です。
 
 > 権限の範囲は、この MySQL サーバー1台だけです。より絞りたい場合は、`Microsoft.DBforMySQL/flexibleServers/read` /
 > `start/action` / `stop/action` だけを持つカスタムロールを作って割り当ててください。
@@ -252,18 +289,17 @@ az containerapp logs show -g $RG -n ca-ai-learning-portal --follow
 - **DB の手動操作**:`az mysql flexible-server start|stop|show -g $RG -n $MYSQL --query state`。
 - **ユーザ管理**:管理者でログインし「管理 › メンバー管理」から行います(コンテナ内で CLI を使う必要はありません)。
 
-## 講座の画像の保存先(次回のデプロイまでに対応)
+## 講座の画像の保存先
 
-講座の画像(講座エディタの「画像」、講座フォルダの `images/`)は、ローカルでは `backend/var/images` に保存している
+講座の画像(講座エディタの「画像」、講座フォルダの `images/`)は、ローカルでは `backend/var/images` に保存する
 (設定 `IMAGE_STORE=local`)。Container Apps のコンテナ内のファイルは再起動で消えるため、Azure では
-**Azure Blob Storage** に保存する(ユーザ決定 2026-10-25)。次回のデプロイ時に次を行う。
+**Azure Blob Storage** に保存する(ユーザ決定 2026-10-25、2026-10-30 対応)。
 
-1. ストレージアカウントとコンテナ(例:`stailearningportal` / `course-images`)を作成する。非公開(匿名アクセスなし)にする。
-   画像はアプリ経由で配信し、下書き講座の画像は作成者・管理者だけが見られるようにしているため。
-2. `backend/app/infra/image_store.py` に Blob Storage 版の保存先を追加し、`IMAGE_STORE=azure_blob` で切り替える
-   (キーは「講座 ID/ファイル名」のまま。`delete_prefix` は講座の削除時に使う)。
-3. 接続はアプリのマネージド ID(ロール「ストレージ BLOB データ共同作成者」)で行う。ロールの割り当て権限が無い場合は接続文字列をシークレットで渡す。
-4. スナップショットの画像(`db/snapshot_20261030/images/`。ローカルの `backend/var/images` と同じ構成)を、同じキーでコンテナにアップロードする。
+- ストレージアカウント `stailearningportal` / コンテナ `course-images`(手順 6 のテンプレートで作成)。非公開(匿名アクセスなし)。
+  画像はアプリ経由で配信し、下書き講座の画像は作成者・管理者だけが見られるようにしているため。
+- 保存先は `backend/app/infra/image_store.py` の `AzureBlobImageStore`(`IMAGE_STORE=azure_blob`)。キーは「講座 ID/ファイル名」。
+- 接続はアプリのマネージド ID(ロール「ストレージ BLOB データ共同作成者」、手順 7)。ロールを割り当てられない場合は、
+  `AZURE_STORAGE_CONNECTION_STRING`(接続文字列)をシークレットで渡しても接続できる。
 
 ## AI が作ったコードの実行環境(次回のデプロイまでに確認)
 
@@ -310,20 +346,33 @@ az acr delete -g $RG -n $ACR --yes
 
 ## デプロイの記録
 
+### 2026-10-30(本リリース)
+
 | 項目 | 内容 |
 |---|---|
-| 実施日 | 2026-10-20 |
 | URL | `https://ca-ai-learning-portal.icymeadow-336147b5.japaneast.azurecontainerapps.io`(オフィス・VPN からのみ) |
+| イメージ | `acrailearningportal.azurecr.io/ai-learning-portal:20261030060035` |
+| アプリ | CPU 1.0 / メモリ 2Gi に変更(AI が作ったコードの実行に備えて)。`minReplicas=0` のまま(アクセスがあるときだけ起動) |
+| データ | Azure の DB を `db/snapshot_20261030/` の内容で置き換え(10/20 以降に Azure 上で行われた操作は破棄)。件数とチェックサムがローカルと一致することを確認。作業中だけ作業端末の IP をファイアウォールに追加し、作業後に削除 |
+| 講座の画像 | ストレージアカウント `stailearningportal` / コンテナ `course-images` を作成し、スナップショットの画像 82 枚をアップロード |
+| DB の自動起動・停止 | **有効**(`dbAutostartEnabled=true` / `deployIdleStopJob=true`)。ジョブ `caj-ai-learning-portal-db-stop` を作成 |
+| マネージド ID | アプリ `c658bace-e815-479d-a4ae-adfae9b07622` / ジョブ `345da101-443c-4907-b7d2-8fef232cb846` |
+| ロールの割り当て | 手順 7 の 3 つを所有者に依頼(Azure portal で実施) |
+| 秘密情報 | `infra/.env.azure`・`infra/containerapp.parameters.json`(どちらも Git 管理対象外) |
+
+DB を手動で起動・停止する場合(マイグレーションを含む更新デプロイの前など):
+
+```bash
+az mysql flexible-server start -g test20251008 -n mysql-ai-learning-portal    # 起動(数分かかる)
+az mysql flexible-server stop  -g test20251008 -n mysql-ai-learning-portal    # 停止
+az mysql flexible-server show  -g test20251008 -n mysql-ai-learning-portal --query state -o tsv
+```
+
+### 2026-10-20(プレリリース)
+
+| 項目 | 内容 |
+|---|---|
 | イメージ | `acrailearningportal.azurecr.io/ai-learning-portal:20261020072419` |
 | MySQL | `mysql-ai-learning-portal`(Burstable B1ms / MySQL 8.0 / TLS 必須)。接続許可は「Azure のサービス」のみ |
 | データ | デプロイ時点のローカル DB の内容をそのまま登録(ユーザ・講座・受講記録) |
-| DB の自動起動・停止 | **無効**(`dbAutostartEnabled=false` / `deployIdleStopJob=false`)。デプロイしたアカウントにロールの割り当て権限が無いため |
-| 秘密情報 | `infra/.env.azure`・`infra/containerapp.parameters.json`(どちらも Git 管理対象外) |
-
-DB の起動・停止は手動で行います(停止中にアクセスすると「データベースに接続できません」と表示されます)。
-
-```bash
-az mysql flexible-server stop  -g test20251008 -n mysql-ai-learning-portal    # 使い終わったら停止
-az mysql flexible-server start -g test20251008 -n mysql-ai-learning-portal    # 使う前に起動(数分かかる)
-az mysql flexible-server show  -g test20251008 -n mysql-ai-learning-portal --query state -o tsv
-```
+| DB の自動起動・停止 | 無効(デプロイしたアカウントにロールの割り当て権限が無かったため。DB は手動で起動・停止) |

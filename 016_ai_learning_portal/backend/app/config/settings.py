@@ -57,9 +57,14 @@ class Settings(BaseSettings):
     )
 
     # --- 講座の画像の保存先 ---
-    # local: ローカルのフォルダ(IMAGE_LOCAL_DIR)に保存する。Azure では Blob Storage を使う予定(docs/azure_deploy.md)
+    # local: ローカルのフォルダ(IMAGE_LOCAL_DIR)に保存する
+    # azure_blob: Azure Blob Storage のコンテナに保存する(Azure 上で使う。docs/azure_deploy.md)
     image_store: str = Field(default="local", alias="IMAGE_STORE")
     image_local_dir: str = Field(default=str(BACKEND_DIR / "var" / "images"), alias="IMAGE_LOCAL_DIR")
+    # Blob Storage の接続先(マネージド ID で接続する)。接続文字列を指定した場合はそちらを優先する
+    azure_storage_account_url: str = Field(default="", alias="AZURE_STORAGE_ACCOUNT_URL")
+    azure_storage_container: str = Field(default="course-images", alias="AZURE_STORAGE_CONTAINER")
+    azure_storage_connection_string: str = Field(default="", alias="AZURE_STORAGE_CONNECTION_STRING")
 
     # --- AI(Azure OpenAI。010_ai_reviewer と同じ接続方式) ---
     azure_openai_endpoint: str = Field(default="", alias="AZURE_OPENAI_ENDPOINT")

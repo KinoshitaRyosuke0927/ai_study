@@ -2,7 +2,7 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "metadata": {
-    "description": "AI学習ポータル(016_ai_learning_portal):Log Analytics・Container Apps 環境・Container App・DB 自動停止ジョブ。手順は docs/azure_deploy.md を参照。"
+    "description": "AI学習ポータル(016_ai_learning_portal):Log Analytics・Container Apps 環境・Container App・DB 自動停止ジョブ・講座の画像用ストレージ。手順は docs/azure_deploy.md を参照。"
   },
   "parameters": {
     "location": {
@@ -24,6 +24,20 @@
     "idleStopJobName": {
       "type": "string",
       "defaultValue": "caj-ai-learning-portal-db-stop"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "defaultValue": "stailearningportal",
+      "metadata": {
+        "description": "講座の画像を保存するストレージアカウント(英小文字・数字 3〜24 文字。Azure 全体で一意)"
+      }
+    },
+    "imageContainerName": {
+      "type": "string",
+      "defaultValue": "course-images",
+      "metadata": {
+        "description": "講座の画像を保存する Blob コンテナ(非公開)"
+      }
     },
     "acrLoginServer": {
       "type": "string"
@@ -205,6 +219,18 @@
       {
         "name": "DB_IDLE_STOP_MINUTES",
         "value": "[string(parameters('dbIdleStopMinutes'))]"
+      },
+      {
+        "name": "IMAGE_STORE",
+        "value": "azure_blob"
+      },
+      {
+        "name": "AZURE_STORAGE_ACCOUNT_URL",
+        "value": "[concat('https://', parameters('storageAccountName'), '.blob.', environment().suffixes.storage, '/')]"
+      },
+      {
+        "name": "AZURE_STORAGE_CONTAINER",
+        "value": "[parameters('imageContainerName')]"
       }
     ]
   },
@@ -219,6 +245,33 @@
           "name": "PerGB2018"
         },
         "retentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[parameters('storageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "accessTier": "Hot",
+        "allowBlobPublicAccess": false,
+        "minimumTlsVersion": "TLS1_2",
+        "supportsHttpsTrafficOnly": true
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-05-01",
+      "name": "[concat(parameters('storageAccountName'), '/default/', parameters('imageContainerName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+      ],
+      "properties": {
+        "publicAccess": "None"
       }
     },
     {
@@ -245,7 +298,8 @@
       "name": "[parameters('containerAppName')]",
       "location": "[parameters('location')]",
       "dependsOn": [
-        "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]"
+        "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
       ],
       "identity": {
         "type": "SystemAssigned"
@@ -270,8 +324,8 @@
               "name": "ai-learning-portal",
               "image": "[parameters('imageName')]",
               "resources": {
-                "cpu": 0.5,
-                "memory": "1Gi"
+                "cpu": 1.0,
+                "memory": "2Gi"
               },
               "env": "[variables('env')]",
               "probes": [
@@ -300,7 +354,8 @@
       "name": "[parameters('idleStopJobName')]",
       "location": "[parameters('location')]",
       "dependsOn": [
-        "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]"
+        "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
       ],
       "identity": {
         "type": "SystemAssigned"
@@ -350,6 +405,14 @@
     "appPrincipalId": {
       "type": "string",
       "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('containerAppName')), '2024-03-01', 'full').identity.principalId]"
+    },
+    "jobPrincipalId": {
+      "type": "string",
+      "value": "[if(parameters('deployIdleStopJob'), reference(resourceId('Microsoft.App/jobs', parameters('idleStopJobName')), '2024-03-01', 'full').identity.principalId, '')]"
+    },
+    "storageAccountId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
     }
   }
 }

@@ -5,3 +5,7 @@
 **/.env
 frontend/dist
 backend/var
+# イメージに不要で、秘密情報・個人情報を含むもの(クラウドビルドで送らない)
+db
+infra
+docs
