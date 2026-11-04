@@ -60,3 +60,6 @@ docs/Qiita/appendix/crs_extend_01/project_codes.json
 
 # CatBoost 学習ログ（自動生成される一時ファイル）
 catboost_info/
+
+# 音声ファイル（録音を含むため Git 管理対象外）
+**/*.mp3
