@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+# Transcription (Azure gpt-transcribe)
+openai>=1.40
+# Bundles ffmpeg for splitting audio, so users don't need to install ffmpeg
+imageio-ffmpeg>=0.5

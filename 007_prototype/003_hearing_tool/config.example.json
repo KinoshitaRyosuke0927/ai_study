@@ -1,0 +1,5 @@
+{
+  "user_name": "A",
+  "data_dir": "./data",
+  "azure_env_file": "../001_communication_helper/.env"
+}

@@ -63,3 +63,7 @@ catboost_info/
 
 # 音声ファイル（録音を含むため Git 管理対象外）
 **/*.mp3
+
+# 003_hearing_tool のデータ（ヒアリングの発言や個人情報を含むため Git 管理対象外）
+007_prototype/003_hearing_tool/data/
+007_prototype/003_hearing_tool/config.json
