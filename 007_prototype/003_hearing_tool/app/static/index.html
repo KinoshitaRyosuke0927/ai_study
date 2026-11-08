@@ -35,7 +35,16 @@
   </dialog>
 
   <div id="toast" class="toast" hidden></div>
-  <script src="/static/markdown.js"></script>
-  <script src="/static/app.js"></script>
+  <!-- 画面の処理。ファイルをまたいで関数と定数を共有するので、この順番で読み込む（core.js が最初、router.js が最後）。
+       ?v= は版の番号。ファイルを変えたら上げて、ブラウザに古いファイルを使わせないようにする -->
+  <script src="/static/markdown.js?v=2"></script>
+  <script src="/static/js/core.js?v=2"></script>
+  <script src="/static/js/dialog.js?v=2"></script>
+  <script src="/static/js/pages_prepare.js?v=2"></script>
+  <script src="/static/js/pages_lists.js?v=2"></script>
+  <script src="/static/js/pages_live.js?v=2"></script>
+  <script src="/static/js/pages_transcript.js?v=2"></script>
+  <script src="/static/js/pages_analysis.js?v=2"></script>
+  <script src="/static/js/router.js?v=2"></script>
 </body>
 </html>
