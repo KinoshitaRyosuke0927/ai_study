@@ -39,11 +39,15 @@ async function renderHome(main) {
 
   main.innerHTML = `
     <h1>ホーム</h1>
-    <p class="sub">対象者ごとの状況と、次にやることの一覧です。</p>
+    <p class="sub">ロードマップ、次にやること、対象者ごとの状況です。</p>
+    <div class="panel" id="roadmap"></div>
     <div class="panel"><h2>次にやること</h2>${todos}</div>
     <div class="panel-head"><h2>対象者</h2><button class="primary" id="add-person">対象者を追加</button></div>
     <div class="grid">${cards || '<p class="muted">対象者がいません。</p>'}</div>`;
   main.querySelector("#add-person").onclick = async () => { if (await editRow("persons", null)) route(); };
+
+  // ロードマップを表示する（js/roadmap.js）
+  renderRoadmap(main.querySelector("#roadmap"));
 }
 
 // ------------------------------------------------------------------ 画面：対象者

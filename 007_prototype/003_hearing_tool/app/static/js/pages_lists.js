@@ -40,20 +40,31 @@ const filters = { issuePerson: "", issueStatus: "", sourcePerson: "", sourceConf
 function renderIssues(main) {
   const rows = state.tables.issues.filter((x) => (
     (!filters.issuePerson || x.person_id === filters.issuePerson) && (!filters.issueStatus || x.status === filters.issueStatus)));
+  // 表示の切り替え（一覧かマップか。選んだものはブラウザに記憶する）
+  const view = loadPref("issue_view", "list") === "map" ? "map" : "list";
+  const toggle = `<span class="rm-scales">${[["list", "一覧"], ["map", "マップ"]].map(([key, label]) => (
+    `<button type="button" class="${key === view ? "on" : ""}" data-issue-view="${key}">${label}</button>`)).join("")}</span>`;
+
   main.innerHTML = `
-    <h1>課題カード</h1>
-    <p class="sub">ヒアリングで見えた課題を、記録シートの項目で整理します。</p>
+    <div class="panel-head"><div><h1>課題カード</h1>
+      <p class="sub">${view === "map"
+        ? "課題をテーマごとに並べ、課題どうしのつながりや、解決策の候補、データとの関係を表示します。"
+        : "ヒアリングで見えた課題を、記録シートの項目で整理します。"}</p></div>${toggle}</div>
     <div class="panel">
       <div class="panel-head">
         <div class="filters">${personFilter("f-person", filters.issuePerson)}
           ${optionFilter("f-status", "すべての状態", OPTIONS.issueStatus, filters.issueStatus)}
-          <span class="muted">${rows.length}件</span></div>
+          ${view === "list" ? `<span class="muted">${rows.length}件</span>` : ""}</div>
         <button class="primary" id="add-issue">課題を追加</button>
       </div>
-      ${issueTable(rows, true)}
+      ${view === "list" ? issueTable(rows, true) : '<div id="issue-map"></div>'}
     </div>`;
+  main.querySelectorAll("[data-issue-view]").forEach((b) => {
+    b.onclick = () => { savePref("issue_view", b.dataset.issueView); route(); };
+  });
   main.querySelector("#f-person").onchange = (e) => { filters.issuePerson = e.target.value; route(); };
   main.querySelector("#f-status").onchange = (e) => { filters.issueStatus = e.target.value; route(); };
+  if (view === "map") renderIssueMap(main.querySelector("#issue-map"));
   main.querySelector("#add-issue").onclick = async () => {
     if (await editRow("issues", null, { person_id: filters.issuePerson, status: "候補", visibility: "聞き手のみ" })) route();
   };

@@ -94,7 +94,7 @@ function fieldHtml(field, value, scope) {
       input = `<input type="number" step="any" name="${name}" value="${h(value)}" ${req}>`;
       break;
     case "date":
-      input = `<input type="date" name="${name}" value="${h(value)}">`;
+      input = `<input type="date" name="${name}" value="${h(value)}" ${req}>`;
       break;
     case "select":
       input = `<select name="${name}">${field.options.map((o) => (

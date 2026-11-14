@@ -55,6 +55,13 @@ TABLES: dict[str, tuple[str, list[str]]] = {
     "evaluations": ("evaluation_id", ["evaluation_id", "issue_id", "criterion", "rating", "comment"]),
     "criteria": ("criterion_id", ["criterion_id", "criterion", "question", "order"]),
     "terms": ("term_id", ["term_id", "term", "category", "description", "misrecognitions"]),
+    # ロードマップのマイルストーンと予定（ヒアリングの回は sessions.csv の実施日から自動で表示する）
+    "roadmap": ("item_id", ["item_id", "kind", "title", "date", "status", "person_id", "note"]),
+    # 課題どうしのつながり（from が to の「原因」、from が to に「影響」など）
+    "issue_links": ("link_id", ["link_id", "from_issue_id", "to_issue_id", "kind", "note"]),
+    # つながりマップのカードの位置。ID はカードの種類とIDをつないだもの（例：issue:abc123）
+    # ID をカードごとに決まった値にして、ZIP で取り込んだときに同じカードの位置が1行にまとまるようにする
+    "map_positions": ("node", ["node", "x", "y"]),
 }
 
 # 新しく行を作るときの既定値
@@ -66,6 +73,8 @@ DEFAULT_VALUES: dict[str, dict[str, str]] = {
     "issues": {"status": "候補", "visibility": "聞き手のみ"},
     "data_sources": {"confirmation": "本人の認識"},
     "solutions": {"uses_genai": "0"},
+    "roadmap": {"kind": "予定", "status": "予定"},
+    "issue_links": {"kind": "関連"},
 }
 
 # CSV の文字コード（Excel で開いても文字化けしないよう BOM 付き）

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ヒアリング管理ツール</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=6">
 </head>
 <body>
   <header class="topbar">
@@ -37,14 +37,16 @@
   <div id="toast" class="toast" hidden></div>
   <!-- 画面の処理。ファイルをまたいで関数と定数を共有するので、この順番で読み込む（core.js が最初、router.js が最後）。
        ?v= は版の番号。ファイルを変えたら上げて、ブラウザに古いファイルを使わせないようにする -->
-  <script src="/static/markdown.js?v=2"></script>
-  <script src="/static/js/core.js?v=2"></script>
-  <script src="/static/js/dialog.js?v=2"></script>
-  <script src="/static/js/pages_prepare.js?v=2"></script>
-  <script src="/static/js/pages_lists.js?v=2"></script>
-  <script src="/static/js/pages_live.js?v=2"></script>
-  <script src="/static/js/pages_transcript.js?v=2"></script>
-  <script src="/static/js/pages_analysis.js?v=2"></script>
-  <script src="/static/js/router.js?v=2"></script>
+  <script src="/static/markdown.js?v=6"></script>
+  <script src="/static/js/core.js?v=6"></script>
+  <script src="/static/js/dialog.js?v=6"></script>
+  <script src="/static/js/roadmap.js?v=6"></script>
+  <script src="/static/js/issue_map.js?v=6"></script>
+  <script src="/static/js/pages_prepare.js?v=6"></script>
+  <script src="/static/js/pages_lists.js?v=6"></script>
+  <script src="/static/js/pages_live.js?v=6"></script>
+  <script src="/static/js/pages_transcript.js?v=6"></script>
+  <script src="/static/js/pages_analysis.js?v=6"></script>
+  <script src="/static/js/router.js?v=6"></script>
 </body>
 </html>

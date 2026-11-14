@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import RESOURCE_ROOT
-from .routers import analysis, io, sessions, tables, transcripts
+from .routers import analysis, io, issue_map, sessions, tables, transcripts
 from .storage import StorageError, data_dir
 
 # 画面のファイルの場所（exe では同梱先のフォルダから探す）
@@ -39,6 +39,7 @@ app.include_router(sessions.router)
 app.include_router(io.router)
 app.include_router(transcripts.router)
 app.include_router(analysis.router)
+app.include_router(issue_map.router)
 
 # 画面のファイルを配信する
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

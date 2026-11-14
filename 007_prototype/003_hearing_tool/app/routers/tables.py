@@ -87,7 +87,24 @@ def post_row(table: str, body: RowValues) -> dict:
         dict: 追加した行。
     """
     _check(table)
+    _check_link(table, body.values)
     return create_row(table, body.values, load_config()["user_name"])
+
+
+def _check_link(table: str, values: dict) -> None:
+    """課題どうしのつながりで、元と相手が同じ課題になっていないか確かめる。
+
+    Args:
+        table: テーブル名。issue_links 以外は何もしない。
+        values: 保存する列の値。
+
+    Returns:
+        None。同じ課題なら 400 を返す。
+    """
+    if table != "issue_links":
+        return
+    if values.get("from_issue_id") and values.get("from_issue_id") == values.get("to_issue_id"):
+        raise HTTPException(status_code=400, detail="元の課題と相手の課題に、別の課題を選んでください。")
 
 
 @router.put("/tables/{table}/{row_id}")
@@ -103,6 +120,7 @@ def put_row(table: str, row_id: str, body: RowValues) -> dict:
         dict: 更新後の行。
     """
     _check(table)
+    _check_link(table, body.values)
     user = load_config()["user_name"]
     try:
         # 評価の観点の名前を変えるときは、変える前の名前を控えておく
@@ -149,10 +167,17 @@ def remove_row(table: str, row_id: str) -> dict:
             ids = {r[TABLES[child][0]] for r in read_table(child) if r["session_id"] == row_id}
             deleted[child] = delete_rows(child, ids)
 
-    # 課題を削除するときは、その課題の評価もあわせて削除する
+    # 課題を削除するときは、その課題の評価と、課題どうしのつながりもあわせて削除する
     if table == "issues":
         ids = {e["evaluation_id"] for e in read_table("evaluations") if e["issue_id"] == row_id}
         deleted["evaluations"] = delete_rows("evaluations", ids)
+        ids = {k["link_id"] for k in read_table("issue_links") if row_id in (k["from_issue_id"], k["to_issue_id"])}
+        deleted["issue_links"] = delete_rows("issue_links", ids)
+
+    # つながりマップに出るカードを削除するときは、カードの位置もあわせて削除する
+    map_kind = {"issues": "issue", "solutions": "solution", "data_sources": "source"}.get(table)
+    if map_kind:
+        deleted["map_positions"] = delete_rows("map_positions", {f"{map_kind}:{row_id}"})
 
     # 評価の観点を削除するときは、その観点の評価もあわせて削除する
     if table == "criteria":

@@ -362,3 +362,137 @@ table.est th { padding-right: 16px; }
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 .toast.error { background: var(--danger); }
+
+/* ロードマップ（ホーム）：横軸が日付。左端のレーン名は、横にスクロールしても残す */
+.rm-scales { display: inline-flex; }
+.rm-scales button { border-radius: 0; margin-left: -1px; }
+.rm-scales button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+.rm-scales button:last-child { border-radius: 0 6px 6px 0; }
+.rm-scales button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rm-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; margin-bottom: 8px; }
+.rm-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.rm-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+.rm-canvas { position: relative; }
+.rm-head, .rm-lane { display: flex; }
+.rm-head { border-bottom: 1px solid var(--line); background: var(--bg); }
+.rm-lane + .rm-lane { border-top: 1px solid var(--line); }
+.rm-lane-name {
+  position: sticky; left: 0; z-index: 3;
+  width: 120px; flex-shrink: 0;
+  padding: 6px 10px;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  font-size: 12px; font-weight: bold; color: var(--muted);
+}
+.rm-head .rm-lane-name { background: var(--bg); }
+.rm-head-body, .rm-lane-body { position: relative; flex-shrink: 0; }
+.rm-months, .rm-ticks { position: relative; height: 22px; }
+.rm-ticks { border-top: 1px solid var(--line); }
+.rm-month, .rm-tick {
+  position: absolute; top: 0; height: 22px;
+  padding: 2px 6px; font-size: 12px; white-space: nowrap; overflow: hidden;
+  border-left: 1px solid var(--line);
+}
+.rm-tick { padding: 2px 0; text-align: center; color: var(--muted); }
+.rm-tick.weekend { background: #eef1f5; }
+.rm-today-label {
+  position: absolute; bottom: 0; transform: translateX(-50%);
+  background: var(--danger); color: #fff; font-size: 11px; padding: 0 5px; border-radius: 3px 3px 0 0;
+}
+/* 縦線と土日の色。レーンの後ろに敷く */
+.rm-body { position: relative; }
+.rm-grid { position: absolute; top: 0; bottom: 0; left: 120px; pointer-events: none; }
+.rm-line { position: absolute; top: 0; bottom: 0; border-left: 1px dashed #e6e9ee; }
+.rm-line.month { border-left: 1px solid var(--line); }
+.rm-weekend { position: absolute; top: 0; bottom: 0; background: #f3f5f8; }
+.rm-today { position: absolute; top: 0; bottom: 0; border-left: 2px solid var(--danger); opacity: 0.7; z-index: 2; }
+/* 項目：印の中心が日付の位置に来るようにする */
+.rm-item {
+  position: absolute; z-index: 1;
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 22px; padding: 0 6px 0 0;
+  border: none; background: transparent;
+  transform: translateX(-7px);
+  font-size: 12px;
+}
+.rm-item:hover { background: transparent; }
+.rm-item:hover .rm-label { text-decoration: underline; }
+.rm-label { background: rgba(255, 255, 255, 0.85); border-radius: 3px; padding: 0 2px; }
+.rm-mark { display: inline-block; width: 14px; height: 14px; flex-shrink: 0; }
+.rm-item.milestone .rm-mark, .rm-mark.milestone {
+  width: 12px; height: 12px; margin: 0 1px; transform: rotate(45deg); background: var(--warn);
+}
+.rm-item.milestone .rm-label { font-weight: bold; }
+.rm-item.schedule .rm-mark, .rm-mark.schedule { border-radius: 50%; background: var(--ok); }
+.rm-item.session .rm-mark, .rm-mark.session { border-radius: 50%; background: var(--accent); }
+.rm-item.done { opacity: 0.45; }
+.rm-item.cancel .rm-label { text-decoration: line-through; color: var(--muted); }
+.rm-item.cancel .rm-mark { background: var(--muted); }
+
+/* つながりマップ（課題カード）：左がマップ（縦横にスクロール）、右が選んだカードの内容 */
+.im-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-bottom: 6px; }
+.im-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; margin-bottom: 8px; }
+.im-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.im-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.im-line { display: inline-block; width: 26px; border-top: 2px solid; }
+.im-line.link { border-color: #7c3aed; }
+.im-line.solution { border-color: var(--ok); border-top-style: dashed; }
+.im-line.source { border-color: #8a94a3; border-top-style: dotted; }
+.im-connect { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.im-layout { display: flex; gap: 12px; align-items: flex-start; }
+.im-wrap {
+  flex: 1; min-width: 0;
+  height: calc(100vh - var(--topbar-h) - 260px); min-height: 420px;
+  overflow: auto; border: 1px solid var(--line); border-radius: 6px;
+  background: #fbfcfd radial-gradient(#e3e7ec 1px, transparent 1px) 0 0 / 20px 20px;
+}
+.im-sizer { position: relative; }
+.im-canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.im-side { width: 300px; flex-shrink: 0; margin: 0; max-height: calc(100vh - var(--topbar-h) - 260px); min-height: 420px; overflow-y: auto; }
+.im-side h3 { margin-top: 4px; }
+.im-side h4 { font-size: 13px; margin: 12px 0 4px; }
+.im-side ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.im-side .actions { margin-top: 12px; }
+.im-side-kind { font-size: 12px; color: var(--muted); }
+.im-help { line-height: 1.7; }
+.im-quote { margin: 6px 0; padding: 4px 10px; border-left: 3px solid var(--line); color: var(--muted); font-size: 13px; }
+/* テーマの囲み：見出しだけ押せる（ドラッグでテーマごと動かす） */
+.im-boxes { position: absolute; inset: 0; }
+.im-box {
+  position: absolute; pointer-events: none;
+  border: 1px solid #c9d6ea; border-radius: 10px; background: rgba(232, 240, 253, 0.45);
+}
+.im-box.none { border-style: dashed; border-color: var(--line); background: rgba(240, 242, 245, 0.5); }
+.im-box-head {
+  pointer-events: auto; cursor: move; user-select: none;
+  height: 26px; padding: 3px 10px; font-size: 13px; font-weight: bold; color: #2b4f86;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.im-box-count { font-weight: normal; color: var(--muted); font-size: 12px; margin-left: 4px; }
+/* 線：細い線の上に、押しやすいよう透明な太い線を重ねる */
+.im-edges { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.im-edge-line { stroke-width: 1.6; }
+.im-edge.link .im-edge-line { stroke: #7c3aed; stroke-width: 2; }
+.im-edge.solution .im-edge-line { stroke: var(--ok); stroke-dasharray: 6 4; }
+.im-edge.source .im-edge-line { stroke: #8a94a3; stroke-dasharray: 2 4; }
+.im-edge-hit { stroke: transparent; stroke-width: 12; }
+.im-edge.link .im-edge-hit { pointer-events: stroke; cursor: pointer; }
+.im-edge.link:hover .im-edge-line { stroke-width: 3; }
+.im-edge-label { font-size: 11px; fill: #5b21b6; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.im-edge.dim { opacity: 0.12; }
+/* カード */
+.im-card {
+  position: absolute; z-index: 2;
+  padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  cursor: grab; user-select: none; touch-action: none; font-size: 12px; line-height: 1.45;
+}
+.im-card:active { cursor: grabbing; }
+.im-card.issue { border-left: 5px solid; }
+.im-card.solution { background: var(--ok-soft); border-color: #b7dcc6; }
+.im-card.source { background: #f1f3f6; }
+.im-card-title { font-weight: bold; font-size: 13px; }
+.im-card-meta { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 3px; color: var(--muted); }
+.im-card-kind { color: var(--muted); font-size: 11px; }
+.im-card.selected { outline: 3px solid var(--accent); outline-offset: 1px; }
+.im-card.dim { opacity: 0.25; }

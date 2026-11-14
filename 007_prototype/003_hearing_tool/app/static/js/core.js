@@ -21,6 +21,17 @@ const OPTIONS = {
   issueStatus: ["候補", "深掘り中", "提案候補", "見送り"],
   confirmation: ["本人の認識", "確認を依頼中", "確認済み"],
   termCategory: ["人名", "サービス", "部署", "その他"],
+  roadmapKind: ["マイルストーン", "予定"],
+  roadmapStatus: ["予定", "完了", "中止"],
+  linkKind: ["原因", "影響", "似ている", "関連"],
+};
+
+/** 課題どうしのつながりの種類の説明（「原因」「影響」は向きがある） */
+const LINK_KIND_HINT = {
+  原因: "元の課題が、相手の課題の原因になっている",
+  影響: "元の課題が、相手の課題に影響している",
+  似ている: "同じような課題（向きなし）",
+  関連: "そのほかの関わり（向きなし）",
 };
 
 /** テーブルごとのIDの列 */
@@ -28,13 +39,15 @@ const ID_COLUMN = {
   persons: "person_id", sessions: "session_id", segments: "segment_id", hypotheses: "hypothesis_id",
   questions: "question_id", utterances: "utterance_id", issues: "issue_id", data_sources: "source_id",
   solutions: "solution_id", evaluations: "evaluation_id", criteria: "criterion_id", terms: "term_id",
+  roadmap: "item_id", issue_links: "link_id", map_positions: "node",
 };
 
 /** テーブルの日本語名（ダイアログの見出しに使う） */
 const TABLE_NAME = {
   persons: "対象者", sessions: "ヒアリングの回", segments: "タイムテーブルの区切り", hypotheses: "仮説",
   questions: "質問", issues: "課題カード", data_sources: "データ台帳", terms: "用語", utterances: "発言",
-  solutions: "解決策の候補", criteria: "評価の観点",
+  solutions: "解決策の候補", criteria: "評価の観点", roadmap: "ロードマップの項目",
+  issue_links: "課題どうしのつながり",
 };
 
 /* 編集フォームの定義
@@ -153,6 +166,23 @@ const FORMS = {
     { key: "category", label: "分類", type: "select", options: OPTIONS.termCategory },
     { key: "description", label: "説明", type: "textarea" },
     { key: "misrecognitions", label: "誤認識されやすい表記（; 区切り）", type: "text" },
+  ],
+  roadmap: [
+    { key: "kind", label: "種類", type: "select", options: OPTIONS.roadmapKind,
+      hint: "マイルストーンは大きな区切り（例：課題決定、PoC終了）、予定は小さなスケジュール（例：上長への進捗報告会）です。" },
+    { key: "title", label: "名前", type: "text", required: true },
+    { key: "date", label: "日付", type: "date", required: true,
+      hint: "期間を表したいときは、開始と終了の2つの項目を作ってください。ヒアリングの回は、回の実施日から自動で表示されます。" },
+    { key: "status", label: "状態", type: "select", options: OPTIONS.roadmapStatus },
+    { key: "person_id", label: "関係する対象者（任意）", type: "ref", refTable: "persons" },
+    { key: "note", label: "メモ", type: "markdown" },
+  ],
+  issue_links: [
+    { key: "from_issue_id", label: "元の課題", type: "ref", refTable: "issues", required: true },
+    { key: "kind", label: "種類", type: "select", options: OPTIONS.linkKind,
+      hint: "原因：元の課題が相手の課題の原因／影響：元の課題が相手の課題に影響／似ている・関連：向きなし" },
+    { key: "to_issue_id", label: "相手の課題", type: "ref", refTable: "issues", required: true },
+    { key: "note", label: "メモ（例：見積もりがずれると、引き渡しの時期もずれる）", type: "textarea" },
   ],
 };
 
