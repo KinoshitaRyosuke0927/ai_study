@@ -1,0 +1,2 @@
+# run_local.py が保存する監視状態(ローカル動作確認用)
+.local_state/

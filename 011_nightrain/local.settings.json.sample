@@ -1,0 +1,28 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "POLL_SCHEDULE": "0 */5 0-8 * * 1-5",
+
+    "MATTERMOST_URL": "https://chat.jbdcl.com",
+    "MATTERMOST_TOKEN": "your-personal-access-token",
+    "GROUPSESSION_BASE_URL": "https://gs.jbdcl.com/gsession",
+    "GROUPSESSION_USERNAME": "your-groupsession-id",
+    "GROUPSESSION_PASSWORD": "your-groupsession-password",
+    "AZURE_OPENAI_ENDPOINT": "https://your-resource.services.ai.azure.com/openai/v1",
+    "AZURE_OPENAI_KEY": "your-azure-openai-key",
+    "AZURE_OPENAI_DEPLOYMENT": "gpt-5.4-mini",
+
+    "WATCH_MATTERMOST_CHANNELS": "JBD社員全体のお知らせ, JBD全体のお知らせ, 全員/拠点などの特定のお知らせ, 社員/拠点などの特定のお知らせ, 東京本社共有",
+    "WATCH_GROUPSESSION_FORUM_SIDS": "5, 15",
+    "REMIND_CHANNEL": "雑務連絡",
+    "REMIND_DM_USERNAME": "r-kinoshita",
+    "REMIND_MENTION": "@channel",
+    "REMINDER_THRESHOLD": "0.7",
+    "POLL_OVERLAP_MINUTES": "2",
+    "NOTIFIED_RETENTION_DAYS": "30",
+    "MAX_RETRY_COUNT": "3",
+    "COMPANY_HOLIDAYS": "12-29,12-30,12-31,01-02,01-03,01-04"
+  }
+}

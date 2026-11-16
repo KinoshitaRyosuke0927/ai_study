@@ -1,0 +1,13 @@
+.git*
+.vscode
+.venv
+__pycache__
+local.settings.json
+local.settings.json.sample
+.local_state
+.build
+dist
+run_local.py
+build_package.ps1
+README.md
+DEPLOYMENT.md
