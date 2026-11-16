@@ -23,6 +23,8 @@ class ApplyImport(BaseModel):
     """取り込みの実行の指示を受け取る。"""
 
     token: str
+    # テーブルごとの取り込み方（update / add / skip）。指定のないテーブルは update
+    modes: dict[str, str] = {}
 
 
 def _file_label(session_ids: list[str]) -> str:
@@ -109,12 +111,12 @@ def post_transfer_apply(body: ApplyImport) -> dict:
     """確認した ZIP を取り込む。
 
     Args:
-        body: preview で受け取った番号。
+        body: preview で受け取った番号と、テーブルごとの取り込み方。
 
     Returns:
         dict: transfer.apply_import の結果。
     """
     try:
-        return apply_import(body.token, load_config()["user_name"])
+        return apply_import(body.token, load_config()["user_name"], body.modes)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

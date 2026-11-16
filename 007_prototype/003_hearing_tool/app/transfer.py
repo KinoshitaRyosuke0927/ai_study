@@ -2,7 +2,7 @@
 
 ZIP には CSV だけを入れる。音声や動画は大きいので、ファイルを直接渡して
 data/audio に置いてもらう運用とする。
-取り込みでは、同じIDの行は updated_at が新しいほうを残す。
+取り込みでは、CSV ごとに取り込み方（IMPORT_MODES）を選べる。既定は、同じIDの行は updated_at が新しいほうを残す。
 上書きされる件数を先に確認できるよう、「確認」と「実行」の2段階にしている。
 """
 
@@ -11,10 +11,33 @@ import zipfile
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
-from .storage import TABLES, backup, data_dir, id_column, read_table, write_table, new_id, _lock
+from .storage import TABLES, backup, columns_of, data_dir, id_column, read_table, split_ids, write_table, new_id, _lock
 
 # 取り込みの確認中のファイルを置くフォルダ名
 INCOMING_DIR = "_incoming"
+
+# CSV ごとの取り込み方
+#   update：新しい行は追加し、同じ行は updated_at が新しいほうを残す（既定）
+#   add：新しい行だけ追加し、今ある行は変えない
+#   skip：取り込まない
+IMPORT_MODES = ("update", "add", "skip")
+
+# ほかのテーブルを参照する列と、参照先のテーブル（取り込まない CSV への参照を調べるために使う）
+REFERENCES = {
+    "person_id": "persons",
+    "session_id": "sessions",
+    "session_ids": "sessions",
+    "segment_id": "segments",
+    "hypothesis_ids": "hypotheses",
+    "question_ids": "questions",
+    "issue_id": "issues",
+    "issue_ids": "issues",
+    "from_issue_id": "issues",
+    "to_issue_id": "issues",
+}
+
+# つながりマップのカードの種類と、参照先のテーブル（map_positions の node 列の先頭）
+MAP_NODE_TABLES = {"issue": "issues", "solution": "solutions", "source": "data_sources"}
 
 
 def export_zip(user_name: str) -> Path:
@@ -119,6 +142,51 @@ def _row_label(row: dict) -> str:
     return ""
 
 
+def _references_to_incoming(extract_dir: Path, tables: list[str]) -> list[dict]:
+    """取り込む行が、取り込む側にしかない行（今のデータにない行）を参照している件数を数える。
+
+    参照先の CSV を「取り込まない」にすると、これらの行は参照先がない状態になる。
+    画面で注意を出すために使う。
+
+    Args:
+        extract_dir: 取り出した CSV のフォルダ。
+        tables: ZIP に入っていたテーブル名。
+
+    Returns:
+        list[dict]: table（参照する側）、target（参照先）、count（該当する行の数）の一覧。
+    """
+    # 参照先のテーブルごとに、取り込む側にだけある ID を集める
+    incoming_rows = {t: read_table(t, extract_dir) for t in tables}
+    only_incoming = {}
+    for target in set(REFERENCES.values()) | set(MAP_NODE_TABLES.values()):
+        if target not in incoming_rows:
+            continue
+        key = id_column(target)
+        local_ids = {r[key] for r in read_table(target)}
+        only_incoming[target] = {r[key] for r in incoming_rows[target] if r.get(key)} - local_ids
+
+    # 参照する側のテーブルごとに、該当する行を数える
+    counts: dict[tuple[str, str], int] = {}
+    for table in tables:
+        ref_cols = [c for c in columns_of(table) if c in REFERENCES and c != id_column(table)]
+        for row in incoming_rows[table]:
+            targets = set()
+            # 通常の参照の列（";" 区切りで複数の ID が入る列もある）
+            for col in ref_cols:
+                target = REFERENCES[col]
+                if target in only_incoming and set(split_ids(row.get(col, ""))) & only_incoming[target]:
+                    targets.add(target)
+            # つながりマップの位置（node 列が「種類:ID」）
+            if table == "map_positions":
+                kind, _, rid = row.get("node", "").partition(":")
+                target = MAP_NODE_TABLES.get(kind)
+                if target in only_incoming and rid in only_incoming[target]:
+                    targets.add(target)
+            for target in targets:
+                counts[(table, target)] = counts.get((table, target), 0) + 1
+    return [{"table": t, "target": g, "count": n} for (t, g), n in sorted(counts.items())]
+
+
 def preview_import(zip_bytes: bytes) -> dict:
     """取り込む ZIP の中身を、今のデータと比べる。
 
@@ -127,7 +195,8 @@ def preview_import(zip_bytes: bytes) -> dict:
 
     Returns:
         dict: token（実行時に使う番号）、tables（テーブルごとの件数）、
-            missing_audio（CSV が参照しているのに data/audio にない音声のファイル名）。
+            missing_audio（CSV が参照しているのに data/audio にない音声のファイル名）、
+            references（取り込む側にしかない行への参照の件数。_references_to_incoming を参照）。
     """
     # 前に確認だけして取り込まなかったファイルを片付ける（1人で使う前提）
     incoming_root = data_dir() / INCOMING_DIR
@@ -159,15 +228,18 @@ def preview_import(zip_bytes: bytes) -> dict:
         s["audio_file"] for s in read_table("sessions", extract_dir)
         if s.get("audio_file") and not (data_dir() / "audio" / s["audio_file"]).exists()
     })
-    return {"token": token, "tables": tables, "missing_audio": missing}
+    # 取り込む側にしかない行への参照を数える（一部の CSV を取り込まないときの注意に使う）
+    references = _references_to_incoming(extract_dir, list(tables))
+    return {"token": token, "tables": tables, "missing_audio": missing, "references": references}
 
 
-def apply_import(token: str, user_name: str) -> dict:
+def apply_import(token: str, user_name: str, modes: dict[str, str] | None = None) -> dict:
     """確認済みの ZIP を取り込む。
 
     Args:
         token: preview_import が返した番号。
         user_name: 実行した利用者の名前（バックアップの記録用）。
+        modes: テーブルごとの取り込み方（IMPORT_MODES のいずれか）。指定のないテーブルは update。
 
     Returns:
         dict: backup（作成したバックアップのフォルダ名）とテーブルごとの反映件数。
@@ -175,6 +247,12 @@ def apply_import(token: str, user_name: str) -> dict:
     # 確認用のフォルダを探す（番号は英数字だけを許可する）
     if not token.isalnum():
         raise ValueError("番号が正しくありません。")
+
+    # 取り込み方を確かめる
+    modes = modes or {}
+    for table, mode in modes.items():
+        if table not in TABLES or mode not in IMPORT_MODES:
+            raise ValueError(f"取り込み方の指定が正しくありません：{table}={mode}")
     work = data_dir() / INCOMING_DIR / token
     extract_dir = work / "files"
     if not extract_dir.exists():
@@ -186,14 +264,16 @@ def apply_import(token: str, user_name: str) -> dict:
 
     with _lock:
         for table in TABLES:
-            if not (extract_dir / f"{table}.csv").exists():
+            # ZIP にない CSV と、「取り込まない」を選んだ CSV は飛ばす
+            mode = modes.get(table, "update")
+            if not (extract_dir / f"{table}.csv").exists() or mode == "skip":
                 continue
             key = id_column(table)
             local = read_table(table)
             index = {r[key]: i for i, r in enumerate(local)}
             count = 0
 
-            # 新しい行は追加し、取り込むほうが新しい行は置き換える
+            # 新しい行は追加し、「新しいほうで上書き」なら、取り込むほうが新しい行を置き換える
             for row in read_table(table, extract_dir):
                 rid = row.get(key, "")
                 if not rid:
@@ -202,7 +282,7 @@ def apply_import(token: str, user_name: str) -> dict:
                     local.append(row)
                     index[rid] = len(local) - 1
                     count += 1
-                elif row.get("updated_at", "") > local[index[rid]].get("updated_at", ""):
+                elif mode == "update" and row.get("updated_at", "") > local[index[rid]].get("updated_at", ""):
                     local[index[rid]] = row
                     count += 1
             if count:

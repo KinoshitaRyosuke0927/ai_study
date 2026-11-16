@@ -252,25 +252,75 @@ function renderIo(main) {
  * @returns {void}
  */
 function renderImportPreview(box, data) {
-  const names = { ...TABLE_NAME, utterances: "文字起こしの発言", solutions: "解決策の候補", evaluations: "評価", criteria: "評価の観点" };
+  const names = {
+    ...TABLE_NAME, utterances: "文字起こしの発言", solutions: "解決策の候補", evaluations: "評価", criteria: "評価の観点",
+    map_positions: "つながりマップのカードの位置",
+  };
   const rows = Object.entries(data.tables);
-  const updates = rows.flatMap(([table, r]) => r.update_examples.map((e) => ({ table, ...e })));
+
+  // CSV ごとの取り込み方（最初はすべて「新しいほうで上書き」＝今までと同じ動き）
+  const MODES = [["update", "新しいほうで上書き"], ["add", "追加だけ（上書きしない）"], ["skip", "取り込まない"]];
+  const modes = Object.fromEntries(rows.map(([table]) => [table, "update"]));
+
+  /**
+   * 選んだ取り込み方に合わせて、件数、注意、上書きされる行の例を描き直す。
+   * @returns {void}
+   */
+  const refresh = () => {
+    // 件数：「追加だけ」なら上書きは0件（そのままに数える）、「取り込まない」ならすべて0件
+    rows.forEach(([table, r]) => {
+      const mode = modes[table];
+      const shown = mode === "skip" ? { new: 0, update: 0, skip: r.new + r.update + r.skip }
+        : mode === "add" ? { new: r.new, update: 0, skip: r.update + r.skip } : r;
+      const tr = box.querySelector(`tr[data-table="${table}"]`);
+      tr.classList.toggle("muted", mode === "skip");
+      tr.querySelector(".c-new").textContent = shown.new;
+      tr.querySelector(".c-update").textContent = shown.update;
+      tr.querySelector(".c-update").classList.toggle("warn-text", shown.update > 0);
+      tr.querySelector(".c-skip").textContent = shown.skip;
+    });
+
+    // 注意：取り込む CSV が、「取り込まない」にした CSV にしかない行を参照している
+    const dangling = (data.references || []).filter((x) => (
+      modes[x.target] === "skip" && modes[x.table] && modes[x.table] !== "skip"));
+    box.querySelector("#io-ref-warn").innerHTML = dangling.length ? `<div class="notice" style="margin-top:10px">
+      次のデータは、「取り込まない」にしたデータを参照しています。取り込むと、画面で名前が空欄や「（不明）」になることがあります。
+      <ul>${dangling.map((x) => `<li>${h(names[x.table] || x.table)}の${x.count}件が、${h(names[x.target] || x.target)}を参照</li>`).join("")}</ul></div>` : "";
+
+    // 上書きされる行の例：「新しいほうで上書き」の CSV だけ
+    const updates = rows.filter(([table]) => modes[table] === "update")
+      .flatMap(([table, r]) => r.update_examples.map((e) => ({ table, ...e })));
+    box.querySelector("#io-updates").innerHTML = updates.length ? `<h3>上書きされる行の例</h3>
+      <table><tr><th>データ</th><th>内容</th><th>今</th><th>取り込むほう</th></tr>
+      ${updates.map((u) => `<tr><td>${h(names[u.table] || u.table)}</td><td>${h(u.label)}</td>
+        <td>${h(u.local_by)}（${h(u.local_at)}）</td><td>${h(u.incoming_by)}（${h(u.incoming_at)}）</td></tr>`).join("")}</table>` : "";
+  };
+
   box.innerHTML = `
     <h3>確認の結果</h3>
-    <table><tr><th>データ</th><th>追加</th><th>上書き</th><th>そのまま（今のほうが新しいか同じ）</th></tr>
-      ${rows.map(([table, r]) => `<tr><td>${h(names[table] || table)}</td><td class="num">${r.new}</td>
-        <td class="num ${r.update ? "warn-text" : ""}">${r.update}</td><td class="num">${r.skip}</td></tr>`).join("")}
+    <p class="muted">データ（CSV）ごとに取り込み方を選べます。「追加だけ」は、今ある行を変えずに新しい行だけを追加します。</p>
+    <table><tr><th>データ</th><th>追加</th><th>上書き</th><th>そのまま（今のほうが新しいか同じ、または取り込まない）</th><th>取り込み方</th></tr>
+      ${rows.map(([table]) => `<tr data-table="${table}"><td>${h(names[table] || table)}</td>
+        <td class="num c-new"></td><td class="num c-update"></td><td class="num c-skip"></td>
+        <td><select data-mode="${table}">${MODES.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></td></tr>`).join("")}
     </table>
+    <div id="io-ref-warn"></div>
     ${data.missing_audio.length ? `<div class="notice" style="margin-top:10px">次の音声ファイルが data/audio にありません。
       ファイルを受け取って置いてください（取り込みは置く前でも行えます）。<ul>${data.missing_audio.map((n) => (
         `<li>${h(n)}</li>`)).join("")}</ul></div>` : ""}
-    ${updates.length ? `<h3>上書きされる行の例</h3><table><tr><th>データ</th><th>内容</th><th>今</th><th>取り込むほう</th></tr>
-      ${updates.map((u) => `<tr><td>${h(names[u.table] || u.table)}</td><td>${h(u.label)}</td>
-        <td>${h(u.local_by)}（${h(u.local_at)}）</td><td>${h(u.incoming_by)}（${h(u.incoming_at)}）</td></tr>`).join("")}</table>` : ""}
+    <div id="io-updates"></div>
     <div class="actions" style="margin-top:10px"><button class="primary" id="io-apply">取り込む</button></div>`;
+  refresh();
+
+  // 取り込み方を変えたら、表示を描き直す
+  box.querySelectorAll("[data-mode]").forEach((select) => {
+    select.onchange = () => { modes[select.dataset.mode] = select.value; refresh(); };
+  });
   box.querySelector("#io-apply").onclick = async () => {
+    // すべて「取り込まない」なら、何もしない
+    if (rows.length && rows.every(([table]) => modes[table] === "skip")) { toast("取り込むデータが選ばれていません。", true); return; }
     try {
-      const result = await api("POST", "/api/transfer/apply", { token: data.token });
+      const result = await api("POST", "/api/transfer/apply", { token: data.token, modes });
       await reload();
       box.innerHTML = `<div class="info">取り込みました。バックアップ：data/backups/${h(result.backup)}</div>`;
     } catch (e) { toast(e.message, true); }
