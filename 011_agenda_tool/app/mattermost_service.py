@@ -85,6 +85,31 @@ def get_usernames_by_ids(user_ids: list[str]) -> dict:
     return {u["id"]: u["username"] for u in users}
 
 
+def get_post(post_id: str) -> dict | None:
+    """
+    投稿IDから投稿の本文・投稿者名を取得する(読み取りのみ)
+
+    Args
+    -----------------
+    - post_id: str,  投稿ID(パーマリンク末尾の26文字)
+
+    Returns
+    -----------------
+    - post: dict | None,  {"message", "username"}。投稿が存在しない・閲覧できない場合は None
+
+    """
+    # 投稿を取得する(削除済み・権限なしは 403/404 になる)
+    res = requests.get(f"{MATTERMOST_URL}/api/v4/posts/{post_id}", headers=HEADERS, timeout=10)
+    if res.status_code in (403, 404):
+        return None
+    res.raise_for_status()
+    post = res.json()
+
+    # 投稿者のユーザーIDをユーザー名に変換する
+    usernames = get_usernames_by_ids([post["user_id"]])
+    return {"message": post["message"], "username": usernames.get(post["user_id"], post["user_id"])}
+
+
 def get_channel_posts_in_range(channel_id: str, start_ts_ms: int, end_ts_ms: int) -> list[dict]:
     """指定チャンネルの、指定期間内(create_atがstart~end)の投稿を古い順で返す。"""
     collected = []

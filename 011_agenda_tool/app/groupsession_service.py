@@ -280,6 +280,41 @@ def _get_thread_detail(session: requests.Session, forum_sid: int, thread_sid: in
     return {"text": text, "html": rich_html, "attachments": attachments}
 
 
+def get_threads_by_sids(forum_sid: int, thread_sids: set[int], since_ts_ms: int, until_ts_ms: int) -> dict[int, dict]:
+    """
+    指定フォーラムのスレッドのうち、指定したスレッドIDの本文・投稿者名を取得する(読み取りのみ)。
+    本文は get_recent_announcements() と同じ形(タイトル + 改行 + 本文)にする
+
+    Args
+    -----------------
+    - forum_sid: int,         フォーラムID
+    - thread_sids: set[int],  取得したいスレッドIDの集合
+    - since_ts_ms: int,       スレッド一覧を探す期間の開始(エポックミリ秒)
+    - until_ts_ms: int,       スレッド一覧を探す期間の終了(エポックミリ秒)
+
+    Returns
+    -----------------
+    - threads: dict[int, dict],  スレッドID → {"message", "username"}。
+                                  見つからなかった(削除済み・期間外など)スレッドは含まない
+
+    """
+    # タイトル・投稿者名はスレッド一覧にしか無いため、期間内のスレッド一覧を取得して引く
+    session = _login()
+    listed = {
+        t["thread_sid"]: t
+        for t in _get_forum_threads(session, forum_sid, since_ts_ms, until_ts_ms)
+        if t["thread_sid"] in thread_sids
+    }
+
+    # 見つかったスレッドの本文を取得し、画面での取得時と同じ形の本文にする
+    threads: dict[int, dict] = {}
+    for thread_sid, thread in listed.items():
+        detail = _get_thread_detail(session, forum_sid, thread_sid)
+        message = f"{thread['title']}\n{detail['text']}" if detail["text"] else thread["title"]
+        threads[thread_sid] = {"message": message, "username": thread["author"]}
+    return threads
+
+
 def get_recent_announcements(forum_sid: int, since_ts_ms: int, until_ts_ms: int) -> list[dict]:
     """
     指定フォーラムの、指定期間内に投稿されたアナウンス記事を取得する。

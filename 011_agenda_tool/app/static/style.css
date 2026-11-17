@@ -516,6 +516,92 @@ textarea {
 
 /* ========== 投稿一覧(左) ========== */
 
+/* ========== 一覧の表示切り替え(すべて / 選択済み) ========== */
+
+.agenda-view-toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-bottom: 10px;
+  border: 1px solid #0052cc;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.view-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  background-color: #fff;
+  color: #0052cc;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.view-toggle-btn + .view-toggle-btn {
+  border-left: 1px solid #0052cc;
+}
+
+.view-toggle-btn:hover:not(.active) {
+  background-color: #e6f0ff;
+}
+
+.view-toggle-btn.active {
+  background-color: #0052cc;
+  color: #fff;
+}
+
+/* 件数バッジ */
+.view-toggle-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  text-align: center;
+  background-color: #e6f0ff;
+  color: #0052cc;
+}
+
+.view-toggle-btn.active .view-toggle-count {
+  background-color: #fff;
+}
+
+/* ========== wiki公開の成功メッセージ(リンク・URLコピー) ========== */
+
+.message.publish-success {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.publish-link {
+  color: #0052cc;
+  font-weight: bold;
+}
+
+.btn.copy-url-btn {
+  width: auto;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  background-color: #fff;
+  color: #276749;
+  border: 1px solid #9ae6b4;
+}
+
+.btn.copy-url-btn:hover:not(:disabled) {
+  background-color: #e6ffed;
+}
+
+.publish-note {
+  flex-basis: 100%;
+  font-size: 0.8rem;
+  color: #975a16;
+}
+
 .post-list {
   flex: 1;
   overflow-y: auto;

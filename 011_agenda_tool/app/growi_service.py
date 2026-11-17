@@ -42,6 +42,56 @@ def _get_page(path: str) -> dict | None:
     return response.json()["page"]
 
 
+def list_descendant_paths(path: str) -> list[str]:
+    """
+    指定パス配下の全ページのパスを再帰的に返す(読み取りのみ)
+
+    Args
+    -----------------
+    - path: str,  親ページのパス
+
+    Returns
+    -----------------
+    - paths: list[str],  配下のページのパス一覧(中間階層の空ページも含む)
+
+    """
+    # 直下の子ページ一覧を取得する
+    response = requests.get(
+        f"{GROWI_BASE_URL}/_api/v3/page-listing/children",
+        params={"path": path, "access_token": GROWI_API_TOKEN},
+        timeout=20,
+    )
+    response.raise_for_status()
+
+    # 子ページにさらに子がある場合は再帰的にたどる
+    paths: list[str] = []
+    for child in response.json().get("children", []):
+        paths.append(child["path"])
+        if child.get("descendantCount", 0) > 0:
+            paths.extend(list_descendant_paths(child["path"]))
+    return paths
+
+
+def get_page_body(path: str) -> str | None:
+    """
+    指定パスのページ本文(最新リビジョン)を返す(読み取りのみ)
+
+    Args
+    -----------------
+    - path: str,  ページのパス
+
+    Returns
+    -----------------
+    - body: str | None,  ページ本文。ページが存在しない(中間階層の空ページなど)場合は None
+
+    """
+    page = _get_page(path)
+    if page is None:
+        return None
+    revision = page.get("revision")
+    return revision.get("body", "") if isinstance(revision, dict) else ""
+
+
 def _create_page(path: str, body: str, grant: int) -> dict:
     """新規ページを作成する。中間階層(親ページ)が無い場合は自動生成される。
     grant=PAGE_GRANT_ONLY_ME の場合、GROWI側がAPIトークンの持ち主を

@@ -50,6 +50,10 @@ const agendaPostList       = document.getElementById("agenda-post-list");
 const agendaSortDateBtn     = document.getElementById("agenda-sort-date-btn");
 const agendaSortUsernameBtn = document.getElementById("agenda-sort-username-btn");
 const agendaSortSourceBtn   = document.getElementById("agenda-sort-source-btn");
+const agendaViewAllBtn       = document.getElementById("agenda-view-all-btn");
+const agendaViewCheckedBtn   = document.getElementById("agenda-view-checked-btn");
+const agendaViewAllCount     = document.getElementById("agenda-view-all-count");
+const agendaViewCheckedCount = document.getElementById("agenda-view-checked-count");
 const agendaPostDetail     = document.getElementById("agenda-post-detail");
 const agendaCreateBtn      = document.getElementById("agenda-create-btn");
 const agendaDetailMessage  = document.getElementById("agenda-detail-message");
@@ -66,6 +70,13 @@ const agendaPublishGrantToggle = document.getElementById("agenda-publish-grant-t
 // ============================================================
 
 let agendaFetchedPosts = [];
+// アジェンダに含めるようチェックした投稿・記事のID。
+// 「選択済みのみ」表示で一覧から隠れた項目のチェックも保持するため、DOMではなくここで管理する
+let agendaCheckedIds = new Set();
+// 一覧を「選択済みのみ」で表示しているかどうか
+let agendaShowCheckedOnly = false;
+// 詳細を表示中の投稿・記事のID(並び替え・表示切り替えで再描画した後も選択状態を残すため)
+let agendaSelectedPostId = null;
 let agendaChannelIds = [];
 // 参加チャンネルの一覧(/api/channels の取得結果)。settings.ini のチャンネル名からIDを引くために使う
 let joinedChannels = [];
@@ -184,20 +195,86 @@ gsLoginBtn.addEventListener("click", async () => {
 // ============================================================
 
 function resetAgendaDetail() {
-  agendaCreateBtn.disabled = true;
+  agendaSelectedPostId = null;
   hideMessage(agendaDetailMessage);
   agendaPostDetail.innerHTML = `<p class="post-detail-placeholder">左の一覧から投稿・記事を選択してください</p>`;
+  updateAgendaCreateBtnState();
 }
 
-/** チェック済みの投稿・記事が1件以上あるかどうかで「アジェンダを作成」ボタンの活性状態を切り替える */
-function updateAgendaCreateBtnState() {
-  const hasChecked = agendaPostList.querySelector(".agenda-item-checkbox:checked") !== null;
-  agendaCreateBtn.disabled = !hasChecked;
+/**
+ * 「アジェンダを作成」ボタンの表示(件数)と活性状態を、チェック済みの件数に合わせて更新する
+ *
+ * Args:
+ *   label: string  ボタンの文言(省略時は「アジェンダを作成」。作成中は「作成中...」を渡す)
+ */
+function updateAgendaCreateBtnState(label = "アジェンダを作成") {
+  // 作成中(処理待ち)の間は文言・非活性のまま変えない
+  if (agendaCreateBtn.dataset.busy === "true") return;
+
+  // チェック済みの件数をボタンの文言に添える(0件のときは件数を出さない)
+  const count = agendaCheckedIds.size;
+  agendaCreateBtn.textContent = count > 0 ? `${label}(${count}件)` : label;
+  // 1件以上チェックしているときだけ活性化する
+  agendaCreateBtn.disabled = count === 0;
+}
+
+/** 一覧の表示切り替えボタン(すべて / 選択済み)の件数・選択状態を更新する */
+function updateAgendaViewToggle() {
+  // 件数を更新する
+  agendaViewAllCount.textContent = agendaFetchedPosts.length;
+  agendaViewCheckedCount.textContent = agendaCheckedIds.size;
+
+  // 今どちらの表示かをボタンの見た目に反映する
+  agendaViewAllBtn.classList.toggle("active", !agendaShowCheckedOnly);
+  agendaViewCheckedBtn.classList.toggle("active", agendaShowCheckedOnly);
+  agendaViewAllBtn.setAttribute("aria-pressed", String(!agendaShowCheckedOnly));
+  agendaViewCheckedBtn.setAttribute("aria-pressed", String(agendaShowCheckedOnly));
+}
+
+/**
+ * 一覧の表示を切り替えて再描画する
+ *
+ * Args:
+ *   checkedOnly: boolean  true のときチェックした投稿・記事のみを表示する
+ */
+function setAgendaViewMode(checkedOnly) {
+  agendaShowCheckedOnly = checkedOnly;
+  renderAgendaPostList();
+}
+
+agendaViewAllBtn.addEventListener("click", () => setAgendaViewMode(false));
+agendaViewCheckedBtn.addEventListener("click", () => setAgendaViewMode(true));
+
+/**
+ * 一覧のチェックボックスが変更されたときに、チェック状態を保持して表示を更新する
+ *
+ * Args:
+ *   postId: string    変更された投稿・記事のID
+ *   checked: boolean  変更後のチェック状態
+ */
+function onAgendaItemCheckChange(postId, checked) {
+  // チェック状態を保持する
+  if (checked) {
+    agendaCheckedIds.add(postId);
+  } else {
+    agendaCheckedIds.delete(postId);
+  }
+
+  // 「選択済み」表示でチェックを外した項目は一覧から消すため、再描画する
+  if (agendaShowCheckedOnly) {
+    renderAgendaPostList();
+    return;
+  }
+  // 「すべて」表示では一覧はそのままで、件数とボタンだけ更新する
+  updateAgendaViewToggle();
+  updateAgendaCreateBtnState();
 }
 
 function selectAgendaPost(post, itemEl) {
   hideMessage(agendaDetailMessage);
 
+  // 選択中の投稿・記事を記録し、一覧の強調表示を付け替える
+  agendaSelectedPostId = post.id;
   agendaPostList.querySelectorAll(".post-list-item").forEach((el) => el.classList.remove("selected"));
   itemEl.classList.add("selected");
 
@@ -241,21 +318,27 @@ function selectAgendaPost(post, itemEl) {
 }
 
 function renderAgendaPostList() {
-  const checkedIds = new Set(
-    Array.from(agendaPostList.querySelectorAll(".agenda-item-checkbox:checked")).map(
-      (checkbox) => checkbox.closest(".agenda-list-item").dataset.postId
-    )
-  );
-
   agendaPostList.innerHTML = "";
+  // 件数・ボタンの表示を先に更新する
+  updateAgendaViewToggle();
+  updateAgendaCreateBtnState();
 
+  // 取得結果が0件の場合はその旨を表示する
   if (agendaFetchedPosts.length === 0) {
     agendaPostList.innerHTML = `<p class="post-list-placeholder">指定期間内の投稿・記事はありませんでした</p>`;
-    updateAgendaCreateBtnState();
     return;
   }
 
-  agendaFetchedPosts.forEach((post) => {
+  // 表示モードに応じて、一覧に出す投稿・記事を絞り込む
+  const visiblePosts = agendaShowCheckedOnly
+    ? agendaFetchedPosts.filter((post) => agendaCheckedIds.has(post.id))
+    : agendaFetchedPosts;
+  if (visiblePosts.length === 0) {
+    agendaPostList.innerHTML = `<p class="post-list-placeholder">チェックした投稿・記事はありません。「すべて」に切り替えてチェックを入れてください</p>`;
+    return;
+  }
+
+  visiblePosts.forEach((post) => {
     const item = document.createElement("div");
     item.className = "post-list-item agenda-list-item";
     item.dataset.postId = post.id;
@@ -273,19 +356,18 @@ function renderAgendaPostList() {
       </div>
     `;
     item.querySelector(".post-list-item-body").textContent = truncateForPreview(post.message);
-    if (checkedIds.has(post.id)) {
-      item.querySelector(".agenda-item-checkbox").checked = true;
+    // 保持しているチェック状態・詳細表示中の状態を復元する
+    const checkbox = item.querySelector(".agenda-item-checkbox");
+    checkbox.checked = agendaCheckedIds.has(post.id);
+    if (post.id === agendaSelectedPostId) {
+      item.classList.add("selected");
     }
     item
       .querySelector(".post-list-item-main")
       .addEventListener("click", () => selectAgendaPost(post, item));
-    item
-      .querySelector(".agenda-item-checkbox")
-      .addEventListener("change", updateAgendaCreateBtnState);
+    checkbox.addEventListener("change", () => onAgendaItemCheckChange(post.id, checkbox.checked));
     agendaPostList.appendChild(item);
   });
-
-  updateAgendaCreateBtnState();
 }
 
 /** agendaFetchedPosts を指定の比較関数で並び替えて再描画する */
@@ -309,6 +391,11 @@ agendaSortSourceBtn.addEventListener("click", () => {
 
 async function fetchAndRenderAgendaPosts() {
   hideMessage(agendaMessage);
+  // 取得し直すと一覧が入れ替わるため、チェック状態と表示モードを初期状態に戻す
+  agendaCheckedIds = new Set();
+  agendaShowCheckedOnly = false;
+  agendaFetchedPosts = [];
+  updateAgendaViewToggle();
   resetAgendaDetail();
 
   const start = agendaStartDateInput.value;
@@ -375,17 +462,14 @@ agendaFetchBtn.addEventListener("click", fetchAndRenderAgendaPosts);
 agendaCreateBtn.addEventListener("click", async () => {
   hideMessage(agendaOutputMessage);
 
-  const checkedIds = Array.from(
-    agendaPostList.querySelectorAll(".agenda-item-checkbox:checked")
-  ).map((checkbox) => checkbox.closest(".agenda-list-item").dataset.postId);
-
-  if (checkedIds.length === 0) {
+  // チェック状態は agendaCheckedIds で保持している(「選択済み」表示で隠れた項目も含む)
+  if (agendaCheckedIds.size === 0) {
     showMessage(agendaOutputMessage, "アジェンダに含める投稿・記事にチェックを入れてください", "error");
     return;
   }
 
   const items = agendaFetchedPosts
-    .filter((post) => checkedIds.includes(post.id))
+    .filter((post) => agendaCheckedIds.has(post.id))
     .map((post) => ({
       message: post.message,
       username: post.username,
@@ -393,8 +477,10 @@ agendaCreateBtn.addEventListener("click", async () => {
       url: post.url || null,
     }));
 
+  // 作成中は件数を添えた「作成中...」表示にし、完了まで文言・非活性を固定する
+  updateAgendaCreateBtnState("作成中...");
   agendaCreateBtn.disabled = true;
-  agendaCreateBtn.textContent = "作成中...";
+  agendaCreateBtn.dataset.busy = "true";
 
   try {
     const res = await fetch("/api/agenda", {
@@ -418,14 +504,67 @@ agendaCreateBtn.addEventListener("click", async () => {
   } catch (err) {
     showMessage(agendaOutputMessage, `ネットワークエラー: ${err.message}`, "error");
   } finally {
-    agendaCreateBtn.disabled = false;
-    agendaCreateBtn.textContent = "アジェンダを作成";
+    // 作成中の固定を解除し、現在のチェック件数に合わせて表示を戻す
+    delete agendaCreateBtn.dataset.busy;
+    updateAgendaCreateBtnState();
   }
 });
 
 // ============================================================
 // アジェンダのwiki公開
 // ============================================================
+
+/**
+ * wiki公開の成功メッセージを、公開ページへのリンクと「URLをコピー」ボタン付きで表示する
+ *
+ * Args:
+ *   data: object   /api/agenda/publish の戻り値({ path, url, recreated })
+ *   year: number   公開先の年
+ *   month: number  公開先の月
+ */
+function showPublishSuccessMessage(data, year, month) {
+  // メッセージ欄を空にして成功表示にする
+  agendaPublishMessage.textContent = "";
+  agendaPublishMessage.className = "message success publish-success";
+
+  // 本文: 「wikiへ公開しました:」+ 公開ページへのリンク(新しいタブで開く)
+  const text = document.createElement("span");
+  text.textContent = "wikiへ公開しました: ";
+  const link = document.createElement("a");
+  link.href = data.url;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.className = "publish-link";
+  link.textContent = `「${year}年${month}月度アジェンダ」を開く ↗`;
+  link.title = data.url;
+  text.appendChild(link);
+  agendaPublishMessage.appendChild(text);
+
+  // URLをコピーするボタン(チャット等に貼り付ける用途)
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "btn copy-url-btn";
+  copyBtn.textContent = "URLをコピー";
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(data.url);
+      copyBtn.textContent = "コピーしました";
+    } catch {
+      copyBtn.textContent = "コピーできませんでした";
+    }
+    // 少し経ったら文言を元に戻す
+    setTimeout(() => { copyBtn.textContent = "URLをコピー"; }, 2000);
+  });
+  agendaPublishMessage.appendChild(copyBtn);
+
+  // 公開範囲の変更でページを作り直した場合は、URLが変わったことを知らせる
+  if (data.recreated) {
+    const note = document.createElement("p");
+    note.className = "publish-note";
+    note.textContent = "※公開範囲を変更したためページを作成し直しました。以前のURLは使えなくなっています。";
+    agendaPublishMessage.appendChild(note);
+  }
+}
 
 agendaPublishBtn.addEventListener("click", async () => {
   hideMessage(agendaPublishMessage);
@@ -459,7 +598,7 @@ agendaPublishBtn.addEventListener("click", async () => {
       showMessage(agendaPublishMessage, `エラー: ${data.detail}`, "error");
       return;
     }
-    showMessage(agendaPublishMessage, `wikiへ公開しました: ${data.url}`, "success");
+    showPublishSuccessMessage(data, year, month);
   } catch (err) {
     showMessage(agendaPublishMessage, `ネットワークエラー: ${err.message}`, "error");
   } finally {

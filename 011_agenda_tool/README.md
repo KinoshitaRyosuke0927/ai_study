@@ -5,15 +5,15 @@ Mattermost・GROUPSESSIONの投稿・記事から、部署定例会(AIM)のア�
 [011_chat_linkage_light](../011_chat_linkage_light/) のアジェンダ作成機能(アジェンダタブ)だけを切り出したもの。機能は分割元のアジェンダタブと同じ。分割元にあったMattermostタブ・GROUPSESSIONタブ(個別投稿のリマインド作成・投稿)と、`/nightrain agenda`・`/nightrain remind` の自動応答(Azure Functions)は含まない。投稿の自動リマインドは [011_nightrain](../011_nightrain/)(チャット内容自動リマインドサービス)が担当する。
 
 - **配布形態**: exe(PyInstaller)での配布のみ。Azure上には展開しない。利用者が各自 `settings.ini`・`.env` を編集して使う
-- **Azureの利用**: アジェンダ本文(全体共有事項)の生成のみ、Azure OpenAI(`gpt-5.4-mini`)を使う
+- **Azureの利用**: アジェンダ本文(全体共有事項)の生成のみ、Azure OpenAI(`gpt-6-luna`)を使う
 - **投稿の絞り込みモデル**: ローカルで動く学習済みモデル(TF-IDF + ロジスティック回帰)。**モデルの学習・検証はこのフォルダで行い**、学習したモデルを `011_nightrain` にも反映する(「フィルタモデル」章を参照)
 
 ## 機能
 
 - GROUPSESSIONは画面上のログインフォーム(モーダル)からID・パスワードを入力してログイン(サーバのメモリ上にのみ保持し、ファイルには保存しない)
 - `settings.ini` の `growi.channel_list` に設定したMattermostチャンネルの投稿と、`groupsession.forum_sid` に設定したGROUPSESSIONフォーラムの記事を、指定期間でまとめて取得
-- 取得した投稿・記事を学習済みモデルで0~1のスコアにし、画面上部の「フィルタ強度」スライダー(0~1、0.1刻み、初期値0.5)以上のものだけを一覧表示
-- チェックした項目をもとに、AIで「全体共有事項」を生成し、`agenda_template.txt` のひな形に埋め込む
+- 取得した投稿・記事を学習済みモデルで0~1のスコアにし、画面上部の「フィルタ強度」スライダー(0~1、0.1刻み、初期値0.7)以上のものだけを一覧表示
+- チェックした項目をもとに、AIで「全体共有事項」を生成し、`agenda_template.txt` のひな形に埋め込む。生成時は過去のアジェンダ(`agenda_examples.json`)を手本としてAIに渡し、文体・要約の仕方を過去の実例に合わせる(「アジェンダ生成の手本」章を参照)
 - 生成したアジェンダを、GROWIへ「公開」または「自分のみ公開」で公開(既存ページがあれば更新)
 
 ## セットアップ
@@ -78,12 +78,12 @@ uvicorn app.main:app --reload --port 8000
 
 画面左上の「アジェンダ作成ツール」ラベルの右に「GROUPSESSIONログイン」ボタンがある。クリックするとログインモーダルが開き、GROUPSESSIONのID・パスワードを入力してログインできる。ログインするとボタンの文字が緑色の「GROUPSESSIONログイン済」に変わり、「履歴・新着記事を取得」ボタンが活性化する(未ログインの間は非活性)。
 
-その右に「フィルタ強度」スライダーがある(0~1、0.1刻み、初期値0.5)。横の「?」アイコンにカーソルを合わせると説明が表示される。
+その右に「フィルタ強度」スライダーがある(0~1、0.1刻み、初期値0.7)。横の「?」アイコンにカーソルを合わせると説明が表示される。
 
 - 左上: 取得開始日・取得終了日のカレンダー、「履歴・新着記事を取得」ボタン(Mattermost履歴・GROUPSESSION新着記事の両方を取得)
-- 左下: Mattermost投稿・GROUPSESSION記事を合わせた一覧(取得元がわかるバッジ付き)。各行にチェックボックスがあり、詳細表示はクリック、アジェンダへの採否はチェックボックスで操作する。見出し右の「日時順」「投稿者順」「取得元順」ボタンで並び替え可能
-- 右上: 選択した項目の詳細内容・「アジェンダを作成」ボタン(1件以上チェックすると活性化)
-- 右下: 生成された部署定例会アジェンダ(Markdown)を表示するテキストエリア。「公開先: 年」「公開先: 月」と「公開範囲」(公開 / 自分のみ公開)を指定し「wikiへ公開」でGROWIへ公開する
+- 左下: Mattermost投稿・GROUPSESSION記事を合わせた一覧(取得元がわかるバッジ付き)。各行にチェックボックスがあり、詳細表示はクリック、アジェンダへの採否はチェックボックスで操作する。見出し右の「日時順」「投稿者順」「取得元順」ボタンで並び替え可能。一覧上の「すべて / 選択済み」(件数付き)でチェックした項目のみの表示に切り替えられる
+- 右上: 選択した項目の詳細内容・「アジェンダを作成(n件)」ボタン(1件以上チェックすると活性化。チェック件数を表示)
+- 右下: 生成された部署定例会アジェンダ(Markdown)を表示するテキストエリア。「公開先: 年」「公開先: 月」と「公開範囲」(公開 / 自分のみ公開)を指定し「wikiへ公開」でGROWIへ公開する。公開に成功すると、公開ページへのリンク(新しいタブで開く)と「URLをコピー」ボタンを表示する(公開範囲の変更でページを作り直した場合は、URLが変わった旨も表示する)
 
 右上・右下エリアの境界はドラッグして高さを変更できる。
 
@@ -97,11 +97,11 @@ uvicorn app.main:app --reload --port 8000
 | GET | `/api/health` | ヘルスチェック |
 | GET | `/api/settings` | `settings.ini` の設定(取得期間・GROUPSESSIONフォーラム・対象チャンネル・公開先)を返す |
 | GET | `/api/channels` | 参加チャンネル一覧(チーム横断、公開・非公開のみ)。`settings.ini` のチャンネル名からIDを引くために使う |
-| GET | `/api/channels/{channel_id}/posts?start=YYYY-MM-DD&end=YYYY-MM-DD&threshold=0.5` | 指定期間の投稿一覧(モデルのスコアが `threshold` 以上のもののみ) |
+| GET | `/api/channels/{channel_id}/posts?start=YYYY-MM-DD&end=YYYY-MM-DD&threshold=0.7` | 指定期間の投稿一覧(モデルのスコアが `threshold` 以上のもののみ) |
 | GET | `/api/groupsession/login-status` | GROUPSESSIONのログイン状態を返す |
 | POST | `/api/groupsession/login` | GROUPSESSIONへログインを試行し、成功した場合のみサーバのメモリ上にID・パスワードを保持する |
 | POST | `/api/groupsession/logout` | GROUPSESSIONのログイン情報を破棄する |
-| GET | `/api/webpage/announcements?start=YYYY-MM-DD&end=YYYY-MM-DD&threshold=0.5` | GROUPSESSION新着記事一覧(モデルのスコアが `threshold` 以上のもののみ。未ログインの場合は401) |
+| GET | `/api/webpage/announcements?start=YYYY-MM-DD&end=YYYY-MM-DD&threshold=0.7` | GROUPSESSION新着記事一覧(モデルのスコアが `threshold` 以上のもののみ。未ログインの場合は401) |
 | POST | `/api/agenda` | チェックした投稿・記事一覧からAIが部署定例会アジェンダを生成(`agenda_template.txt` を使用) |
 | POST | `/api/agenda/publish` | 生成したアジェンダをGROWIへ公開(`grant`: `public` / `only_me`) |
 
@@ -111,15 +111,40 @@ uvicorn app.main:app --reload --port 8000
 
 - `app/main.py` — FastAPI エントリポイント
 - `app/settings_loader.py` — `settings.ini` の読み込み
-- `app/agenda_service.py` — モデルによる投稿の絞り込み・アジェンダの生成(ひな形への埋め込み)・GROWIへの公開
+- `app/agenda_service.py` — モデルによる投稿の絞り込み・アジェンダの生成(AIの構造化出力からMarkdownへの組み立て・リンク付与・ひな形への埋め込み)・GROWIへの公開
 - `app/mattermost_service.py` — Mattermost API v4 の呼び出し(チャンネル一覧・投稿履歴・パーマリンク組み立て。読み取りのみ)
 - `app/groupsession_service.py` — GROUPSESSIONへのログイン・スレッド一覧/本文取得(HTMLサニタイズ・添付ファイルURL組み立てを含む。ID・パスワードはメモリ上にのみ保持)
 - `app/growi_service.py` — GROWI(社内wiki)へのアジェンダページ作成・更新
-- `app/azure_ai_service.py` — Azure OpenAI 呼び出し(アジェンダ生成: `gpt-5.4-mini`。投稿の絞り込みには使用しない)
+- `app/azure_ai_service.py` — Azure OpenAI 呼び出し(アジェンダ生成: `gpt-6-luna`、Structured Outputs でJSONを返させる。投稿の絞り込みには使用しない)
 - `app/model/` — 投稿の絞り込みモデル(学習・推論・`011_nightrain` への反映。詳細は「フィルタモデル」章)
 - `app/static/` — フロントエンド(HTML / CSS / JS)
+- `app/agenda_examples/collect_agenda_examples.py` — 過去のアジェンダ(GROWI)と元の投稿・記事から、アジェンダ生成の手本 `agenda_examples.json` を作成する
 - `agenda_template.txt` — アジェンダのひな形
+- `agenda_examples.json` — アジェンダ生成の手本(few-shot)。`collect_agenda_examples.py` で作成する
 - `agenda_tool.spec` — PyInstaller のビルド設定
+
+## アジェンダ生成の手本(few-shot)
+
+AIの生成する文面を過去の実際のアジェンダ(人が手直しして公開したもの)に近づけるため、過去のアジェンダの「元の投稿・記事 → アジェンダの項目」の組を手本としてAIに渡している(few-shot)。手本は `agenda_examples.json`(`agenda_template.txt` と同じ階層)に保存し、アジェンダ作成のたびに読み込む(アプリの再起動は不要)。ファイルが無い場合は手本なしで生成する。
+
+### 手本の作成・更新
+
+新しいアジェンダを公開したら、以下を実行して手本を作り直す(GROWI・Mattermost・GROUPSESSIONとも読み取りのみ)。GROUPSESSIONのID・パスワードを聞かれる(メモリ上でのみ使い、保存しない)。
+
+```bash
+python -m app.agenda_examples.collect_agenda_examples
+```
+
+- 対象は、GROWIの過去アジェンダ(`DEFAULT_ROOT_PATH` 配下の "年/月" のページ)のうち **2025/04 以降** のもの(`EXAMPLES_SINCE`)。それより前は書き方が異なるため使わない。議事録などの子ページは対象外
+- 「全体共有事項」の項目のうち、見出しにMattermost・GROUPSESSIONへのリンクが付いた項目について、リンク先から元の投稿・記事の本文を取得して組にする。リンクの無い項目(勤怠・交通費申請、拠点内のお知らせなど)や、元の投稿・記事を取得できない項目は手本にしない
+- 2025/09 までの「全体共有事項」が箇条書きの書式と、2025/10 以降の見出しの書式の両方に対応している
+- 部会の後に追記された対応状況の行(「全員対応済み」「未対応：…」)と、元の投稿・記事に無いURLを含む行(後から作成したwikiページへのリンクなど)は、元の投稿・記事からは書けないため手本から除く
+- 出力した `agenda_examples.json` は手で編集してもよい(手本にしたくない項目の削除など)
+
+### 手本の渡し方
+
+- `agenda_service.py` の `load_agenda_examples()` で、**新しいアジェンダから順に**、元の投稿・記事の本文の合計が `MAX_EXAMPLES_TOTAL_CHARS`(40,000文字)を超えるまで採用する(1件あたり `MAX_EXAMPLE_MESSAGE_CHARS`(1,500文字)を超える本文は先頭のみ)
+- アジェンダ1回分を1組の「入力(投稿・記事の一覧)→ 出力(JSON)」の会話にし、古い順に並べて今回の入力の前に置く(後ろ=今回の入力に近いほど新しい手本になり、システムプロンプトでも新しい実例ほどよい手本だと指示している)
 
 ## フィルタモデル(投稿の絞り込み)
 
@@ -214,7 +239,7 @@ pyinstaller --name agenda_tool `
 
 ### 4. 配布用ファイルの配置
 
-ビルドすると `dist/agenda_tool/` フォルダに `agenda_tool.exe` 本体と `_internal/` が生成される。このフォルダに、exeと同じ階層で以下を追加する(PyInstallerには同梱されないため手動で配置する)。exe化時は `settings.ini`・`.env`・`agenda_template.txt` とも **exeと同じフォルダ** を参照する。
+ビルドすると `dist/agenda_tool/` フォルダに `agenda_tool.exe` 本体と `_internal/` が生成される。このフォルダに、exeと同じ階層で以下を追加する(PyInstallerには同梱されないため手動で配置する)。exe化時は `settings.ini`・`.env`・`agenda_template.txt`・`agenda_examples.json` とも **exeと同じフォルダ** を参照する。
 
 - `.env` — Mattermost・GROUPSESSION・GROWIの接続情報に加え、Azure OpenAIの接続情報(`AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_KEY`)も1つのファイルにまとめて配置する
   ```
@@ -231,6 +256,7 @@ pyinstaller --name agenda_tool `
   ```
 - `settings.ini`(`011_agenda_tool/settings.ini` をコピーして配布環境向けに編集)
 - `agenda_template.txt`(`011_agenda_tool/agenda_template.txt` をコピー)
+- `agenda_examples.json`(`011_agenda_tool/agenda_examples.json` をコピー。無くても動くが、手本なしで生成される)
 - `起動.bat`(任意)— ダブルクリックでexe起動とブラウザオープンを行うショートカット
   ```bat
   @echo off
@@ -247,6 +273,7 @@ agenda_tool/                  ← このフォルダごとzip化して配布す�
 ├── .env                      ... 接続情報(手動配置)
 ├── settings.ini              ... 対象チャンネル・フォーラム・公開先等の設定(手動配置)
 ├── agenda_template.txt       ... アジェンダのひな形(手動配置)
+├── agenda_examples.json      ... アジェンダ生成の手本(手動配置)
 └── 起動.bat                  ... 起動用ショートカット(任意、手動配置)
 ```
 
@@ -256,8 +283,10 @@ manual.md 内の「1. フォルダ構成」もこの構成と対応している�
 
 - 履歴取得は Mattermost API のページング(`/api/v4/channels/{id}/posts`)を新しい投稿から遡る形で行うため、対象期間が古い・投稿数が多いチャンネルほど取得に時間がかかる。
 - モデルの学習データが少ない・偏っているカテゴリ(例: 避難訓練・工事等のアナウンス系)では判定精度が低くなることがあるため、見逃しが疑われる場合は「フィルタ強度」を下げるか、`app/model/train_data/` にそのカテゴリの事例を追加してモデルを再学習することを検討する。
-- アジェンダ文章中の各項目へのリンクは、AIに直接URLを生成させると誤り・改変のリスクがあるため、プレースホルダー文字列(`{{URL_0}}` 等)を出力させたうえで、アプリ側で実際のURLに置換している。
-- アジェンダ生成で一度に多くの項目(10件超など)をチェックすると、AIが末尾の項目でリンク付与を省略することがまれにある。その場合は再実行すると改善することが多い。
+- アジェンダ生成では、AIにMarkdownを直接書かせず、Structured Outputs(JSONスキーマ指定。スキーマは `azure_ai_service.py` の `AGENDA_RESPONSE_SCHEMA`)で項目ごとの構造化データ(`source_indexes` / `title` / `title_note` / `details`)を出力させ、`agenda_service.py` の `build_agenda_body_markdown()` でMarkdown箇条書きに組み立てている。
+  - 各項目へのリンクは、AIが出力した `source_indexes`(入力の投稿・記事の番号)をもとにアプリ側で付ける。AIにはURLを渡さないため、URLの誤り・改変やリンクの付け忘れは起きない。複数の投稿・記事をまとめた項目は、見出しを1件目へのリンクにし、2件目以降を「関連2」「関連3」…のリンクとして見出しの後ろに添える。
+  - `title_note`(期限など見出しに添える一言)は過去のアジェンダに合わせて見出しの後ろに全角スペース区切りで付け、箇条書きのインデント(半角スペース4つ)もアプリ側で付けるため、書式が毎回揃う。
+  - AIが本文中にMarkdownリンクを書いた場合、元の投稿・記事に含まれないURLへのリンクは表示文字列だけにする(誤ったURLが公開されないようにするため)。
 - GROUPSESSIONへのログインはStruts(CSRFトークン)方式のため、ログイン画面を都度GETしてトークンを取得したうえでPOSTしている。ID・パスワードが誤っている場合もHTTPステータスは200で返り、ログイン画面がそのまま再表示されるため、`groupsession_service.py` ではレスポンス内にログインフォームが残っているかどうかで成否を判定している。
 - GROWIのページ更新API(レガシー`/_api/pages.update`)は、公開範囲を「自分のみ公開」に変更する際にアクセス許可ユーザーを正しく設定できず、誰もアクセスできないページになってしまう不具合があるため、`growi_service.py` では「自分のみ公開」への変更時のみページを削除して新規作成し直す(この場合、ページのURLが変わる)。
 - 右パネル上下2エリアの境界はドラッグで高さを調整できる。一度ドラッグすると、以後その2エリアはウィンドウサイズに応じて比例的に伸縮する。

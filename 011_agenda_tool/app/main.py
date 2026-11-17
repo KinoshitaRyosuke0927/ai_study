@@ -117,7 +117,7 @@ def get_channels() -> list[dict]:
 
 
 @app.get("/api/channels/{channel_id}/posts")
-def get_channel_posts(channel_id: str, start: str, end: str, threshold: float = 0.5) -> list[dict]:
+def get_channel_posts(channel_id: str, start: str, end: str, threshold: float = 0.7) -> list[dict]:
     try:
         start_ts = date_str_to_epoch_ms(start, end_of_day=False)
         end_ts = date_str_to_epoch_ms(end, end_of_day=True)
@@ -139,7 +139,7 @@ def get_channel_posts(channel_id: str, start: str, end: str, threshold: float = 
 
 
 @app.get("/api/webpage/announcements")
-def get_webpage_announcements(start: str, end: str, threshold: float = 0.5) -> list[dict]:
+def get_webpage_announcements(start: str, end: str, threshold: float = 0.7) -> list[dict]:
     if not gs.has_credentials():
         raise HTTPException(status_code=401, detail="GROUPSESSIONにログインしてください")
 

@@ -12,8 +12,8 @@
       <h1>アジェンダ作成ツール</h1>
       <button type="button" id="gs-login-open-btn" class="btn gs-login-open-btn">GROUPSESSIONログイン</button>
       <div class="filter-strength-group">
-        <label for="filter-strength-slider">フィルタ強度: <span id="filter-strength-value">0.5</span></label>
-        <input type="range" id="filter-strength-slider" min="0" max="1" step="0.1" value="0.5">
+        <label for="filter-strength-slider">フィルタ強度: <span id="filter-strength-value">0.7</span></label>
+        <input type="range" id="filter-strength-slider" min="0" max="1" step="0.1" value="0.7">
         <span class="tooltip-icon" tabindex="0">?
           <span class="tooltip-text">取得した投稿・記事からリマインドが必要な投稿を抽出する際の、絞り込みの強さを0(弱い)から1(強い)で設定します。</span>
         </span>
@@ -51,6 +51,15 @@
                 <button type="button" id="agenda-sort-username-btn" class="btn sort-btn">投稿者順</button>
                 <button type="button" id="agenda-sort-source-btn" class="btn sort-btn">取得元順</button>
               </div>
+            </div>
+            <!-- 一覧の表示切り替え(すべて / チェックした投稿・記事のみ) -->
+            <div class="agenda-view-toggle" role="group" aria-label="一覧の表示切り替え">
+              <button type="button" id="agenda-view-all-btn" class="view-toggle-btn active" aria-pressed="true">
+                すべて <span id="agenda-view-all-count" class="view-toggle-count">0</span>
+              </button>
+              <button type="button" id="agenda-view-checked-btn" class="view-toggle-btn" aria-pressed="false">
+                選択済み <span id="agenda-view-checked-count" class="view-toggle-count">0</span>
+              </button>
             </div>
             <div id="agenda-post-list" class="post-list">
               <p class="post-list-placeholder">履歴・新着記事を取得すると一覧が表示されます</p>
