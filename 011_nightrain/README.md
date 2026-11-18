@@ -7,7 +7,7 @@
 - **実行環境**: Azure Functions(Consumptionプラン、タイマートリガー)のみ。画面は持たず、個人のPCで常用することは想定しない(`run_local.py` は開発時の動作確認専用)
 - **設定**: 監視対象・投稿先・アカウント情報などは、すべてFunction Appのアプリケーション設定(環境変数)で管理する。変更はAzure portalの「環境変数」画面などから行う(パスワード・トークンはKey Vault参照を推奨)
 - **リマインド対象の判定**: [011_agenda_tool](../011_agenda_tool/)(アジェンダ作成ツール)と同じ学習済みモデル(TF-IDF + ロジスティック回帰)を使う
-- **リマインドの回数**: 1つの投稿につき、見つけたときに1回だけ投稿する
+- **リマインドの回数**: 1つの投稿につき、見つけたときに1回だけ投稿する。期日つきの依頼は、期日の3営業日前に :sumi: を押していない人へ1回だけ再リマインドする
 
 デプロイ手順は [DEPLOYMENT.md](DEPLOYMENT.md) を参照。
 
@@ -21,6 +21,7 @@
 2. 学習済みモデルで各投稿に0~1のスコアを付け、`REMINDER_THRESHOLD` 以上のものをリマインド対象にする
 3. リマインド対象1件ごとに、Azure OpenAIで元の投稿から「種類(依頼/お知らせ)」「表題」「依頼されている作業(お知らせの件名)」「注意点」「期日」を抜き出し、定型の文面に当てはめて `REMIND_CHANNEL` に投稿する
 4. 確認した時刻と通知済みの投稿IDを、Blob Storageに保存する(同じ投稿を二度リマインドしないため)
+5. 期日つきの依頼をリマインドした場合は、再リマインドの予定を保存する。再リマインド日を迎えた予定があれば、:sumi: を押していない人へ再リマインドする(`app/followup.py`。詳細は「期日前の再リマインド」)
 
 投稿されるメッセージの例:
 
@@ -54,6 +55,30 @@ https://chat.jbdcl.com/...(元の投稿のURL)
 - 初回実行時(状態が未保存の場合)は、直近 `POLL_OVERLAP_MINUTES` 分の投稿だけを対象にする(過去の投稿をまとめてリマインドしないため)
 - 要約・投稿に失敗した投稿は、次回以降に再試行する。`MAX_RETRY_COUNT` 回失敗したら諦める(Application Insightsにエラーログが残る)
 
+## 期日前の再リマインド
+
+このサービスがリマインドした依頼(:sumi: スタンプの案内があるもの)のうち、期日を記載したものについて、期日が近づいたらまだ対応していない人へ再リマインドする。
+
+- **対象者**: `REMIND_CHANNEL` の所属メンバーのうち、リマインド投稿に :sumi: を押していない人(Bot・無効化されたアカウントは除く。トークンの持ち主も対象に含める)。元の投稿ではなく、このサービスのリマインド投稿に押されたスタンプで判断する
+- **再リマインド日**: 期日の `FOLLOWUP_BUSINESS_DAYS_BEFORE` 営業日前(既定は3営業日前。土日・祝日・会社独自の休日を除いて数える)。その日の最初の実行(通常は 9:00)で投稿する
+  - 1回目のリマインドの時点で、その日を既に過ぎている(当日を含む)場合は、1回目の翌営業日にする
+  - 期日が1回目のリマインドの当日の場合や、翌営業日が期日を過ぎる場合は、再リマインドしない
+  - 例: 期日 11/27(金) → 11/24(火)(11/23 は祝日)。期日 11/20(金) の依頼を 11/19(木) にリマインドした場合 → 11/20(金)
+- **回数**: 1つのリマインドにつき1回だけ
+- **投稿方法**: 1回目のリマインド投稿へのスレッド返信として投稿し、対象者を個別にメンションする。対象者が `FOLLOWUP_CHANNEL_MENTION_MIN` 人(既定は4人)以上なら `@channel` にする。全員が押していれば何も投稿しない
+- 再リマインドの予定は、Blob Storage の `followups.json` に保存する。この機能を入れる前に投稿したリマインドは対象外
+- **動作確認用**: `FOLLOWUP_DM_USERNAME` を設定すると、対象者の判定は実際のチャンネルで行ったうえで、返信はそのユーザーとのDMに投稿する(確認用の親投稿をDMに作り、そのスレッドに返信する)。メンションは `` で囲み、誰にも通知が飛ばないようにする
+
+再リマインドの例:
+
+```
+@user-a @user-b @user-c
+リマインドした依頼の期日が近づいております。
+作業完了しましたら、上のリマインド投稿に :sumi: スタンプを押してください。
+
+**期日：11/20(金)**
+```
+
 ## アプリケーション設定
 
 | 設定名 | 必須 | 説明 | 例・既定値 |
@@ -78,7 +103,11 @@ https://chat.jbdcl.com/...(元の投稿のURL)
 | `MAX_RETRY_COUNT` | | リマインドの作成・投稿に失敗した場合に試行する回数 | `3` |
 | `BUSINESS_START_HOUR` | | 営業開始の時(JST) | `9` |
 | `BUSINESS_END_HOUR` | | 営業終了の時(JST。この時刻以降は営業時間外) | `18` |
-| `COMPANY_HOLIDAYS` | | 会社独自の休日(カンマ区切り)。`MM-DD` は毎年、`YYYY-MM-DD` はその日だけ休日として扱う。土日・祝日は設定しなくても休日として扱う | `12-29, 12-30, 12-31, 01-02, 01-03` |
+| `COMPANY_HOLIDAYS` | | 会社独自の休日(カンマ区切り)。`MM-DD` は毎年、`YYYY-MM-DD` はその日だけ休日として扱う。土日・祝日は設定しなくても休日として扱う | `12-29,12-30,12-31,01-02,01-03,01-04` |
+| `FOLLOWUP_BUSINESS_DAYS_BEFORE` | | 期日の何営業日前に再リマインドするか | `3` |
+| `FOLLOWUP_CHANNEL_MENTION_MIN` | | 再リマインドの対象者がこの人数以上なら、個別のメンションではなく `@channel` にする | `4` |
+| `FOLLOWUP_EMOJI` | | 完了を表すスタンプ名(コロンなし) | `sumi` |
+| `FOLLOWUP_DM_USERNAME` | | **動作確認用**。設定すると、再リマインドの返信を1回目のリマインド投稿へのスレッドではなく、このユーザーとのDMに投稿する(メンションもしない)。本番運用時は空にする | `r-kinoshita` |
 
 - チャンネルは、トークンの持ち主が参加している公開・非公開チャンネルを表示名で指定する。同じ表示名のチャンネルが複数のチームにある場合は「チーム表示名/チャンネル表示名」の形式で指定する
 - 見つからないチャンネルが `WATCH_MATTERMOST_CHANNELS` にあった場合は、警告ログを出してそのチャンネルだけ飛ばす。`REMIND_CHANNEL` が見つからない場合は、その回の処理全体を中止する(確認位置は進めないため、設定を直せば次回から続きを処理する)
@@ -95,8 +124,9 @@ https://chat.jbdcl.com/...(元の投稿のURL)
 - `app/mattermost_service.py` — Mattermost API v4 の呼び出し(チャンネル一覧・投稿履歴・投稿)
 - `app/groupsession_service.py` — GROUPSESSIONへのログイン・スレッド一覧/本文取得
 - `app/azure_ai_service.py` — Azure OpenAI 呼び出し(投稿内容から表題・依頼作業・注意点・期日をJSONで抜き出す)
-- `app/business_calendar.py` — 営業日・営業時間の判定(土日・祝日・会社独自の休日・営業時間外)
-- `app/state_store.py` — 監視状態の保存(Blob Storage のコンテナ `nightrain-state`。ローカル確認時はフォルダ)
+- `app/followup.py` — 期日前の再リマインド(予定の登録・:sumi: を押していない人の判定・スレッド返信)
+- `app/business_calendar.py` — 営業日・営業時間の判定(土日・祝日・会社独自の休日・営業時間外)と営業日の計算
+- `app/state_store.py` — 監視状態・再リマインド予定の保存(Blob Storage のコンテナ `nightrain-state`。ローカル確認時はフォルダ)
 - `app/model/` — 投稿の絞り込みモデル(`reminder_classifier.joblib`・`predict.py`・`preprocess.py`)。**011_agenda_tool からコピーしたもの。直接編集しない**
 - `build_package.ps1` — デプロイ用zipの作成
 - `run_local.py` — 開発時の動作確認用(ローカルで1回だけ実行)
@@ -115,7 +145,7 @@ python -m app.model.export_model
 
 ## 開発時の動作確認(ローカル)
 
-`local.settings.json.sample` を `local.settings.json` にコピーして値を設定し、`011_nightrain` ディレクトリで実行する。ローカル実行では、誤って本番チャンネルに投稿しないよう、`REMIND_DM_USERNAME` を設定していないと実行できない。状態はBlobではなく `.local_state/` に保存される。
+`local.settings.json.sample` を `local.settings.json` にコピーして値を設定し、`011_nightrain` ディレクトリで実行する。ローカル実行では、誤って本番チャンネルに投稿しないよう、`REMIND_DM_USERNAME` と `FOLLOWUP_DM_USERNAME` を設定していないと実行できない。状態はBlobではなく `.local_state/` に保存される。
 
 ```bash
 pip install -r requirements.txt
@@ -125,6 +155,9 @@ python run_local.py --print-only --skip-ai --lookback-minutes 10080
 
 # 直近1日分を対象に、AIで投稿内容を要約してDMへ投稿する
 python run_local.py --lookback-minutes 1440
+
+# 既存のリマインド投稿1件について、再リマインドだけをすぐに行う(AIは呼ばない。返信はDMにメンションなしで投稿する)
+python run_local.py --followup-post-id <リマインド投稿のID> --followup-deadline 2026-11-20
 ```
 
 | オプション | 説明 |
@@ -134,3 +167,5 @@ python run_local.py --lookback-minutes 1440
 | `--lookback-minutes N` | さかのぼって確認する時間(分)。`POLL_OVERLAP_MINUTES` を上書きする |
 | `--reset-state` | `.local_state/` を削除し、初回実行の状態から始める |
 | `--ignore-business-hours` | 営業日・営業時間の判定をせずに実行する(夜間・休日に動作確認する場合に使う) |
+| `--followup-post-id ID` | 既存のリマインド投稿1件について、再リマインドだけをすぐに行う。対象者はその投稿のチャンネルの所属メンバーと :sumi: から判定し、返信は `FOLLOWUP_DM_USERNAME` とのDMに投稿する(`--print-only` と併用すると表示だけ) |
+| `--followup-deadline D` | `--followup-post-id` の期日(`YYYY-MM-DD`)。文面の期日表示に使う |

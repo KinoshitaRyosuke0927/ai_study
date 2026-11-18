@@ -19,6 +19,12 @@ local.settings.json の "Values" を環境変数として読み込み、状態�
     --lookback-minutes N  さかのぼって確認する時間(分)。POLL_OVERLAP_MINUTES を上書きする
     --reset-state         .local_state/ を削除し、初回実行の状態から始める
     --ignore-business-hours  営業日・営業時間(平日9:00-18:00、祝日・会社独自の休日を除く)の判定をせずに実行する
+    --followup-post-id ID    既存のリマインド投稿1件について、再リマインドだけをすぐに行う(AIは呼ばない)。
+                             対象者はその投稿のチャンネルの所属メンバーと :sumi: から判定し、
+                             返信は FOLLOWUP_DM_USERNAME とのDMに、メンションせずに投稿する
+    --followup-deadline D    --followup-post-id の期日(YYYY-MM-DD)。文面の期日表示に使う
+
+再リマインドの返信も、誤って本番チャンネルへ投稿しないよう、FOLLOWUP_DM_USERNAME が空の場合は実行しない。
 """
 
 from __future__ import annotations
@@ -64,6 +70,8 @@ def main() -> None:
     parser.add_argument("--lookback-minutes", type=int, help="さかのぼって確認する時間(分)")
     parser.add_argument("--reset-state", action="store_true", help=".local_state/ を削除してから実行する")
     parser.add_argument("--ignore-business-hours", action="store_true", help="営業日・営業時間の判定をせずに実行する")
+    parser.add_argument("--followup-post-id", help="既存のリマインド投稿IDを指定し、その投稿の再リマインドだけをすぐに行う")
+    parser.add_argument("--followup-deadline", help="--followup-post-id の期日(YYYY-MM-DD。再リマインドの文面に表示する)")
     args = parser.parse_args()
 
     # Windowsのコンソールでも日本語のログが文字化けしないようにする
@@ -78,13 +86,19 @@ def main() -> None:
     if args.reset_state and LOCAL_STATE_DIR.exists():
         shutil.rmtree(LOCAL_STATE_DIR)
 
-    # 安全のため、投稿先がDMに差し替えられていない場合は実行しない
+    # 安全のため、リマインド・再リマインドの投稿先がDMに差し替えられていない場合は実行しない
     dm_username = os.environ.get("REMIND_DM_USERNAME", "").strip()
     if not dm_username:
         raise SystemExit("REMIND_DM_USERNAME が空です。ローカル実行ではDMへの差し替えが必須です。")
-    print(f"リマインドの投稿先: DM:{dm_username}" + ("(--print-only のため投稿しません)" if args.print_only else ""))
+    followup_dm_username = os.environ.get("FOLLOWUP_DM_USERNAME", "").strip()
+    if not followup_dm_username:
+        raise SystemExit("FOLLOWUP_DM_USERNAME が空です。ローカル実行では再リマインドのDMへの差し替えが必須です。")
+    suffix = "(--print-only のため投稿しません)" if args.print_only else ""
+    print(f"リマインドの投稿先: DM:{dm_username} / 再リマインドの投稿先: DM:{followup_dm_username}{suffix}")
 
     # 設定の読み込み後にimportする(モジュールの読み込み時に環境変数を参照する箇所があるため)
+    from app import config
+    from app import followup
     from app import mattermost_service as mm
     from app import state_store
     from app import watcher
@@ -92,12 +106,30 @@ def main() -> None:
     # --print-only: 投稿処理を画面への表示に差し替え、状態も保存しない
     # (保存すると、表示しただけの投稿が通知済み扱いになり、後で実際に投稿する確認ができなくなるため)
     if args.print_only:
-        def _print_message(channel_id: str, message: str, props: dict | None = None) -> None:
-            print("=" * 60)
+        def _print_message(channel_id: str, message: str, props: dict | None = None, root_id: str | None = None) -> str:
+            print("=" * 60 + (f"(スレッド返信: {root_id})" if root_id else ""))
             print(message)
             print("=" * 60)
+            return "print-only-post-id"
         mm.post_message = _print_message
         state_store.save_state = lambda key, state: None
+        state_store.save_followups = lambda followups: None
+
+    # --followup-post-id: 既存のリマインド投稿1件について、再リマインドだけをすぐに行う
+    # (対象者の判定はその投稿のチャンネルで行い、返信は FOLLOWUP_DM_USERNAME とのDMに投稿する)
+    if args.followup_post_id:
+        # リマインド投稿の本文から、見出し(#### 表題)を表題として取り出す
+        post = mm.get_post(args.followup_post_id)
+        lines = (post.get("message") or "").splitlines()
+        record = {
+            "channel_id": post["channel_id"],
+            "title": next((line[5:] for line in lines if line.startswith("#### ")), ""),
+            "deadline": args.followup_deadline,
+            "deadline_time": None,
+        }
+        usernames = followup.send_followup(args.followup_post_id, record, config.load_watch_settings())
+        print(f"再リマインドの対象者 {len(usernames)} 名: {', '.join(usernames)}")
+        return
 
     # --skip-ai: AIによる要約を、固定の内容に差し替える
     summarize = None

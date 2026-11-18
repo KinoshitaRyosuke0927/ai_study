@@ -94,25 +94,125 @@ def get_direct_channel_id_by_username(username: str) -> str:
     return _post("/api/v4/channels/direct", [my_id, target_id])["id"]
 
 
-def post_message(channel_id: str, message: str, props: dict | None = None) -> None:
+def post_message(channel_id: str, message: str, props: dict | None = None, root_id: str | None = None) -> str:
     """
     指定チャンネルにメッセージを投稿する
 
     Args
     -----------------
-    - channel_id: str,     投稿先チャンネルのID
-    - message: str,        投稿本文
-    - props: dict | None,  投稿に付与する独自プロパティ(このサービスの投稿であることの目印に使う)
+    - channel_id: str,       投稿先チャンネルのID
+    - message: str,          投稿本文
+    - props: dict | None,    投稿に付与する独自プロパティ(このサービスの投稿であることの目印に使う)
+    - root_id: str | None,   スレッドへの返信にする場合、返信先(スレッドの親)の投稿ID
 
     Returns
     -----------------
-    - None
+    - post_id: str,  作成された投稿のID
 
     """
+    # 投稿内容を組み立てる(返信の場合は親投稿のIDを付ける)
     body = {"channel_id": channel_id, "message": message}
     if props:
         body["props"] = props
-    _post("/api/v4/posts", body)
+    if root_id:
+        body["root_id"] = root_id
+    return _post("/api/v4/posts", body)["id"]
+
+
+def get_post(post_id: str) -> dict:
+    """投稿の情報を返す"""
+    return _get(f"/api/v4/posts/{post_id}")
+
+
+def get_reaction_user_ids(post_id: str, emoji_name: str) -> set[str]:
+    """
+    投稿に指定のスタンプ(リアクション)を押したユーザーのIDを返す
+
+    Args
+    -----------------
+    - post_id: str,     対象の投稿ID
+    - emoji_name: str,  スタンプ名(コロンなし。例: "sumi")
+
+    Returns
+    -----------------
+    - user_ids: set[str],  スタンプを押したユーザーIDの集合
+
+    """
+    # リアクションが1件も無い場合、APIは null を返すことがあるため空リストとして扱う
+    reactions = _get(f"/api/v4/posts/{post_id}/reactions") or []
+    return {r["user_id"] for r in reactions if r.get("emoji_name") == emoji_name}
+
+
+def get_channel_member_ids(channel_id: str) -> list[str]:
+    """
+    チャンネルに所属しているユーザーのIDを返す
+
+    Args
+    -----------------
+    - channel_id: str,  対象チャンネルのID
+
+    Returns
+    -----------------
+    - user_ids: list[str],  所属ユーザーIDの一覧
+
+    """
+    user_ids = []
+    page = 0
+
+    # ページングしながら所属メンバーをすべて取得する
+    while page < MAX_PAGES:
+        members = _get(f"/api/v4/channels/{channel_id}/members", params={"page": page, "per_page": POSTS_PER_PAGE})
+        user_ids += [m["user_id"] for m in members]
+        if len(members) < POSTS_PER_PAGE:
+            break
+        page += 1
+    return user_ids
+
+
+def get_users_by_ids(user_ids: list[str]) -> list[dict]:
+    """
+    ユーザーIDの一覧から、ユーザー情報の一覧を返す
+
+    Args
+    -----------------
+    - user_ids: list[str],  ユーザーIDの一覧
+
+    Returns
+    -----------------
+    - users: list[dict],  Mattermostのユーザー情報(username, is_bot, delete_at など)の一覧
+
+    """
+    users = []
+    unique_ids = list(dict.fromkeys(user_ids))
+
+    # 一度に大量のIDを送らないよう、区切って取得する
+    for i in range(0, len(unique_ids), POSTS_PER_PAGE):
+        users += _post("/api/v4/users/ids", unique_ids[i:i + POSTS_PER_PAGE])
+    return users
+
+
+def build_channel_post_permalink(channel_id: str, post_id: str) -> str:
+    """
+    チャンネルIDと投稿IDから、投稿のパーマリンクを組み立てる
+
+    Args
+    -----------------
+    - channel_id: str,  投稿があるチャンネルのID
+    - post_id: str,     投稿ID
+
+    Returns
+    -----------------
+    - url: str,  投稿のパーマリンク
+
+    """
+    # DM・グループDMチャンネルは team_id が空文字になるため、参加チームのいずれかで代用する
+    channel = get_channel(channel_id)
+    if channel.get("team_id"):
+        team_name = get_team(channel["team_id"])["name"]
+    else:
+        my_teams = get_my_teams()
+        team_name = my_teams[0]["name"] if my_teams else ""
+    return build_post_permalink(team_name, post_id)
 
 
 def get_channel(channel_id: str) -> dict:

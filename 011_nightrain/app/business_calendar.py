@@ -77,21 +77,11 @@ def get_non_business_reason(now: datetime) -> str | None:
 
     """
     now_jst = now.astimezone(JST)
-    today = now_jst.date()
 
-    # 土日
-    if today.weekday() >= 5:
-        return "土日"
-
-    # 祝日(振替休日・国民の休日を含む)
-    holiday_name = jpholiday.is_holiday_name(today)
-    if holiday_name:
-        return f"祝日({holiday_name})"
-
-    # 会社独自の休日
-    yearly, once = _load_company_holidays()
-    if today.strftime("%m-%d") in yearly or today in once:
-        return "会社独自の休日"
+    # 休日(土日・祝日・会社独自の休日)
+    holiday_reason = get_holiday_reason(now_jst.date())
+    if holiday_reason:
+        return holiday_reason
 
     # 営業時間(開始時刻以上、終了時刻未満を営業時間とする)
     start_hour = config.get_int("BUSINESS_START_HOUR", 9)
@@ -100,3 +90,63 @@ def get_non_business_reason(now: datetime) -> str | None:
         return f"営業時間外({start_hour}:00-{end_hour}:00 以外)"
 
     return None
+
+
+def get_holiday_reason(day: date) -> str | None:
+    """
+    指定日が休日(土日・祝日・会社独自の休日)であれば、その理由を返す(営業日なら None)
+
+    Args
+    -----------------
+    - day: date,  判定する日付(JST)
+
+    Returns
+    -----------------
+    - reason: str | None,  休日の理由(例: "土日"、"祝日(勤労感謝の日)"、"会社独自の休日")。営業日なら None
+
+    """
+    # 土日
+    if day.weekday() >= 5:
+        return "土日"
+
+    # 祝日(振替休日・国民の休日を含む)
+    holiday_name = jpholiday.is_holiday_name(day)
+    if holiday_name:
+        return f"祝日({holiday_name})"
+
+    # 会社独自の休日
+    yearly, once = _load_company_holidays()
+    if day.strftime("%m-%d") in yearly or day in once:
+        return "会社独自の休日"
+
+    return None
+
+
+def is_business_day(day: date) -> bool:
+    """指定日が営業日(土日・祝日・会社独自の休日以外)かどうかを返す"""
+    return get_holiday_reason(day) is None
+
+
+def add_business_days(day: date, count: int) -> date:
+    """
+    指定日から営業日で count 日進めた(負の値ならさかのぼった)日付を返す
+
+    Args
+    -----------------
+    - day: date,    基準日(基準日自体が休日でもよい)
+    - count: int,   進める営業日数(例: -3 なら3営業日前、1 なら翌営業日)
+
+    Returns
+    -----------------
+    - result: date,  count 営業日後(前)の日付
+
+    """
+    # 1日ずつ動かし、営業日に当たるたびに残り日数を減らす
+    step = 1 if count >= 0 else -1
+    remaining = abs(count)
+    result = day
+    while remaining > 0:
+        result += timedelta(days=step)
+        if is_business_day(result):
+            remaining -= 1
+    return result

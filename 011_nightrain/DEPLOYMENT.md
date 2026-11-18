@@ -110,6 +110,7 @@ $Settings = @{
   REMIND_DM_USERNAME = "r-kinoshita"
   REMINDER_THRESHOLD = "0.7"
   COMPANY_HOLIDAYS = "12-29,12-30,12-31,01-02,01-03,01-04"   # 会社独自の休日(毎年同じ。特定年だけの休日はなし)
+  # FOLLOWUP_DM_USERNAME = "r-kinoshita"   # 再リマインドをDMで確認したい場合だけ設定する(2026-11-18 からは未設定=雑務連絡のスレッドに返信)
 }
 $Json = Join-Path $env:TEMP "nightrain-settings.json"
 # チャンネル名に日本語を含むため、BOMなしUTF-8で書き出す(Windows PowerShell 5.1の Out-File はBOM付きになる)
@@ -192,6 +193,7 @@ Invoke-RestMethod -Uri "https://$FUNCAPP.azurewebsites.net/admin/host/status" -H
    GROUPSESSIONのログイン・取得でエラーが出ていないことを確認する
 3. DMにリマインドが届くことを確認する
 4. 問題なければ、Azure portal の「環境変数」で `REMIND_DM_USERNAME` を削除(空に)して保存する。以後は `REMIND_CHANNEL` に投稿される
+5. 期日前の再リマインドは、`FOLLOWUP_DM_USERNAME` を設定した状態で、DMに届く確認用の投稿(対象者の一覧つき)を確認する。問題なければ `FOLLOWUP_DM_USERNAME` を削除して保存する。以後は1回目のリマインド投稿へのスレッド返信として、対象者をメンションして投稿される
 
 ### ログの見方(Application Insights)
 

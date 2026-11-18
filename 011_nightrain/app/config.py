@@ -116,4 +116,12 @@ def load_watch_settings() -> dict:
         "notified_retention_days": get_int("NOTIFIED_RETENTION_DAYS", 30),
         # 1件のリマインド作成・投稿に失敗した場合に再試行する回数
         "max_retry_count": get_int("MAX_RETRY_COUNT", 3),
+        # 再リマインド: 期日の何営業日前に再リマインドするか
+        "followup_business_days_before": get_int("FOLLOWUP_BUSINESS_DAYS_BEFORE", 3),
+        # 再リマインド: 完了を表すスタンプ名(コロンなし)
+        "followup_emoji": get_str("FOLLOWUP_EMOJI", "sumi").strip(":"),
+        # 再リマインド: 対象者がこの人数以上なら、個別のメンションではなく @channel にする
+        "followup_channel_mention_min": get_int("FOLLOWUP_CHANNEL_MENTION_MIN", 4),
+        # 動作確認用: 設定すると再リマインドの返信をこのユーザーとのDMに差し替える(メンションもしない)
+        "followup_dm_username": get_str("FOLLOWUP_DM_USERNAME"),
     }

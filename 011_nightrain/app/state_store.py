@@ -12,6 +12,8 @@ Blobの代わりにそのフォルダへJSONファイルとして保存する(ru
         "notified": {id: int},      # 通知済み(または通知をあきらめた)投稿ID -> 投稿時刻(epochミリ秒)
         "failures": {id: int},      # リマインド作成・投稿に失敗した投稿ID -> 失敗回数
     }
+
+これとは別に、再リマインドの予定を "followups" というキーで1つだけ保存する(形式は app/followup.py を参照)。
 """
 
 from __future__ import annotations
@@ -21,6 +23,9 @@ import os
 from pathlib import Path
 
 STATE_CONTAINER_NAME = "nightrain-state"
+
+# 再リマインド予定の一覧を保存するキー(監視対象ごとの状態とは別に1つだけ持つ)
+FOLLOWUP_KEY = "followups"
 
 
 def _empty_state() -> dict:
@@ -59,6 +64,64 @@ def _get_container_client():
     return container_client
 
 
+def _read_json(key: str) -> dict | None:
+    """
+    指定キーのJSONを読み込む(未保存の場合は None)
+
+    Args
+    -----------------
+    - key: str,  保存キー(ファイル名・Blob名の拡張子を除いた部分)
+
+    Returns
+    -----------------
+    - data: dict | None,  保存されている内容。未保存なら None
+
+    """
+    # ローカル保存の場合はJSONファイルから読み込む
+    local_dir = _local_dir()
+    if local_dir is not None:
+        path = local_dir / f"{key}.json"
+        if not path.exists():
+            return None
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    # Blobから読み込む(未保存なら None)
+    from azure.core.exceptions import ResourceNotFoundError
+
+    blob_client = _get_container_client().get_blob_client(f"{key}.json")
+    try:
+        return json.loads(blob_client.download_blob().readall())
+    except ResourceNotFoundError:
+        return None
+
+
+def _write_json(key: str, data: dict) -> None:
+    """
+    指定キーにJSONを上書き保存する
+
+    Args
+    -----------------
+    - key: str,    保存キー
+    - data: dict,  保存する内容
+
+    Returns
+    -----------------
+    - None
+
+    """
+    body = json.dumps(data, ensure_ascii=False)
+
+    # ローカル保存の場合はJSONファイルに書き込む
+    local_dir = _local_dir()
+    if local_dir is not None:
+        local_dir.mkdir(parents=True, exist_ok=True)
+        (local_dir / f"{key}.json").write_text(body, encoding="utf-8")
+        return
+
+    # Blobに上書き保存する
+    _get_container_client().get_blob_client(f"{key}.json").upload_blob(body, overwrite=True)
+
+
 def load_state(key: str) -> dict:
     """
     指定した監視対象の状態を取得する。未保存の場合は初期状態を返す
@@ -72,25 +135,8 @@ def load_state(key: str) -> dict:
     - state: dict,  {"cursor", "notified", "failures"}
 
     """
-    # ローカル保存の場合はJSONファイルから読み込む
-    local_dir = _local_dir()
-    if local_dir is not None:
-        path = local_dir / f"{key}.json"
-        if not path.exists():
-            return _empty_state()
-        data = path.read_text(encoding="utf-8")
-    else:
-        # Blobから読み込む(未保存なら初期状態)
-        from azure.core.exceptions import ResourceNotFoundError
-
-        blob_client = _get_container_client().get_blob_client(f"{key}.json")
-        try:
-            data = blob_client.download_blob().readall()
-        except ResourceNotFoundError:
-            return _empty_state()
-
     # 項目が欠けていても動くよう、初期状態に上書きする形で返す
-    return {**_empty_state(), **json.loads(data)}
+    return {**_empty_state(), **(_read_json(key) or {})}
 
 
 def save_state(key: str, state: dict) -> None:
@@ -107,14 +153,36 @@ def save_state(key: str, state: dict) -> None:
     - None
 
     """
-    body = json.dumps(state, ensure_ascii=False)
+    _write_json(key, state)
 
-    # ローカル保存の場合はJSONファイルに書き込む
-    local_dir = _local_dir()
-    if local_dir is not None:
-        local_dir.mkdir(parents=True, exist_ok=True)
-        (local_dir / f"{key}.json").write_text(body, encoding="utf-8")
-        return
 
-    # Blobに上書き保存する
-    _get_container_client().get_blob_client(f"{key}.json").upload_blob(body, overwrite=True)
+def load_followups() -> dict:
+    """
+    再リマインド予定の一覧を取得する(未保存の場合は空)
+
+    Args
+    -----------------
+    - なし
+
+    Returns
+    -----------------
+    - followups: dict,  {1回目のリマインド投稿ID: 再リマインドの予定(app.followup を参照)}
+
+    """
+    return _read_json(FOLLOWUP_KEY) or {}
+
+
+def save_followups(followups: dict) -> None:
+    """
+    再リマインド予定の一覧を上書き保存する
+
+    Args
+    -----------------
+    - followups: dict,  {1回目のリマインド投稿ID: 再リマインドの予定}
+
+    Returns
+    -----------------
+    - None
+
+    """
+    _write_json(FOLLOWUP_KEY, followups)

@@ -9,6 +9,8 @@ Azure Functionsのタイマートリガー(function_app.py)から一定間隔で
 3. リマインド対象1件ごとに、Azure OpenAIで投稿内容を要約(表題・依頼作業・注意点・期日)し、
    定型の文面に当てはめて指定のMattermostチャンネルへ投稿する(1つの投稿につき1回だけ)
 4. どこまで確認したか・どの投稿を通知済みかを state_store に保存する
+5. 期日つきの依頼は再リマインドの予定を登録し、再リマインド日を迎えたものは
+   :sumi: を押していない人へスレッド返信で再リマインドする(app/followup.py)
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from typing import Callable
 
 from app import business_calendar
 from app import config
+from app import followup
 from app import groupsession_service as gs
 from app import mattermost_service as mm
 from app import state_store
@@ -92,6 +95,12 @@ def poll_once(
             _process_source(source, settings, now, destination_id, summarize)
         except Exception:
             logger.exception("監視対象 %s の処理に失敗しました", source["label"])
+
+    # 再リマインド日を迎えた依頼について、:sumi: を押していない人へ再リマインドする
+    try:
+        followup.run_due_followups(now, settings)
+    except Exception:
+        logger.exception("再リマインドの処理に失敗しました")
 
 
 def _find_channel_id(name: str, channels: list[dict]) -> str:
@@ -241,11 +250,15 @@ def _process_source(
     retry_floor_ms = None
     for item, score in targets:
         try:
-            message = build_remind_message(item, summarize, settings["remind_mention"])
-            mm.post_message(destination_id, message, props={NIGHTRAIN_PROP_KEY: True})
+            message, summary = build_remind_message(item, summarize, settings["remind_mention"])
+            reminder_post_id = mm.post_message(destination_id, message, props={NIGHTRAIN_PROP_KEY: True})
             notified[item["id"]] = item["create_at"]
             failures.pop(item["id"], None)
             logger.info("%s: リマインドを投稿しました(投稿ID: %s, スコア: %.2f)", source["label"], item["id"], score)
+
+            # 期日つきの依頼なら、再リマインドの予定を登録する
+            # (登録に失敗してもリマインド自体は投稿済みのため、再投稿はせずにログだけ残す)
+            _register_followup_if_needed(item, summary, reminder_post_id, destination_id, now, settings, source["label"])
         except Exception:
             # 失敗した投稿は、上限回数まで次回以降に再試行する(上限に達したら通知済み扱いにしてあきらめる)
             count = failures.get(item["id"], 0) + 1
@@ -271,7 +284,72 @@ def _process_source(
     })
 
 
-def build_remind_message(item: dict, summarize: ReminderSummarizer, mention: str = "@channel") -> str:
+def _register_followup_if_needed(
+    item: dict,
+    summary: dict,
+    reminder_post_id: str,
+    destination_id: str,
+    now: datetime,
+    settings: dict,
+    label: str,
+) -> None:
+    """
+    リマインドした投稿が期日つきの依頼であれば、再リマインドの予定を登録する
+
+    Args
+    -----------------
+    - item: dict,               リマインド対象の投稿・記事
+    - summary: dict,            AIによる要約結果
+    - reminder_post_id: str,    投稿したリマインドの投稿ID
+    - destination_id: str,      リマインドを投稿したチャンネルのID
+    - now: datetime,            現在時刻(リマインドを投稿した日時)
+    - settings: dict,           config.load_watch_settings() の戻り値
+    - label: str,               ログ表示用の監視対象名
+
+    Returns
+    -----------------
+    - None
+
+    """
+    try:
+        # 依頼(:sumi: の案内あり)で、リマインドに期日を表示したものだけを対象にする
+        deadline = get_displayed_deadline(summary, item["create_at"])
+        if summary.get("kind") == "notice" or deadline is None:
+            return
+
+        followup_date = followup.register_followup(
+            reminder_post_id, destination_id, summary, deadline, now, settings["followup_business_days_before"],
+        )
+        if followup_date:
+            logger.info("%s: 再リマインドを %s に予定しました(リマインド投稿ID: %s)", label, followup_date, reminder_post_id)
+        else:
+            logger.info("%s: 期日まで日がないため再リマインドしません(リマインド投稿ID: %s)", label, reminder_post_id)
+    except Exception:
+        logger.exception("%s: 再リマインドの予定の登録に失敗しました(リマインド投稿ID: %s)", label, reminder_post_id)
+
+
+def get_displayed_deadline(summary: dict, create_at_ms: int):
+    """
+    リマインドに表示する期日を返す(元の投稿日より前の日付や、読み取れない場合は None)
+
+    Args
+    -----------------
+    - summary: dict,      要約結果({"deadline", ...})
+    - create_at_ms: int,  元の投稿の投稿時刻(epochミリ秒)
+
+    Returns
+    -----------------
+    - deadline: date | None,  表示する期日
+
+    """
+    posted_at = datetime.fromtimestamp(create_at_ms / 1000, tz=JST)
+    deadline_date = _parse_date(summary.get("deadline") or "")
+    if deadline_date and deadline_date >= posted_at.date():
+        return deadline_date
+    return None
+
+
+def build_remind_message(item: dict, summarize: ReminderSummarizer, mention: str = "@channel") -> tuple[str, dict]:
     """
     リマインド対象の投稿をAIで要約し、リマインド投稿の文面を組み立てる
 
@@ -283,13 +361,13 @@ def build_remind_message(item: dict, summarize: ReminderSummarizer, mention: str
 
     Returns
     -----------------
-    - message: str,  投稿するメッセージ(Markdown)
+    - result: tuple[str, dict],  (投稿するメッセージ(Markdown), AIによる要約結果)
 
     """
     # 投稿日時(JST)を添えて、表題・依頼作業・注意点・期日をAIで抜き出す
     posted_at = datetime.fromtimestamp(item["create_at"] / 1000, tz=JST)
     summary = summarize(item["message"], item["username"], posted_at)
-    return render_remind_message(summary, item["url"], posted_at, mention)
+    return render_remind_message(summary, item["url"], posted_at, mention), summary
 
 
 def render_remind_message(summary: dict, url: str, posted_at: datetime, mention: str = "@channel") -> str:
