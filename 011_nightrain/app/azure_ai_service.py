@@ -6,6 +6,9 @@
 AIにはリマインド投稿の文面全体を書かせず、元の投稿から「種類(依頼/お知らせ)」「表題」「依頼されている作業」「注意点」「期日」だけを
 JSONで抜き出させる。文面の定型部分・期日の曜日・元の投稿のURLは、プログラム側(watcher.py)で組み立てる
 (AIに曜日やURLを書かせると誤りが入りやすいため)。
+
+最近リマインドした内容の一覧を渡すと、同じ呼び出しの中で「そのいずれかと同じ依頼・お知らせか」も判定させる
+(同じ内容の再掲を二重にリマインドしないため。判定結果の扱いは app/dedup.py を参照)。
 """
 
 from __future__ import annotations
@@ -69,26 +72,54 @@ REMINDER_SUMMARY_SYSTEM_PROMPT = """
               それ以外(kind が "notice" の場合や、期日が明記されていない場合)は null にしてください。
 - "deadline_time": 上記の期日に時刻が書かれている場合は "HH:MM" 形式で(例: "17:00")。書かれていない場合は null にしてください。
 
+- "relation": 入力に「最近リマインドした内容」の一覧がある場合に、この投稿と一覧との関係を次の3つから1つ選んでください。
+              一覧が無い場合は "none" にしてください。
+              "follow_up": この投稿が "notice" で、一覧のいずれかの「お知らせ」と同じ対象(同じシステム・同じ建物・同じ工事など)について、
+                           状況が変わったことを伝える続報である場合。
+                           例: 障害の発生 → 障害の復旧・原因の報告、工事・メンテナンスの予定 → 中止・延期・延長・終了・完了
+                           (復旧・終了・中止・延期などを伝えるお知らせは、元のお知らせと表題が似ていても "same" ではなく "follow_up" です)
+              "same":      一覧のいずれかと同じ依頼・同じお知らせであると言い切れる場合。
+                           - 同じ提出物・同じ作業についての再掲・催促・補足・締め切り間近の案内(書き方や投稿者・投稿場所が違っても同じ)
+                           - 同じ依頼で、期日だけが延長・変更されたもの
+                           - 同じお知らせの単なる再掲(状況に変化がないもの)
+                           同じ種類でも対象が違う依頼(例: 11月分の勤務表の提出と12月分の勤務表の提出、別のアンケート)は "same" ではありません。
+              "none":      上記以外。"follow_up" か "same" か "none" か迷う場合も "none" にしてください。
+- "related_to": "relation" が "follow_up" または "same" の場合は、関係する一覧の番号(例: "R3")。"none" の場合は null にしてください。
+- "supplement": "relation" が "same" で、かつこの投稿に、一覧の該当するリマインドの内容・注意点に含まれていない
+                新しい注意事項・指示(提出先・提出方法・必要書類・原本の要否・対象者・手順の変更など)が明記されている場合だけ、
+                その内容を2文までで(注意事項・指示が複数ある場合は、大事なものから順に含めてください)。単なる催促・再掲・期日の繰り返し・期日の変更だけの場合は補足ではないので、必ず空文字 "" にしてください。
+                "relation" が "same" 以外の場合も空文字 "" にしてください。
+
 注意:
 - 投稿に書かれていない情報を想像で補わないでください(年の補完を除く)。
 - 期日の曜日は出力しないでください。
 """
 
 
-def call_summarize_for_reminder(post_message: str, author_username: str, posted_at: datetime) -> dict:
+def call_summarize_for_reminder(
+    post_message: str,
+    author_username: str,
+    posted_at: datetime,
+    recent_reminders: list[dict] | None = None,
+) -> dict:
     """
-    投稿内容から、リマインド投稿に使う表題・依頼作業・注意点・期日をAzure OpenAIで抜き出す
+    投稿内容から、リマインド投稿に使う表題・依頼作業・注意点・期日をAzure OpenAIで抜き出す。
+    最近リマインドした内容の一覧を渡した場合は、そのいずれかと同じ内容かどうかも判定させる
 
     Args
     -----------------
-    - post_message: str,      リマインド対象の投稿・記事の内容
-    - author_username: str,   元投稿の投稿者ユーザー名
-    - posted_at: datetime,    元投稿の投稿日時(期日の年を補うために使う)
+    - post_message: str,                    リマインド対象の投稿・記事の内容
+    - author_username: str,                 元投稿の投稿者ユーザー名
+    - posted_at: datetime,                  元投稿の投稿日時(期日の年を補うために使う)
+    - recent_reminders: list[dict] | None,  最近リマインドした内容の一覧
+                                            ([{"ref"("R1"など), "kind", "title", "task", "notes", "deadline", "reminded_on"}, ...])
 
     Returns
     -----------------
     - summary: dict,  {"kind"("request" または "notice"), "title", "task", "notes", "deadline"("YYYY-MM-DD" または None),
-                       "deadline_time"("HH:MM" または None)}
+                       "deadline_time"("HH:MM" または None), "same_as"(同じ内容の一覧の番号 または None),
+                       "supplement"(同じ内容の場合の新しい補足 または ""),
+                       "follow_up_of"(続報の元になったお知らせの一覧の番号 または None)}
 
     """
     # 投稿日時・投稿者・本文をまとめてモデルに渡す
@@ -97,6 +128,18 @@ def call_summarize_for_reminder(post_message: str, author_username: str, posted_
         f"投稿者: {author_username}\n"
         f"投稿内容:\n{post_message}"
     )
+
+    # 最近リマインドした内容があれば、同じ内容かどうかの判定用に一覧を添える
+    if recent_reminders:
+        lines = []
+        for r in recent_reminders:
+            kind = "依頼" if r.get("kind") == "request" else "お知らせ"
+            lines.append(
+                f"{r['ref']}: 種類={kind} / 表題={r.get('title', '')} / 内容={r.get('task', '')}"
+                f" / 注意点={r.get('notes') or 'なし'}"
+                f" / 期日={r.get('deadline') or 'なし'} / リマインドした日={r.get('reminded_on', '')}"
+            )
+        user_content += "\n\n最近リマインドした内容:\n" + "\n".join(lines)
 
     # JSON形式で出力させる
     response = _get_client().chat.completions.create(
@@ -113,6 +156,10 @@ def call_summarize_for_reminder(post_message: str, author_username: str, posted_
     summary = json.loads(content)
     if not isinstance(summary, dict) or not summary.get("title") or not summary.get("task"):
         raise ValueError(f"AIの出力に title / task がありません: {content}")
+
+    # 一覧との関係(同じ内容 / 続報 / 関係なし)と、関係する一覧の番号を取り出す
+    relation = str(summary.get("relation") or "none")
+    related_to = str(summary["related_to"]) if summary.get("related_to") else None
     return {
         # 種類が読み取れない場合は依頼として扱う
         "kind": "notice" if summary.get("kind") == "notice" else "request",
@@ -121,4 +168,10 @@ def call_summarize_for_reminder(post_message: str, author_username: str, posted_
         "notes": str(summary.get("notes") or ""),
         "deadline": summary.get("deadline") or None,
         "deadline_time": summary.get("deadline_time") or None,
+        # 同じ内容と判定した一覧の番号(一覧に無い番号は dedup 側で無視する)
+        "same_as": related_to if relation == "same" else None,
+        # 同じ内容の場合に、前回のリマインドに無い新しい注意事項・指示(無ければ空文字)
+        "supplement": str(summary.get("supplement") or "") if relation == "same" and related_to else "",
+        # 状況が変わった続報と判定したお知らせの番号(同上)
+        "follow_up_of": related_to if relation == "follow_up" else None,
     }

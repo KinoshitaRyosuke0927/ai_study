@@ -101,13 +101,15 @@ def register_followup(
     - followup_date: date | None,  登録した再リマインド日。再リマインドしない場合は None(登録もしない)
 
     """
-    # 再リマインド日を決める(再リマインドしない場合は登録しない)
+    # 再リマインド日を決める(再リマインドしない場合は、既存の予定があれば取り消す)
     followup_date = compute_followup_date(deadline, reminded_at.astimezone(JST).date(), business_days_before)
+    followups = state_store.load_followups()
     if followup_date is None:
+        if followups.pop(reminder_post_id, None) is not None:
+            state_store.save_followups(followups)
         return None
 
-    # 予定の一覧に追加して保存する
-    followups = state_store.load_followups()
+    # 予定の一覧に追加(既にあれば上書き)して保存する
     followups[reminder_post_id] = {
         "channel_id": channel_id,
         "title": " ".join(str(summary.get("title") or "").split()).lstrip("#").strip(),
@@ -198,24 +200,55 @@ def send_followup(reminder_post_id: str, record: dict, settings: dict) -> list[s
         test_mode=bool(dm_username),
     )
 
+    # 1回目のリマインド投稿へのスレッド返信として投稿する(動作確認時はDMに投稿する)
+    destination, _ = post_thread_reply(record["channel_id"], reminder_post_id, message, record.get("title", ""), dm_username, "再リマインド")
+    logger.info("再リマインドを%sに投稿しました(リマインド投稿ID: %s, 対象 %d 名)", destination, reminder_post_id, len(usernames))
+    return usernames
+
+
+def post_thread_reply(
+    channel_id: str,
+    reminder_post_id: str,
+    message: str,
+    title: str,
+    dm_username: str,
+    purpose: str,
+) -> tuple[str, str]:
+    """
+    リマインド投稿へのスレッド返信を投稿する。
+    動作確認用のDMユーザーが指定されている場合は、本番チャンネルには投稿せず、
+    DMに確認用の親投稿を作ってそのスレッドに返信する
+
+    Args
+    -----------------
+    - channel_id: str,          リマインド投稿があるチャンネルのID
+    - reminder_post_id: str,    返信先のリマインド投稿のID
+    - message: str,             返信の本文
+    - title: str,               リマインドの表題(DMの確認用の親投稿に表示する)
+    - dm_username: str,         動作確認用のDMの相手(空なら本番どおりスレッドに返信する)
+    - purpose: str,             返信の用途(DMの確認用の親投稿に表示する。例: "再リマインド")
+
+    Returns
+    -----------------
+    - result: tuple[str, str],  (ログ表示用の投稿先(例: "スレッド"、"DM:r-kinoshita"), 作成した返信の投稿ID)
+
+    """
     # 動作確認用: DMに確認用の親投稿を作り、そのスレッドに返信する(本番チャンネルには投稿しない)
     if dm_username:
         dm_channel_id = mm.get_direct_channel_id_by_username(dm_username)
-        permalink = mm.build_channel_post_permalink(record["channel_id"], reminder_post_id)
+        permalink = mm.build_channel_post_permalink(channel_id, reminder_post_id)
         root_message = "\n".join([
-            "【再リマインドの動作確認】本番では、次のリマインド投稿へのスレッド返信として投稿されます。",
-            f"#### {record.get('title', '')}",
+            f"【{purpose}の動作確認】本番では、次のリマインド投稿へのスレッド返信として投稿されます。",
+            f"#### {title}",
             permalink,
         ])
         root_id = mm.post_message(dm_channel_id, root_message, props={NIGHTRAIN_PROP_KEY: True})
-        mm.post_message(dm_channel_id, message, props={NIGHTRAIN_PROP_KEY: True}, root_id=root_id)
-        logger.info("再リマインドをDM:%sに投稿しました(リマインド投稿ID: %s, 対象 %d 名)", dm_username, reminder_post_id, len(usernames))
-        return usernames
+        reply_id = mm.post_message(dm_channel_id, message, props={NIGHTRAIN_PROP_KEY: True}, root_id=root_id)
+        return f"DM:{dm_username}", reply_id
 
-    # 本番: 1回目のリマインド投稿へのスレッド返信として投稿する
-    mm.post_message(record["channel_id"], message, props={NIGHTRAIN_PROP_KEY: True}, root_id=reminder_post_id)
-    logger.info("再リマインドを投稿しました(リマインド投稿ID: %s, 対象 %d 名)", reminder_post_id, len(usernames))
-    return usernames
+    # 本番: リマインド投稿へのスレッド返信として投稿する
+    reply_id = mm.post_message(channel_id, message, props={NIGHTRAIN_PROP_KEY: True}, root_id=reminder_post_id)
+    return "スレッド", reply_id
 
 
 def find_unreacted_usernames(channel_id: str, post_id: str, emoji_name: str) -> list[str]:

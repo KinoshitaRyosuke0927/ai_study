@@ -124,4 +124,8 @@ def load_watch_settings() -> dict:
         "followup_channel_mention_min": get_int("FOLLOWUP_CHANNEL_MENTION_MIN", 4),
         # 動作確認用: 設定すると再リマインドの返信をこのユーザーとのDMに差し替える(メンションもしない)
         "followup_dm_username": get_str("FOLLOWUP_DM_USERNAME"),
+        # 二重リマインド防止: 最近のリマインドを投稿先チャンネルからさかのぼって読む日数
+        "dedup_lookback_days": get_int("DEDUP_LOOKBACK_DAYS", 60),
+        # 二重リマインド防止: 期日なしのリマインドを判定の対象にする日数
+        "dedup_no_deadline_days": get_int("DEDUP_NO_DEADLINE_DAYS", 14),
     }

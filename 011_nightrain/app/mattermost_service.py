@@ -283,7 +283,7 @@ def get_channel_posts_in_range(channel_id: str, start_ts_ms: int, end_ts_ms: int
 
     Returns
     -----------------
-    - posts: list[dict],  [{"id","channel_id","username","message","create_at","url","props"}, ...]
+    - posts: list[dict],  [{"id","channel_id","username","message","create_at","url","props","root_id"}, ...]
 
     """
     collected = []
@@ -343,6 +343,8 @@ def get_channel_posts_in_range(channel_id: str, start_ts_ms: int, end_ts_ms: int
             "create_at": p["create_at"],
             "url": build_post_permalink(team_name, p["id"]),
             "props": p.get("props") or {},
+            # スレッドへの返信の場合は親投稿のID(返信でなければ空文字)
+            "root_id": p.get("root_id") or "",
         }
         for p in collected
     ]

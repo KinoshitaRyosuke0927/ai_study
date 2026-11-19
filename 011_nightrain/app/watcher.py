@@ -7,7 +7,10 @@ Azure Functionsのタイマートリガー(function_app.py)から一定間隔で
 2. 学習済みモデル(011_agenda_tool と同じモデル)で各投稿のリマインド必要度をスコアリングし、
    しきい値以上のものをリマインド対象とする
 3. リマインド対象1件ごとに、Azure OpenAIで投稿内容を要約(表題・依頼作業・注意点・期日)し、
-   定型の文面に当てはめて指定のMattermostチャンネルへ投稿する(1つの投稿につき1回だけ)
+   定型の文面に当てはめて指定のMattermostチャンネルへ投稿する(1つの投稿につき1回だけ)。
+   このとき最近リマインドした内容と同じかどうかもAIに判定させ、同じ内容(再掲・催促など)はリマインドしない
+   (期日だけが変わっていれば、前回のリマインドのスレッドで知らせる。お知らせの続報(障害の復旧など)は、
+   元のお知らせのリマインドへのスレッド返信として投稿する。app/dedup.py)
 4. どこまで確認したか・どの投稿を通知済みかを state_store に保存する
 5. 期日つきの依頼は再リマインドの予定を登録し、再リマインド日を迎えたものは
    :sumi: を押していない人へスレッド返信で再リマインドする(app/followup.py)
@@ -21,6 +24,7 @@ from typing import Callable
 
 from app import business_calendar
 from app import config
+from app import dedup
 from app import followup
 from app import groupsession_service as gs
 from app import mattermost_service as mm
@@ -40,8 +44,10 @@ NIGHTRAIN_PROP_KEY = "from_nightrain"
 # 期日の曜日表記
 WEEKDAYS_JA = "月火水木金土日"
 
-# 投稿内容を要約する関数の型(投稿本文, 投稿者名, 投稿日時) -> 要約
-# 要約は {"kind"("request"/"notice"), "title", "task", "notes", "deadline"("YYYY-MM-DD"/None), "deadline_time"("HH:MM"/None)}
+# 投稿内容を要約する関数の型(投稿本文, 投稿者名, 投稿日時[, recent_reminders=最近のリマインド一覧]) -> 要約
+# 要約は {"kind"("request"/"notice"), "title", "task", "notes", "deadline"("YYYY-MM-DD"/None), "deadline_time"("HH:MM"/None),
+#         "same_as"(同じ内容の最近のリマインドの番号/None。省略可)}
+# 最近のリマインドが無い場合は、recent_reminders を渡さずに呼び出す
 ReminderSummarizer = Callable[[str, str, datetime], dict]
 
 
@@ -89,10 +95,14 @@ def poll_once(
         logger.warning("監視対象が設定されていません(WATCH_MATTERMOST_CHANNELS / WATCH_GROUPSESSION_FORUM_SIDS)")
         return
 
+    # 二重リマインドの判定に使う「最近リマインドした内容」は、リマインド対象が見つかったときに初めて読み込む
+    # (動作確認でDMに投稿する場合も、判定には REMIND_CHANNEL のリマインドを使う)
+    recent = {"channel_id": _resolve_history_channel(settings, channels), "items": None}
+
     # 監視対象ごとに処理する(1つの監視対象で失敗しても、他の監視対象の処理は続ける)
     for source in sources:
         try:
-            _process_source(source, settings, now, destination_id, summarize)
+            _process_source(source, settings, now, destination_id, summarize, recent)
         except Exception:
             logger.exception("監視対象 %s の処理に失敗しました", source["label"])
 
@@ -158,6 +168,53 @@ def _resolve_destination(settings: dict, channels: list[dict]) -> tuple[str, str
     return _find_channel_id(remind_channel, channels), remind_channel
 
 
+def _resolve_history_channel(settings: dict, channels: list[dict]) -> str | None:
+    """
+    二重リマインドの判定に使う、過去のリマインドを読むチャンネル(REMIND_CHANNEL)のIDを返す
+
+    Args
+    -----------------
+    - settings: dict,         config.load_watch_settings() の戻り値
+    - channels: list[dict],   mm.list_my_channels() の戻り値
+
+    Returns
+    -----------------
+    - channel_id: str | None,  チャンネルID(解決できない場合は None。その場合は二重リマインドの判定をしない)
+
+    """
+    try:
+        return _find_channel_id(settings["remind_channel"], channels) if settings["remind_channel"] else None
+    except ValueError as exc:
+        logger.warning("二重リマインドの判定に使うチャンネルを解決できません: %s", exc)
+        return None
+
+
+def _get_recent_reminders(recent: dict, now: datetime, settings: dict) -> list[dict]:
+    """
+    最近リマインドした内容の一覧を返す(1回の実行につき最初の1回だけ読み込む)
+
+    Args
+    -----------------
+    - recent: dict,      {"channel_id", "items"}(読み込んだ一覧を items に保持する)
+    - now: datetime,     現在時刻
+    - settings: dict,    config.load_watch_settings() の戻り値
+
+    Returns
+    -----------------
+    - reminders: list[dict],  最近リマインドした内容の一覧(読み込めない場合は空。その場合はこれまでどおりリマインドする)
+
+    """
+    if recent["items"] is None:
+        recent["items"] = []
+        if recent["channel_id"]:
+            try:
+                recent["items"] = dedup.load_recent_reminders(recent["channel_id"], now, settings)
+                logger.info("二重リマインドの判定対象: 最近のリマインド %d 件", len(recent["items"]))
+            except Exception:
+                logger.exception("最近のリマインドの読み込みに失敗しました(二重リマインドの判定をせずにリマインドします)")
+    return recent["items"]
+
+
 def _build_sources(settings: dict, channels: list[dict]) -> list[dict]:
     """
     監視対象の一覧を組み立てる
@@ -207,6 +264,7 @@ def _process_source(
     now: datetime,
     destination_id: str,
     summarize: ReminderSummarizer,
+    recent: dict,
 ) -> None:
     """
     1つの監視対象について、新着投稿の取得・スコアリング・リマインド投稿・状態保存を行う
@@ -218,6 +276,7 @@ def _process_source(
     - now: datetime,                      現在時刻
     - destination_id: str,                リマインドの投稿先チャンネルID
     - summarize: ReminderSummarizer,      投稿内容の要約関数
+    - recent: dict,                       最近リマインドした内容({"channel_id", "items"}。_get_recent_reminders を参照)
 
     Returns
     -----------------
@@ -250,11 +309,43 @@ def _process_source(
     retry_floor_ms = None
     for item, score in targets:
         try:
-            message, summary = build_remind_message(item, summarize, settings["remind_mention"])
+            # AIで要約し、あわせて最近リマインドした内容と同じかどうかを判定させる
+            reminders = _get_recent_reminders(recent, now, settings)
+            message, summary = build_remind_message(item, summarize, settings["remind_mention"], reminders)
+
+            # 同じ内容を既にリマインドしていれば、リマインドしない(期日の変更・新しい補足があればスレッドで知らせる)
+            same = dedup.find_same_reminder(summary, reminders)
+            if same:
+                deadline = get_displayed_deadline(summary, item["create_at"])
+                dedup.handle_same_reminder(same, summary, deadline, item["url"], now, settings)
+                notified[item["id"]] = item["create_at"]
+                failures.pop(item["id"], None)
+                logger.info("%s: 既にリマインドした内容と同じため、リマインドしません(投稿ID: %s, 同じ内容のリマインド投稿ID: %s「%s」)",
+                            source["label"], item["id"], same["post_id"], same.get("title"))
+                continue
+
+            # お知らせの続報(障害の復旧など)は、元のお知らせのリマインドへのスレッド返信として投稿する
+            related = dedup.find_related_notice(summary, reminders)
+            if related:
+                where, reply_id = followup.post_thread_reply(
+                    related["channel_id"], related["thread_root_id"], message, related.get("title", ""),
+                    settings["remind_dm_username"], "続報のお知らせ",
+                )
+                notified[item["id"]] = item["create_at"]
+                failures.pop(item["id"], None)
+                dedup.add_recent_reminder(reminders, reply_id, related["channel_id"], summary, None, now, related["thread_root_id"])
+                logger.info("%s: 続報のお知らせを%sに返信しました(投稿ID: %s, 元のお知らせのリマインド投稿ID: %s「%s」)",
+                            source["label"], where, item["id"], related["post_id"], related.get("title"))
+                continue
+
             reminder_post_id = mm.post_message(destination_id, message, props={NIGHTRAIN_PROP_KEY: True})
             notified[item["id"]] = item["create_at"]
             failures.pop(item["id"], None)
             logger.info("%s: リマインドを投稿しました(投稿ID: %s, スコア: %.2f)", source["label"], item["id"], score)
+
+            # 同じ実行の中で届いた同じ内容の投稿も判定できるよう、一覧に加える
+            dedup.add_recent_reminder(reminders, reminder_post_id, destination_id, summary,
+                                      get_displayed_deadline(summary, item["create_at"]), now)
 
             # 期日つきの依頼なら、再リマインドの予定を登録する
             # (登録に失敗してもリマインド自体は投稿済みのため、再投稿はせずにログだけ残す)
@@ -349,24 +440,34 @@ def get_displayed_deadline(summary: dict, create_at_ms: int):
     return None
 
 
-def build_remind_message(item: dict, summarize: ReminderSummarizer, mention: str = "@channel") -> tuple[str, dict]:
+def build_remind_message(
+    item: dict,
+    summarize: ReminderSummarizer,
+    mention: str = "@channel",
+    recent_reminders: list[dict] | None = None,
+) -> tuple[str, dict]:
     """
     リマインド対象の投稿をAIで要約し、リマインド投稿の文面を組み立てる
 
     Args
     -----------------
-    - item: dict,                     リマインド対象の投稿・記事
-    - summarize: ReminderSummarizer,  投稿内容の要約関数
-    - mention: str,                   先頭に付けるメンション(空なら付けない)
+    - item: dict,                           リマインド対象の投稿・記事
+    - summarize: ReminderSummarizer,        投稿内容の要約関数
+    - mention: str,                         先頭に付けるメンション(空なら付けない)
+    - recent_reminders: list[dict] | None,  最近リマインドした内容の一覧(あればAIに同じ内容かどうかも判定させる)
 
     Returns
     -----------------
-    - result: tuple[str, dict],  (投稿するメッセージ(Markdown), AIによる要約結果)
+    - result: tuple[str, dict],  (投稿するメッセージ(Markdown), AIによる要約結果(same_as を含む))
 
     """
     # 投稿日時(JST)を添えて、表題・依頼作業・注意点・期日をAIで抜き出す
+    # (最近のリマインドが無い場合は、同じ内容かどうかの判定は不要なため一覧を渡さない)
     posted_at = datetime.fromtimestamp(item["create_at"] / 1000, tz=JST)
-    summary = summarize(item["message"], item["username"], posted_at)
+    if recent_reminders:
+        summary = summarize(item["message"], item["username"], posted_at, recent_reminders=recent_reminders)
+    else:
+        summary = summarize(item["message"], item["username"], posted_at)
     return render_remind_message(summary, item["url"], posted_at, mention), summary
 
 

@@ -114,6 +114,7 @@ def main() -> None:
         mm.post_message = _print_message
         state_store.save_state = lambda key, state: None
         state_store.save_followups = lambda followups: None
+        state_store.save_json = lambda key, data: None
 
     # --followup-post-id: 既存のリマインド投稿1件について、再リマインドだけをすぐに行う
     # (対象者の判定はその投稿のチャンネルで行い、返信は FOLLOWUP_DM_USERNAME とのDMに投稿する)
@@ -134,7 +135,7 @@ def main() -> None:
     # --skip-ai: AIによる要約を、固定の内容に差し替える
     summarize = None
     if args.skip_ai:
-        def summarize(post_message: str, author_username: str, posted_at) -> dict:
+        def summarize(post_message: str, author_username: str, posted_at, recent_reminders=None) -> dict:
             return {
                 "kind": "request",
                 "title": "(--skip-ai のため表題の作成を省略)",

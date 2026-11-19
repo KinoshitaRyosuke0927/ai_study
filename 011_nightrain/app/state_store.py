@@ -13,7 +13,7 @@ Blobの代わりにそのフォルダへJSONファイルとして保存する(ru
         "failures": {id: int},      # リマインド作成・投稿に失敗した投稿ID -> 失敗回数
     }
 
-これとは別に、再リマインドの予定を "followups" というキーで1つだけ保存する(形式は app/followup.py を参照)。
+これとは別に、再リマインドの予定を "followups"(形式は app/followup.py)、変更後の期日を "deadline_changes"(形式は app/dedup.py)というキーで保存する。
 """
 
 from __future__ import annotations
@@ -186,3 +186,34 @@ def save_followups(followups: dict) -> None:
 
     """
     _write_json(FOLLOWUP_KEY, followups)
+
+
+def load_json(key: str) -> dict:
+    """
+    任意のキーで保存した辞書を取得する(未保存の場合は空)
+
+    Args
+    -----------------
+    - key: str,  保存キー(例: "deadline_changes")
+
+    Returns
+    -----------------
+    - data: dict,  保存されている内容
+    """
+    return _read_json(key) or {}
+
+
+def save_json(key: str, data: dict) -> None:
+    """
+    任意のキーで辞書を上書き保存する
+
+    Args
+    -----------------
+    - key: str,    保存キー
+    - data: dict,  保存する内容
+
+    Returns
+    -----------------
+    - None
+    """
+    _write_json(key, data)
