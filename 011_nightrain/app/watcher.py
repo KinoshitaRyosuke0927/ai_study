@@ -334,6 +334,7 @@ def _process_source(
                 notified[item["id"]] = item["create_at"]
                 failures.pop(item["id"], None)
                 dedup.add_recent_reminder(reminders, reply_id, related["channel_id"], summary, None, now, related["thread_root_id"])
+                dedup.save_key_points(reply_id, summary.get("key_points", ""), now, settings)
                 logger.info("%s: 続報のお知らせを%sに返信しました(投稿ID: %s, 元のお知らせのリマインド投稿ID: %s「%s」)",
                             source["label"], where, item["id"], related["post_id"], related.get("title"))
                 continue
@@ -346,6 +347,8 @@ def _process_source(
             # 同じ実行の中で届いた同じ内容の投稿も判定できるよう、一覧に加える
             dedup.add_recent_reminder(reminders, reminder_post_id, destination_id, summary,
                                       get_displayed_deadline(summary, item["create_at"]), now)
+            # 以後の実行でも同じ内容かどうかを判定できるよう、元の投稿の要点を保存する(失敗してもログのみ)
+            dedup.save_key_points(reminder_post_id, summary.get("key_points", ""), now, settings)
 
             # 期日つきの依頼なら、再リマインドの予定を登録する
             # (登録に失敗してもリマインド自体は投稿済みのため、再投稿はせずにログだけ残す)

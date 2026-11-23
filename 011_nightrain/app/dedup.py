@@ -43,6 +43,10 @@ NIGHTRAIN_PROP_KEY = "from_nightrain"
 # 変更後の期日を保存するキー
 DEADLINE_CHANGES_KEY = "deadline_changes"
 
+# リマインドした投稿の要点(AIの key_points)を保存するキー
+# (リマインドの文面には要点を載せないため、同じ内容かどうかの判定用に別に保存しておく)
+KEY_POINTS_KEY = "reminder_key_points"
+
 # リマインド投稿の文面(テンプレート)から項目を読み取るためのパターン
 _REQUEST_LINE = re.compile(r"^(?P<task>.+)の依頼が来ております。$")
 _NOTICE_LINE = re.compile(r"^(?P<task>.+)のお知らせが来ております。$")
@@ -161,13 +165,14 @@ def load_recent_reminders(channel_id: str, now: datetime, settings: dict) -> lis
     Returns
     -----------------
     - reminders: list[dict],  [{"ref"("R1"など), "post_id", "thread_root_id", "channel_id", "kind", "title", "task", "notes"(補足を含む),
-                               "deadline", "deadline_time", "reminded_on"}, ...](古い順)
+                               "key_points"(保存した要点。無ければ空文字), "deadline", "deadline_time", "reminded_on"}, ...](古い順)
 
     """
     today = now.astimezone(JST).date()
     now_ms = int(now.timestamp() * 1000)
     start_ms = now_ms - settings["dedup_lookback_days"] * 24 * 60 * 60 * 1000
     changes = state_store.load_json(DEADLINE_CHANGES_KEY)
+    key_points = state_store.load_json(KEY_POINTS_KEY)
 
     # このサービス自身の投稿だけを使う
     posts = [p for p in mm.get_channel_posts_in_range(channel_id, start_ms, now_ms) if (p.get("props") or {}).get(NIGHTRAIN_PROP_KEY)]
@@ -191,6 +196,9 @@ def load_recent_reminders(channel_id: str, now: datetime, settings: dict) -> lis
         # 補足の返信があれば、注意点に加える
         if supplements.get(post["id"]):
             reminder["notes"] = " ".join([reminder["notes"], *supplements[post["id"]]]).strip()
+
+        # リマインドしたときに保存した要点を加える(要点の保存を始める前のリマインドには無い)
+        reminder["key_points"] = (key_points.get(post["id"]) or {}).get("key_points", "")
 
         # 期日が変更されていれば、変更後の期日を使う
         if post["id"] in changes:
@@ -255,10 +263,42 @@ def add_recent_reminder(
         "title": summary.get("title"),
         "task": summary.get("task"),
         "notes": summary.get("notes") or "",
+        "key_points": summary.get("key_points") or "",
         "deadline": deadline.isoformat() if deadline else None,
         "deadline_time": summary.get("deadline_time") if deadline else None,
         "reminded_on": now.astimezone(JST).date().isoformat(),
     })
+
+
+def save_key_points(post_id: str, key_points: str, now: datetime, settings: dict) -> None:
+    """
+    リマインドした投稿の要点を保存する(以後の、同じ内容かどうかの判定で一覧に載せるため)。
+    リマインドは投稿済みのため、保存に失敗しても例外にはせずログだけ残す(再試行で二重に投稿しないため)
+
+    Args
+    -----------------
+    - post_id: str,     投稿したリマインド(続報の返信を含む)のID
+    - key_points: str,  AIが出力した元の投稿の要点
+    - now: datetime,    現在時刻
+    - settings: dict,   config.load_watch_settings() の戻り値
+
+    Returns
+    -----------------
+    - None
+
+    """
+    if not post_id or not key_points:
+        return
+    try:
+        # 一覧の取得期間より前にリマインドしたものは、判定に使わないので削除する
+        oldest = (now.astimezone(JST).date() - timedelta(days=settings["dedup_lookback_days"])).isoformat()
+        data = {k: v for k, v in state_store.load_json(KEY_POINTS_KEY).items() if v.get("reminded_on", "") >= oldest}
+
+        # 今回のリマインドの要点を加えて保存する
+        data[post_id] = {"key_points": key_points, "reminded_on": now.astimezone(JST).date().isoformat()}
+        state_store.save_json(KEY_POINTS_KEY, data)
+    except Exception:
+        logger.exception("リマインドの要点の保存に失敗しました(リマインド投稿ID: %s)", post_id)
 
 
 def find_same_reminder(summary: dict, reminders: list[dict]) -> dict | None:

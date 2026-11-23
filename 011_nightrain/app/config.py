@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 
 # Azure OpenAI のデプロイ名の既定値(011_agenda_tool のアジェンダ生成と同じモデル)
-DEFAULT_AZURE_OPENAI_DEPLOYMENT = "gpt-5.4-mini"
+DEFAULT_AZURE_OPENAI_DEPLOYMENT = "gpt-6-luna"
 
 
 def get_required(name: str) -> str:

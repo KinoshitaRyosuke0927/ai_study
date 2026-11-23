@@ -61,6 +61,7 @@ https://chat.jbdcl.com/...(元の投稿のURL)
 
 - リマインド対象の投稿をAIで要約するとき、同じ呼び出しの中で「最近リマインドした内容」の一覧を渡し、そのいずれかと同じ依頼・お知らせかを判定させる(AIの呼び出し回数は増えない)。書き方・投稿者・投稿場所(チャンネルやGROUPSESSION)が違っても、同じ内容なら同じと判定する
 - 最近リマインドした内容は、`REMIND_CHANNEL` にあるこのサービス自身のリマインド投稿(続報として返信したお知らせを含む。再リマインド・期日変更の返信は除く)の文面から読み取る。期日つきは期日を過ぎていないもの、期日なしはリマインドしてから `DEDUP_NO_DEADLINE_DAYS` 日(既定14日)以内のものを対象にする
+- 判定の材料として、リマインドしたときにAIが出力した元の投稿の要点(対象者・方法・提出先・日時など。リマインドの文面には出さない)を Blob Storage の `reminder_key_points.json` に保存し、一覧に載せる(前回の投稿に既にあった情報を補足として返信しないため。`DEDUP_LOOKBACK_DAYS` 日より前のものは削除する。保存に失敗してもリマインドは止めない)
 - 同じと判定された投稿はリマインドしない(ログに、同じと判断したリマインドの投稿IDと表題を残す)
 - 同じ依頼で期日だけが変わった場合は、前回のリマインドのスレッドに「期日が変更されました」と返信し(前回に期日が無かった場合は「期日が案内されました」)、再リマインドの予定も新しい期日で組み直す。変更後の期日は Blob Storage の `deadline_changes.json` に保存し、以後の判定に使う
 - お知らせの状況が変わった続報(障害の発生→復旧・原因報告、工事の予定→中止・延期など)で、元のお知らせが明確に分かる場合は、元のお知らせのリマインドへのスレッド返信としてリマインドを投稿する(文面はお知らせと同じ)。さらに続報があれば同じスレッドに返信する。元のお知らせが明確に分からない場合は、新しいお知らせとしてリマインドする
@@ -105,7 +106,7 @@ https://chat.jbdcl.com/...(元の投稿のURL)
 | `GROUPSESSION_PASSWORD` | △ | GROUPSESSIONのパスワード(同上。Key Vault参照を推奨) | |
 | `AZURE_OPENAI_ENDPOINT` | ○ | Azure OpenAIのエンドポイント(v1 API) | `https://xxx.services.ai.azure.com/openai/v1` |
 | `AZURE_OPENAI_KEY` | ○ | Azure OpenAIのAPIキー(Key Vault参照を推奨) | |
-| `AZURE_OPENAI_DEPLOYMENT` | | 投稿内容の要約に使うデプロイ名 | `gpt-5.4-mini` |
+| `AZURE_OPENAI_DEPLOYMENT` | | 投稿内容の要約に使うデプロイ名 | `gpt-6-luna` |
 | `WATCH_MATTERMOST_CHANNELS` | | 監視するMattermostチャンネルの表示名(カンマ区切り) | `JBD社員全体のお知らせ, JBD全体のお知らせ, 全員/拠点などの特定のお知らせ, 社員/拠点などの特定のお知らせ, 東京本社共有` |
 | `WATCH_GROUPSESSION_FORUM_SIDS` | | 監視するGROUPSESSIONフォーラムのID(カンマ区切り) | `5, 15` |
 | `REMIND_CHANNEL` | ○ | リマインドを投稿するMattermostチャンネルの表示名(試運用中は `雑務連絡`、本運用で `AIビジネス連絡事項` に変更予定) | `雑務連絡` |
@@ -143,7 +144,7 @@ https://chat.jbdcl.com/...(元の投稿のURL)
 - `app/dedup.py` — 同じ内容の二重リマインドの防止(最近のリマインドの読み取り・期日変更の返信)
 - `app/followup.py` — 期日前の再リマインド(予定の登録・:sumi: を押していない人の判定・スレッド返信)
 - `app/business_calendar.py` — 営業日・営業時間の判定(土日・祝日・会社独自の休日・営業時間外)と営業日の計算
-- `app/state_store.py` — 監視状態・再リマインド予定の保存(Blob Storage のコンテナ `nightrain-state`。ローカル確認時はフォルダ)
+- `app/state_store.py` — 監視状態・再リマインド予定・リマインドの要点の保存(Blob Storage のコンテナ `nightrain-state`。ローカル確認時はフォルダ)
 - `app/model/` — 投稿の絞り込みモデル(`reminder_classifier.joblib`・`predict.py`・`preprocess.py`)。**011_agenda_tool からコピーしたもの。直接編集しない**
 - `build_package.ps1` — デプロイ用zipの作成
 - `run_local.py` — 開発時の動作確認用(ローカルで1回だけ実行)

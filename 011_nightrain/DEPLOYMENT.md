@@ -103,7 +103,7 @@ $Settings = @{
   GROUPSESSION_PASSWORD = "@Microsoft.KeyVault(VaultName=$KV;SecretName=groupsession-password)"
   AZURE_OPENAI_ENDPOINT = "<Azure OpenAIのエンドポイント>"
   AZURE_OPENAI_KEY = "@Microsoft.KeyVault(VaultName=$KV;SecretName=azure-openai-key)"
-  AZURE_OPENAI_DEPLOYMENT = "gpt-5.4-mini"
+  AZURE_OPENAI_DEPLOYMENT = "gpt-6-luna"
   WATCH_MATTERMOST_CHANNELS = "JBD社員全体のお知らせ, JBD全体のお知らせ, 全員/拠点などの特定のお知らせ, 社員/拠点などの特定のお知らせ, 東京本社共有"
   WATCH_GROUPSESSION_FORUM_SIDS = "5, 15"
   REMIND_CHANNEL = "雑務連絡"
