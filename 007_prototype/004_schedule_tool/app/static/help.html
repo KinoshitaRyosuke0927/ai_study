@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>使い方 - スケジュール確認ツール</title>
+  <!-- 使い方のページ(アプリに同梱し、PCの中から表示する。外部のファイルは読み込まない) -->
+  <style>
+    :root {
+      --text: #1f2937; --muted: #6b7280; --border: #e5e7eb; --primary: #2563eb;
+      --bg: #f5f7fa; --surface: #fff; --note: #eff6ff; --warn: #fff7ed;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.75;
+           font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif; font-size: 15px; }
+    .wrap { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+    nav { position: sticky; top: 16px; align-self: start; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; font-size: 14px; }
+    nav b { display: block; margin-bottom: 6px; }
+    nav ol { margin: 0; padding-left: 20px; }
+    nav a { color: var(--text); text-decoration: none; }
+    nav a:hover { color: var(--primary); }
+    main { min-width: 0; }
+    h1 { font-size: 24px; margin: 0 0 4px; }
+    .lead { color: var(--muted); margin: 0 0 20px; }
+    section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
+    h2 { font-size: 19px; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--primary); }
+    h3 { font-size: 16px; margin: 20px 0 6px; }
+    ol.steps > li { margin-bottom: 6px; }
+    figure { margin: 12px 0 16px; }
+    figure img { width: 100%; border: 1px solid var(--border); border-radius: 8px; display: block; cursor: zoom-in; }
+    figcaption { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    /* 画像の拡大表示(同じ画面の上に重ねて表示し、画像の外をクリックすると閉じる) */
+    .zoom { position: fixed; inset: 0; background: rgba(15, 23, 42, .78); display: none;
+            align-items: center; justify-content: center; padding: 40px 24px 24px; z-index: 100; cursor: zoom-out; }
+    .zoom.open { display: flex; }
+    .zoom img { max-width: 100%; max-height: 100%; border-radius: 6px; box-shadow: 0 10px 40px rgba(0, 0, 0, .45);
+                background: #fff; cursor: default; }
+    .zoom-hint { position: fixed; top: 10px; left: 0; right: 0; text-align: center; color: #e5e7eb; font-size: 13px; pointer-events: none; }
+    .note { background: var(--note); border-left: 4px solid var(--primary); padding: 8px 12px; border-radius: 4px; margin: 10px 0; }
+    .warn { background: var(--warn); border-left: 4px solid #f59e0b; padding: 8px 12px; border-radius: 4px; margin: 10px 0; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 8px 0; }
+    th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+    th { background: #f8fafc; white-space: nowrap; }
+    kbd, .ui { display: inline-block; border: 1px solid var(--border); border-radius: 4px; padding: 0 6px; background: #f8fafc; font-size: 13px; }
+    pre { background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; overflow-x: auto; font-size: 13px; }
+    .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 3px; }
+    @media (max-width: 800px) { .wrap { grid-template-columns: 1fr; } nav { position: static; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <b>目次</b>
+    <ol>
+      <li><a href="#start">はじめに・起動</a></li>
+      <li><a href="#login">ログインと対象の選び方</a></li>
+      <li><a href="#free">空き時間を探す</a></li>
+      <li><a href="#status">出社割合を見る・出力する</a></li>
+      <li><a href="#trouble">困ったとき</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <h1>スケジュール確認ツールの使い方</h1>
+    <p class="lead">GROUPSESSION のマイグループのメンバーの予定をまとめて取得し、全員が空いている時間や、日ごとの出社割合を確認できます。</p>
+
+    <!-- ================================================================ 1 -->
+    <section id="start">
+      <h2>1. はじめに・起動</h2>
+      <div class="note">
+        <ul style="margin:0; padding-left:20px">
+          <li><b>GROUPSESSION の予定は変更しません。</b>予定を読み込んで表示するだけです。</li>
+          <li>取得した予定は画面に表示するだけで、ファイルには保存しません。ID・パスワードも保存しません。</li>
+        </ul>
+      </div>
+      <ol class="steps">
+        <li>配布されたフォルダの <b>schedule_tool.exe</b> をダブルクリックします。</li>
+        <li>黒いコンソール画面が開き、続けてブラウザでツールの画面が開きます。
+          ブラウザが開かない場合は、アドレス欄に <code>http://localhost:8000</code> と入力してください。</li>
+        <li>終了するときは、<b>コンソール画面を閉じます</b>(使っている間は閉じないでください)。</li>
+      </ol>
+      <p>フォルダの中身は次のとおりです。<b>data</b> フォルダには出社割合の判定に使うファイルが入っています。消したり移動したりしないでください。</p>
+      <pre>schedule_tool/
+├── schedule_tool.exe ... ツール本体
+├── config.json       ... 設定(初めて起動したときに作られます)
+├── data/             ... 出社割合の判定に使うファイル
+└── _internal/        ... ツールの動作に必要なファイル</pre>
+    </section>
+
+    <!-- ================================================================ 2 -->
+    <section id="login">
+      <h2>2. ログインと対象の選び方</h2>
+      <figure>
+        <img src="help/login.png" alt="ログイン画面">
+        <figcaption>起動するとログイン画面が開きます(画面の名前・予定はすべて説明用の架空のものです)</figcaption>
+      </figure>
+      <ol class="steps">
+        <li><b>ログイン</b>:GROUPSESSION の ID・パスワードを入力して <span class="ui">ログイン</span> を押します。
+          ログイン画面を閉じてしまった場合は、右上の <span class="ui">GROUPSESSIONログイン</span> から開けます。</li>
+        <li><b>マイグループ</b>:左上のプルダウンから選ぶと、所属するメンバーが表示されます。
+          マイグループは GROUPSESSION のスケジュール画面で作成・編集してください。</li>
+        <li><b>メンバー</b>:予定を確認したい人にチェックを入れます(<span class="ui">全員</span> <span class="ui">解除</span> でまとめて切り替えられます)。</li>
+        <li><b>期間</b>:開始日・終了日を指定して <span class="ui">予定を取得</span> を押します。1週間ずつ読み込むため、期間が長いと少し時間がかかります。</li>
+      </ol>
+      <p>次に起動したときは、前回選んだマイグループとメンバーが自動で選ばれます。</p>
+      <p>画面上部の <span class="ui">空き時間</span> / <span class="ui">業務状況(出社割合)</span> で、2つの画面を切り替えます。</p>
+    </section>
+
+    <!-- ================================================================ 3 -->
+    <section id="free">
+      <h2>3. 空き時間を探す</h2>
+      <p>画面上部で <span class="ui">空き時間</span> を選びます。期間は一度に8週間まで取得できます(初期値は今日から2週間)。</p>
+      <figure>
+        <img src="help/free.png" alt="空き時間の画面">
+        <figcaption>左:取得条件と空き時間の条件 / 中央:空き時間の候補 / 右上:期間の俯瞰 / 右下:選んだ日の詳細</figcaption>
+      </figure>
+
+      <h3>候補の見方</h3>
+      <ul>
+        <li><b>空き時間の候補</b>(中央):条件に合う時間帯の一覧です。クリックすると、右下にその日の詳細が表示されます。</li>
+        <li><b>期間の俯瞰</b>(右上):1日を1行として、時刻ごとの空き状況を色で表します。
+          <span class="sw" style="background:#16a34a"></span>全員空き、
+          <span class="sw" style="background:hsl(42, 95%, 72%)"></span>一部空き(濃いほど空いている人が多い)、
+          <span class="sw" style="background:#eef1f5; border:1px solid #e5e7eb"></span>空きなし。
+          マスにマウスを乗せると、空いていない人が表示されます。行をクリックすると、その日の詳細が表示されます。</li>
+        <li><b>日の詳細</b>(右下):メンバーごとの予定を色の帯で表示します。帯にマウスを乗せると予定の内容が出ます。
+          <span class="ui">この日の予定</span> <span class="ui">全期間の予定</span> のタブでは一覧で確認できます。
+          <span class="ui">◀ 前の日</span> <span class="ui">次の日 ▶</span>(またはキーボードの <kbd>←</kbd> <kbd>→</kbd>)で日を移動できます。</li>
+        <li>右上と右下の間の仕切りを上下にドラッグすると、高さを変えられます(ダブルクリックで元に戻ります)。</li>
+      </ul>
+
+      <h3>空き時間の条件</h3>
+      <p>左の「空き時間の条件」を変えると、取得し直さなくてもすぐに結果が変わります。</p>
+      <table>
+        <tr><th>項目</th><th>初期値</th><th>説明</th></tr>
+        <tr><td>業務開始・業務終了</td><td>9:00〜18:00</td><td>この時間内で空き時間を探します</td></tr>
+        <tr><td>昼休み</td><td>12:00〜13:00</td><td>この時間は候補に含めません</td></tr>
+        <tr><td>判定の刻み</td><td>30分</td><td>この単位で空いているかを判定します</td></tr>
+        <tr><td>必要な長さ</td><td>1時間以上</td><td>これより短い空き時間は候補に出しません</td></tr>
+        <tr><td>参加できる人数</td><td>全員</td><td>「◯人以上」にすると、全員がそろわない場合の次善の候補を探せます</td></tr>
+        <tr><td>土日・祝日を除く</td><td>オン</td><td>土日と祝日を候補から除きます</td></tr>
+      </table>
+
+      <h3>時刻のない予定の扱い</h3>
+      <p>時刻のない予定(締め切りのメモなど)は、初期状態では空き時間の計算に含めません。
+        出張など、その日は実際に埋まっている場合は、日の詳細の「終日」欄の予定をクリックしてください。
+        赤枠になり、その人はその日終日埋まっているものとして計算されます(もう一度クリックで元に戻ります。この切り替えは保存されません)。</p>
+    </section>
+
+    <!-- ================================================================ 4 -->
+    <section id="status">
+      <h2>4. 出社割合を見る・出力する</h2>
+      <p>画面上部で <span class="ui">業務状況(出社割合)</span> を選び、期間を指定して <span class="ui">予定を取得</span> を押します。期間は一度に26週間まで取得できます。</p>
+      <figure>
+        <img src="help/status.png" alt="業務状況(出社割合)の画面">
+        <figcaption>中央:出社割合の表(行=日付、列=メンバー) / 右:選んだ日の30分ごとの判定</figcaption>
+      </figure>
+
+      <h3>出社割合とは</h3>
+      <p>1日の勤務時間(9:00〜18:00 から昼休みを除いた8時間)を30分ごとの16枠に分け、枠ごとに
+        <span class="sw" style="background:#2563eb"></span>オフィス、
+        <span class="sw" style="background:#f59e0b"></span>オフィス外、
+        <span class="sw" style="background:#9ca3af"></span>休み を判定します。
+        <b>出社割合 = オフィスの枠の数 ÷ 16</b> です(1日オフィスなら 1、半休なら 0.5、休暇・土日・祝日は 0)。</p>
+      <p>判定は、GROUPSESSION の予定(予定名・時刻)をもとに、学習済みのモデルが自動で行います。</p>
+
+      <h3>表の見方</h3>
+      <ul>
+        <li>中央の表の数値が出社割合です。青が濃いほど出社割合が高いことを表します。土日と祝日は「休」です。</li>
+        <li>一番下の行は、メンバーごとの平日の平均、右端の列はその日の全員の平均です。</li>
+        <li>行をクリックすると、右側にその日の30分ごとの判定が表示されます。枠の下の細い色の帯はその時間の予定です(マウスを乗せると予定名が出ます)。</li>
+      </ul>
+
+      <h3>判定を直す</h3>
+      <p>判定が実際と違う場合は、右側の表で直せます。上の「塗る値」を選んで、枠をクリック・ドラッグすると塗り直せます。
+        1日まるごとの場合は、行の右の <span class="ui">オ</span> <span class="ui">外</span> <span class="ui">休</span> ボタンが便利です。</p>
+      <div class="warn">直した内容は <b>保存されません</b>。CSVの出力にだけ反映されます。予定を取得し直したり、ツールを開き直したりすると元に戻るため、直したらその場でCSVを出力してください。</div>
+
+      <h3>CSVで出力する</h3>
+      <p>左の <span class="ui">出社割合をCSVで出力</span> を押すと、取得した期間のすべての日付・メンバーの出社割合をCSVファイルでダウンロードします(予定名は含みません)。</p>
+      <pre>date,佐藤,鈴木,高橋,田中,伊藤,渡辺,山本
+2026/11/02,0.9375,1,1,0.875,1,1,1
+2026/11/03,0,0,0,0,0,0,0
+2026/11/04,1,0.8125,1,1,1,1,1
+…</pre>
+      <ul>
+        <li>1行目は <code>date</code> とメンバーの苗字です(同じ苗字の人がいる場合は、その人たちだけ氏名になります)。</li>
+        <li>日付は <code>yyyy/mm/dd</code> の形で、期間内の日付が抜けなく並びます。土日・祝日は 0 です。</li>
+        <li>Excel でそのまま開けます。</li>
+      </ul>
+    </section>
+
+    <!-- ================================================================ 5 -->
+    <section id="trouble">
+      <h2>5. 困ったとき</h2>
+      <table>
+        <tr><th>症状</th><th>原因・対処</th></tr>
+        <tr><td>「IDまたはパスワードが正しくありません」と表示される</td><td>GROUPSESSION に実際にログインできる ID・パスワードを入力してください。</td></tr>
+        <tr><td>途中でログイン画面が開く</td><td>GROUPSESSION のログインが切れました。ログインし直してから、もう一度操作してください。</td></tr>
+        <tr><td>「GROUPSESSIONへのアクセスに失敗しました」と表示される</td><td>社内ネットワークに接続しているか、ブラウザで GROUPSESSION が開けるかを確認してください。</td></tr>
+        <tr><td>マイグループが表示されない</td><td>GROUPSESSION のスケジュール画面でマイグループを作成してから、ツールを開き直してください。</td></tr>
+        <tr><td>「ポート 8000 はすでに使われています」と表示される</td><td>ツールがすでに起動しています。開いているコンソール画面やブラウザのタブを確認してください。</td></tr>
+        <tr><td>「一度に取得できる期間は◯週間までです」と表示される</td><td>期間を短くして、何回かに分けて取得してください(空き時間は8週間、業務状況は26週間まで)。</td></tr>
+        <tr><td>出社割合の画面で「モデル: 未学習(ルールで判定中)」と表示される</td><td>data フォルダに判定用のファイル(office_model.joblib)がありません。配布した担当者に問い合わせてください。</td></tr>
+        <tr><td>画面の表示がおかしい</td><td>ブラウザで <kbd>Ctrl</kbd> + <kbd>F5</kbd> を押して再読み込みしてください。</td></tr>
+      </table>
+    </section>
+  </main>
+</div>
+<!-- 画像の拡大表示 -->
+<div id="zoom" class="zoom" role="dialog" aria-modal="true" aria-label="画像の拡大表示">
+  <div class="zoom-hint">画像の外をクリック(または Esc キー)で閉じます</div>
+  <img id="zoom-img" alt="">
+</div>
+<script>
+  "use strict";
+  // 画像の拡大表示: 本文の画像をクリックすると同じ画面の上に大きく表示し、画像の外のクリック・Esc キーで閉じる
+  (() => {
+    const zoom = document.getElementById("zoom");
+    const zoomImg = document.getElementById("zoom-img");
+
+    /** 拡大表示を閉じる */
+    const close = () => { zoom.classList.remove("open"); document.body.style.overflow = ""; };
+
+    // 1. 本文の画像をクリックしたら、その画像を拡大して表示する(背景のスクロールは止める)
+    document.querySelectorAll("figure img").forEach((img) => {
+      img.title = "クリックで拡大";
+      img.addEventListener("click", () => {
+        zoomImg.src = img.src;
+        zoomImg.alt = img.alt;
+        zoom.classList.add("open");
+        document.body.style.overflow = "hidden";
+      });
+    });
+    // 2. 画像の外(暗い部分)をクリックしたら閉じる。画像そのもののクリックでは閉じない
+    zoom.addEventListener("click", (e) => { if (e.target !== zoomImg) close(); });
+    // 3. Esc キーでも閉じる
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  })();
+</script>
+</body>
+</html>

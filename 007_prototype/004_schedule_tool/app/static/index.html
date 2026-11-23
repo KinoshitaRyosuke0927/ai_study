@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スケジュール確認ツール</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-mode="free" data-labeling="off">
+  <header class="app-header">
+    <h1>スケジュール確認ツール</h1>
+    <div class="mode-switch" role="tablist" aria-label="画面の切り替え">
+      <button type="button" class="mode-btn active" data-mode="free" role="tab">空き時間</button>
+      <button type="button" class="mode-btn" data-mode="status" role="tab">業務状況(出社割合)</button>
+    </div>
+    <div class="header-spacer"></div>
+    <span id="fetch-status" class="header-status"></span>
+    <!-- 使い方のページ(アプリに同梱。新しいタブで開く) -->
+    <a id="help-btn" class="btn" href="/static/help.html" target="_blank" rel="noopener">使い方</a>
+    <button type="button" id="login-open-btn" class="btn">GROUPSESSIONログイン</button>
+  </header>
+
+  <!-- 画面全体はスクロールさせず、各領域の中だけをスクロールする -->
+  <div class="layout">
+    <!-- ========== 左: 取得条件・空き時間の条件 ========== -->
+    <aside class="sidebar pane">
+      <div class="pane-body">
+        <section class="block">
+          <h2>マイグループ</h2>
+          <select id="group-select" disabled>
+            <option value="">ログインすると選択できます</option>
+          </select>
+        </section>
+
+        <details class="block" id="member-details" open>
+          <summary>
+            <span>メンバー <span id="member-summary" class="summary-note"></span></span>
+            <span class="mini-actions">
+              <button type="button" id="member-all-btn" class="link-btn" disabled>全員</button>
+              <button type="button" id="member-none-btn" class="link-btn" disabled>解除</button>
+            </span>
+          </summary>
+          <div id="member-list" class="member-list">
+            <p class="placeholder">マイグループを選ぶと表示されます</p>
+          </div>
+        </details>
+
+        <section class="block">
+          <h2>期間</h2>
+          <div class="row2">
+            <label>開始日<input type="date" id="start-date"></label>
+            <label>終了日<input type="date" id="end-date"></label>
+          </div>
+          <p class="hint" id="period-hint"></p>
+          <button type="button" id="fetch-btn" class="btn btn-primary btn-block" disabled>予定を取得</button>
+          <div id="fetch-message" class="message hidden"></div>
+        </section>
+
+        <details class="block mode-free" id="cond-details" open>
+          <summary><span>空き時間の条件 <span id="cond-summary" class="summary-note"></span></span></summary>
+          <div class="row2">
+            <label>業務開始<input type="time" id="cond-business-start" step="900"></label>
+            <label>業務終了<input type="time" id="cond-business-end" step="900"></label>
+          </div>
+          <div class="row2">
+            <label>昼休み開始<input type="time" id="cond-lunch-start" step="900"></label>
+            <label>昼休み終了<input type="time" id="cond-lunch-end" step="900"></label>
+          </div>
+          <div class="row2">
+            <label>判定の刻み
+              <select id="cond-slot">
+                <option value="15">15分</option>
+                <option value="30">30分</option>
+                <option value="60">60分</option>
+              </select>
+            </label>
+            <label>必要な長さ
+              <select id="cond-duration">
+                <option value="30">30分以上</option>
+                <option value="60">1時間以上</option>
+                <option value="90">1.5時間以上</option>
+                <option value="120">2時間以上</option>
+                <option value="180">3時間以上</option>
+              </select>
+            </label>
+          </div>
+          <label>参加できる人数
+            <select id="cond-required"></select>
+          </label>
+          <label class="check-line"><input type="checkbox" id="cond-exclude-holidays" checked> 土日・祝日を除く</label>
+        </details>
+
+        <!-- ===== 業務状況の画面だけで使う欄 ===== -->
+        <section class="block mode-status">
+          <h2>学習データ・モデル</h2>
+          <div id="status-summary" class="status-summary"><p class="placeholder">読み込み中…</p></div>
+          <button type="button" id="train-btn" class="btn btn-block labeling-only">保存したラベルでモデルを学習</button>
+          <div id="train-message" class="message hidden labeling-only"></div>
+        </section>
+
+        <section class="block mode-status">
+          <h2>出力</h2>
+          <button type="button" id="export-btn" class="btn btn-block" disabled>出社割合をCSVで出力</button>
+          <p class="hint">取得した期間の全日付・全メンバーの出社割合を出力します(休日は0)。予定名は含みません。</p>
+        </section>
+
+      </div>
+    </aside>
+
+    <!-- ========== 中央: 空き時間の候補(一覧) ========== -->
+    <section class="candidates pane mode-free">
+      <div class="pane-head">
+        <h2>空き時間の候補 <span id="candidate-count" class="count">0</span></h2>
+      </div>
+      <p class="hint pane-sub" id="candidate-summary">予定を取得すると、条件に合う空き時間が表示されます。</p>
+      <div class="pane-body" id="candidate-list"></div>
+    </section>
+
+    <!-- ========== 右: 俯瞰(上)と、選んだ日の詳細(下) ========== -->
+    <div class="right mode-free">
+      <section class="overview pane">
+        <div class="pane-head">
+          <h2>期間の俯瞰</h2>
+          <span class="legend">
+            <span class="legend-item"><i class="lg lg-all"></i>全員空き</span>
+            <span class="legend-item"><i class="lg lg-some"></i>一部空き(濃いほど空いている人が多い)</span>
+            <span class="legend-item"><i class="lg lg-none"></i>空きなし</span>
+          </span>
+        </div>
+        <div class="pane-body" id="overview"><p class="empty">予定を取得すると、日付×時刻の空き状況が表示されます。行をクリックすると、下にその日の詳細が出ます。</p></div>
+      </section>
+
+      <!-- 俯瞰と詳細の仕切り(上下にドラッグして高さを変える) -->
+      <div id="right-resizer" class="h-resizer" role="separator" aria-orientation="horizontal" title="ドラッグして高さを変更(ダブルクリックで元に戻す)"></div>
+
+      <section class="detail pane">
+        <div class="pane-head">
+          <h2 id="detail-title">日の詳細</h2>
+          <div class="tabs" role="tablist">
+            <button type="button" class="tab active" data-tab="timeline" role="tab">タイムライン</button>
+            <button type="button" class="tab" data-tab="day-events" role="tab">この日の予定</button>
+            <button type="button" class="tab" data-tab="all-events" role="tab">全期間の予定 <span id="event-count" class="count">0</span></button>
+          </div>
+          <div class="day-nav">
+            <button type="button" id="prev-day-btn" class="btn btn-sm" disabled>◀ 前の日</button>
+            <button type="button" id="next-day-btn" class="btn btn-sm" disabled>次の日 ▶</button>
+          </div>
+        </div>
+        <div class="pane-body">
+          <div id="tab-timeline" class="tab-panel active">
+            <div id="timeline"></div>
+            <p class="hint">帯にマウスを乗せると予定の内容が表示されます。時刻のない予定(「終日」欄)をクリックすると「埋まっている扱い」(赤枠)に切り替わり、空き時間の計算に含まれます。</p>
+          </div>
+          <div id="tab-day-events" class="tab-panel"></div>
+          <div id="tab-all-events" class="tab-panel"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ========== 業務状況(出社割合)の画面 ========== -->
+    <div class="status-area mode-status">
+      <section class="ratio-pane pane">
+        <div class="pane-head">
+          <h2>出社割合</h2>
+          <span class="legend">
+            <span class="legend-item"><b class="src-mark">✓</b>ラベル保存済み</span>
+            <span class="legend-item">無印: モデル推定</span>
+            <span class="legend-item"><i>斜体</i>: ルール判定</span>
+            <span class="legend-item"><b class="src-edit-mark">●</b>未保存の修正</span>
+          </span>
+        </div>
+        <div class="pane-body" id="ratio-table"><p class="empty">予定を取得すると、メンバー×日付の出社割合が表示されます。行をクリックすると、右にその日のラベルが表示されます。</p></div>
+      </section>
+
+      <section class="label-pane pane">
+        <div class="pane-head">
+          <h2 id="label-title">ラベル付け</h2>
+          <div class="day-nav">
+            <button type="button" id="status-prev-btn" class="btn btn-sm" disabled>◀ 前の日</button>
+            <button type="button" id="status-next-btn" class="btn btn-sm" disabled>次の日 ▶</button>
+          </div>
+        </div>
+        <div class="pane-body">
+          <div id="status-tab-label" class="status-panel active">
+            <div class="label-toolbar">
+              <span class="toolbar-label">塗る値:</span>
+              <div class="brush-group" role="radiogroup">
+                <button type="button" class="brush active" data-brush="office"><i class="lb lb-office"></i>オフィス</button>
+                <button type="button" class="brush" data-brush="outside"><i class="lb lb-outside"></i>オフィス外</button>
+                <button type="button" class="brush" data-brush="off"><i class="lb lb-off"></i>休み</button>
+              </div>
+              <div class="header-spacer"></div>
+              <button type="button" id="label-delete-btn" class="btn btn-sm labeling-only" disabled>この日のラベルを削除</button>
+              <button type="button" id="label-save-btn" class="btn btn-primary btn-sm labeling-only" disabled>この日のラベルを保存</button>
+            </div>
+            <div id="label-message" class="message hidden"></div>
+            <div id="label-grid"></div>
+            <p class="hint">枠をクリック・ドラッグすると「塗る値」で塗ります。行の右のボタンで1日分をまとめて塗れます。色の帯はその日の予定です(マウスを乗せると内容を表示)。
+              <span class="labeling-only">保存するのはラベル(メンバー・日付・枠ごとの値)だけで、予定名は保存しません。</span><span class="view-only">この版ではラベルは保存できません(塗り直した内容はCSVの出力にだけ反映されます)。</span></p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ========== ログイン モーダル ========== -->
+  <div id="login-overlay" class="modal-overlay hidden">
+    <form id="login-form" class="modal-box">
+      <h2>GROUPSESSIONログイン</h2>
+      <label>ID<input type="text" id="login-username" autocomplete="username"></label>
+      <label>パスワード<input type="password" id="login-password" autocomplete="current-password"></label>
+      <p class="hint">ID・パスワードはツールのメモリ上にのみ保持し、ファイルには保存しません。</p>
+      <div id="login-message" class="message hidden"></div>
+      <div class="modal-actions">
+        <button type="button" id="login-cancel-btn" class="btn">キャンセル</button>
+        <button type="submit" id="login-btn" class="btn btn-primary">ログイン</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="tooltip" class="tooltip hidden"></div>
+
+  <script src="/static/free_time.js"></script>
+  <script src="/static/app.js"></script>
+  <script src="/static/status.js"></script>
+</body>
+</html>
